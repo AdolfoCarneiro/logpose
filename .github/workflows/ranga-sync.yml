@@ -1,0 +1,48 @@
+name: Ranga sync
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: |
+          git config user.name "taigakilla"
+          git config user.email "taigakilla@gmail.com"
+      - name: Sync
+        env:
+          RANGA_FORCE_VALIDATE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+        run: |
+          set -o pipefail
+          ranga/ci/sync-upstream.sh 2>&1 | tee sync.log
+      - name: Publicar e compilar
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if grep -q '^merged ' sync.log; then
+            git push origin HEAD:main
+            gh workflow run ranga-build.yml --ref main
+          fi
+      - name: Abrir issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(git tag -l '[0-9]*.[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)"
+          gh issue create --title "Sync com o Helium falhou em $tag (${GITHUB_REF_NAME})" --body "$(tail -n 80 sync.log)"
