@@ -8,3 +8,5 @@ Fork pessoal do [helium-linux](https://github.com/imputnet/helium-linux) com int
 - Plano: Obsidian `pessoal/dev/ranga/`.
 
 Upstream é o remote `helium`. Atualizar: workflow `Ranga sync`.
+
+ID da extensão sidebar: `hncljkmljckjojdjincglklbdihcaeko`

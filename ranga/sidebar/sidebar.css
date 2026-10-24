@@ -1,0 +1,23 @@
+:root {
+  --ranga-bg: #1b1f28;
+  --ranga-surface: #262c3a;
+  --ranga-fg: #c6ccdb;
+  --ranga-muted: #495262;
+  --ranga-accent: #71b1ec;
+  --ranga-on-accent: #0f1117;
+  --ranga-radius: 16px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--ranga-bg); color: var(--ranga-fg); font: 13px Recursive, sans-serif; }
+header { display: flex; flex-direction: column; gap: 6px; }
+nav { display: flex; gap: 4px; }
+button { border: 0; border-radius: var(--ranga-radius); background: var(--ranga-surface); color: var(--ranga-fg); padding: 6px 10px; cursor: pointer; }
+#address { width: 100%; border: 0; border-radius: var(--ranga-radius); background: var(--ranga-surface); color: var(--ranga-fg); padding: 8px 12px; }
+#tabs { list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+#tabs li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--ranga-radius); cursor: pointer; }
+#tabs li:hover { background: var(--ranga-surface); }
+#tabs li.active { background: var(--ranga-accent); color: var(--ranga-on-accent); }
+#tabs li.pinned { font-weight: 600; }
+#tabs img { width: 16px; height: 16px; }
+#tabs span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#tabs .close, #tabs .detach { padding: 2px 6px; background: transparent; color: inherit; }
