@@ -1,0 +1,45 @@
+Ctrl+Shift+C no modo Ranga dispara o comando copy-url da barra lateral (copia a URL e notifica)
+em vez do atalho copiar/inspecionar do Helium.
+
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -178,6 +178,8 @@
+ #include "chrome/browser/ui/views/frame/main_background_region_view.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
++#include "extensions/browser/event_router.h"
++#include "extensions/browser/extension_event_histogram_value.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view_delegate.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
+ #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
+@@ -1512,6 +1514,17 @@
+   spotlight->Show(new_tab, browser_view->GetLocalBounds());
+ }
+ 
++void DispatchRangaCommand(BrowserView* browser_view, std::string_view command) {
++  base::ListValue args;
++  args.Append(command);
++  extensions::EventRouter::Get(browser_view->browser()->GetProfile())
++      ->DispatchEventToExtension(
++          "hncljkmljckjojdjincglklbdihcaeko",
++          std::make_unique<extensions::Event>(
++              extensions::events::COMMANDS_ON_COMMAND, "commands.onCommand",
++              std::move(args)));
++}
++
+ }  // namespace
+ 
+ bool BrowserView::GetTabStripVisible() const {
+@@ -6056,6 +6069,12 @@
+       (command_id == IDC_NEW_TAB || command_id == IDC_FOCUS_LOCATION ||
+        command_id == IDC_FOCUS_SEARCH)) {
+     ShowRangaSpotlight(this, command_id == IDC_NEW_TAB);
++    return true;
++  }
++  if (RangaHidesNativeChrome(browser_) &&
++      (command_id == IDC_COPY_OR_INSPECT_SHORTCUT ||
++       command_id == IDC_DEV_TOOLS_INSPECT)) {
++    DispatchRangaCommand(this, "copy-url");
+     return true;
+   }
+ 

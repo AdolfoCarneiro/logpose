@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
+  <link rel="stylesheet" href="find.css">
+  <style id="ranga-theme"></style>
+</head>
+<body class="k-type-body">
+  <section id="card" class="card" role="search" aria-label="Procurar na página">
+    <span class="k-icon lead" data-icon="text-search"></span>
+    <input id="text" class="text k-type-label" type="text" autocomplete="off" spellcheck="false" placeholder="Procurar na página">
+    <output id="count" class="count k-type-numeric"></output>
+    <button id="case" class="k-icon-button k-icon-button--small k-state toggle" title="Diferenciar maiúsculas" aria-pressed="false" data-icon="case-sensitive"></button>
+    <span class="divider"></span>
+    <button id="previous" class="k-icon-button k-icon-button--small k-state" title="Anterior (Shift+Enter)" data-icon="chevron-up"></button>
+    <button id="next" class="k-icon-button k-icon-button--small k-state" title="Próximo (Enter)" data-icon="chevron-down"></button>
+    <button id="close" class="k-icon-button k-icon-button--small k-state" title="Fechar (Esc)" data-icon="x"></button>
+  </section>
+  <script type="module" src="find.js"></script>
+</body>
+</html>

@@ -10,7 +10,7 @@ extension_id="hncljkmljckjojdjincglklbdihcaeko"
 debug_port="${RANGA_DEBUG_PORT:-9333}"
 
 usage() {
-  echo "uso: ranga-sandbox up | open [url...] | key <tecla> [modificador...] | eval <js> | shot <saida.png> | theme <id> | down" >&2
+  echo "uso: ranga-sandbox up | open [url...] | key <tecla> [modificador...] | eval <js> [pagina] | shot <saida.png> | theme <id> | down" >&2
   exit 2
 }
 
@@ -31,14 +31,14 @@ case "${1:-}" in
   open)
     shift
     p="$(profile)"
+    first_run=(--no-first-run)
+    [ -n "${RANGA_FIRST_RUN:-}" ] && first_run=()
     pkill -f "^$binary --user-data-dir=$p"
     sleep 1
     in_sandbox setsid -f "$binary" --user-data-dir="$p" --ozone-platform=wayland \
-      --ranga-hide-native-chrome --load-extension="$extension" --password-store=basic --remote-debugging-port="$debug_port" --enable-logging=stderr "$@" >"${RANGA_LOG:-/dev/null}" 2>&1
+      "${first_run[@]}" --ranga-sidebar-dir="$extension" ${RANGA_EXTRA_EXTENSIONS:+--load-extension="$RANGA_EXTRA_EXTENSIONS"} --password-store=basic --remote-debugging-port="$debug_port" --enable-logging=stderr "$@" >"${RANGA_LOG:-/dev/null}" 2>&1
     in_sandbox timeout 30 bash -c 'until hyprctl clients -j | jq -e "any(.[]; .class==\"helium\")" >/dev/null; do sleep 1; done'
-    sleep 3
-    in_sandbox wtype -M ctrl -M shift -k s -m shift -m ctrl
-    sleep 1.5
+    sleep 4
     ;;
   key)
     shift
@@ -53,10 +53,11 @@ case "${1:-}" in
     "$sandbox" shot "$name" "${2:?saida.png}"
     ;;
   eval)
-    node "$root/ranga/bin/ranga-eval.mjs" "$debug_port" "$extension_id" "${2:?expressao}"
+    node "$root/ranga/bin/ranga-eval.mjs" "$debug_port" "$extension_id" "${2:?expressao}" "${3:-sidebar.html}"
     ;;
   theme)
     in_sandbox ciel theme set "${2:?id do tema}"
+    in_sandbox "$root/ranga/theme/hook-theme-set"
     ;;
   down)
     "$sandbox" stop "$name"

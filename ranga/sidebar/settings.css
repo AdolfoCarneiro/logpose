@@ -6,3 +6,35 @@ h1 { margin: 0; }
 .setting { display: flex; align-items: center; justify-content: space-between; gap: var(--k-space-xxl); padding: var(--k-space-md) var(--k-space-xxl); cursor: pointer; }
 .text { display: flex; flex-direction: column; gap: var(--k-space-xxs); }
 .hint { color: var(--k-color-on-surface-variant); }
+.slider-row { display: flex; align-items: center; gap: var(--k-space-md); }
+.slider-row output { width: 4ch; text-align: right; color: var(--k-color-on-surface-variant); }
+.setting > .text { flex: 1; min-width: 0; }
+.setting > :last-child { flex: none; }
+.extension-name { flex-direction: row; align-items: center; gap: var(--k-space-md); }
+.extension-name img { width: 24px; height: 24px; }
+#extensions-card[hidden] { display: none; }
+#extensions-card > p { margin: 0; padding: 0 var(--k-space-xxl) var(--k-space-sm); }
+#containers-card[hidden] { display: none; }
+#containers-card > p { margin: 0; padding: 0 var(--k-space-xxl) var(--k-space-sm); }
+.container-row { cursor: default; }
+.container-name { flex-direction: row; align-items: center; gap: var(--k-space-sm); }
+.container-name .k-text-field { max-width: 240px; }
+.container-icon {
+  appearance: none;
+  border: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--k-shape-medium);
+  background: color-mix(in srgb, var(--container-color) 30%, transparent);
+  color: var(--k-color-on-surface);
+  font-family: "Kurobe Icons";
+  font-size: 18px;
+  cursor: pointer;
+}
+.container-dot { appearance: none; border: 0; width: 18px; height: 18px; border-radius: var(--k-shape-full); cursor: pointer; }
+.container-actions { display: flex; align-items: center; gap: var(--k-space-xs); }
+.container-new { cursor: default; }
+.container-new .k-text-field { flex: 1; }
+#browser-card[hidden], .setting[hidden] { display: none; }

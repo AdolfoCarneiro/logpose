@@ -7,7 +7,7 @@ dest="$root/ranga/sidebar/kurobe"
 
 node "$kurobe/build/build.mjs" >/dev/null
 mkdir -p "$dest"
-cp "$kurobe/dist/kurobe.css" "$kurobe/dist/components.css" "$kurobe/dist/icons.mjs" "$kurobe/dist/lucide.ttf" "$kurobe/dist/recursive.ttf" "$dest/"
+cp "$kurobe/dist/kurobe.css" "$kurobe/dist/components.css" "$kurobe/dist/icons.mjs" "$kurobe/dist/lucide.ttf" "$kurobe/dist/recursive.ttf" "$kurobe/dist/loading-indicator.mjs" "$dest/"
 cp "$kurobe/fonts/LICENSE-recursive.txt" "$dest/"
 cp "$kurobe/icons/LICENSE-lucide.txt" "$dest/"
 echo "kurobe $(git -C "$kurobe" rev-parse --short HEAD 2>/dev/null || echo sem-commit)" > "$dest/VERSION"

@@ -1,0 +1,53 @@
+A barra lateral do Ranga abre sozinha em toda janela normal.
+
+--- a/chrome/browser/ui/extensions/extension_side_panel_coordinator_views.cc
++++ b/chrome/browser/ui/extensions/extension_side_panel_coordinator_views.cc
+@@ -6,6 +6,10 @@
+ #include <optional>
+ 
+ #include "base/check.h"
++#include "base/functional/bind.h"
++#include "base/location.h"
++#include "base/memory/weak_ptr.h"
++#include "base/task/sequenced_task_runner.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/scoped_observation.h"
+ #include "chrome/browser/extensions/extension_view_host.h"
+@@ -80,7 +84,27 @@
+     }
+   }
+ 
+-  void OnEntryRegistered() override { AcquireActionItemReference(); }
++  void OnEntryRegistered() override {
++    AcquireActionItemReference();
++    if (!coordinator_->tab_interface() &&
++        coordinator_->extension()->id() == "hncljkmljckjojdjincglklbdihcaeko") {
++      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++          FROM_HERE,
++          base::BindOnce(&ExtensionSidePanelCoordinatorViews::ShowRangaSidebar,
++                         weak_factory_.GetWeakPtr()));
++    }
++  }
++
++  void ShowRangaSidebar() {
++    BrowserWindowInterface* browser = coordinator_->GetBrowser();
++    if (!browser) {
++      return;
++    }
++    if (auto* side_panel_ui = SidePanelUI::From(browser)) {
++      side_panel_ui->Show(coordinator_->GetEntryKey(), std::nullopt,
++                          /*suppress_animations=*/true);
++    }
++  }
+ 
+   void OnEntryDeregistered() override { ReleaseActionItemReference(); }
+ 
+@@ -193,6 +217,8 @@
+ 
+   base::ScopedObservation<ExtensionViewViews, ExtensionViewViews::Observer>
+       scoped_view_observation_{this};
++
++  base::WeakPtrFactory<ExtensionSidePanelCoordinatorViews> weak_factory_{this};
+ };
+ 
+ }  // namespace

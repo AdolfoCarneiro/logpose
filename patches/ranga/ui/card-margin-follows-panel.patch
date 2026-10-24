@@ -1,0 +1,19 @@
+A margem do cartão da página acompanha o lado da barra lateral (esquerda ou direita) e fica nos dois lados quando a barra está escondida.
+
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1425,7 +1425,13 @@
+   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+           "ranga-native-chrome") &&
+       !is_fullscreen(layout_data_->window_state)) {
+-    ranga_contents_bounds.Inset(gfx::Insets::TLBR(8, 0, 8, 8));
++    const bool panel_shown =
++        views().side_panel && views().side_panel->GetVisible();
++    const bool panel_right =
++        panel_shown && views().side_panel->IsRightAligned();
++    ranga_contents_bounds.Inset(
++        gfx::Insets::TLBR(8, panel_shown && !panel_right ? 0 : 8, 8,
++                          panel_right ? 0 : 8));
+   }
+   auto& contents_layout =
+       layout.AddChild(views().multi_contents_view, ranga_contents_bounds);

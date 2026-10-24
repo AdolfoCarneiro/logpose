@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
+  <link rel="stylesheet" href="spotlight.css">
+  <style id="ranga-theme"></style>
+</head>
+<body class="k-type-body">
+  <div id="scrim" class="scrim"></div>
+  <section id="card" class="card" role="dialog" aria-label="Spotlight">
+    <label class="field">
+      <span id="field-icon" class="k-icon"></span>
+      <input id="query" class="query k-type-title" type="text" autocomplete="off" spellcheck="false" placeholder="Buscar ou digitar endereço">
+    </label>
+    <div class="results-wrap">
+      <div id="selection" class="selection"></div>
+      <ul id="results" class="results k-list"></ul>
+    </div>
+  </section>
+  <script type="module" src="spotlight.js"></script>
+</body>
+</html>

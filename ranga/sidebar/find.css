@@ -1,0 +1,34 @@
+html, body { height: 100%; margin: 0; background: transparent; overflow: hidden; font-family: var(--k-type-family); color: var(--k-color-on-surface); }
+.card {
+  position: fixed;
+  inset: 8px 14px auto 14px;
+  height: 56px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--k-space-xxs);
+  padding: 0 var(--k-space-sm) 0 var(--k-space-lg);
+  border-radius: var(--k-shape-extra-large);
+  background: var(--k-color-surface-container-high);
+  box-shadow: 0 6px 14px -4px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.25);
+  transform-origin: top right;
+  animation: card-in var(--k-motion-spring-spatial-default-duration) var(--k-motion-spring-spatial-default);
+}
+@keyframes card-in { from { opacity: 0; transform: translateY(-10px) scale(0.9); border-radius: var(--k-shape-medium); } }
+.lead { color: var(--k-color-primary); font-size: 20px; margin-right: var(--k-space-xs); }
+.text {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--k-color-on-surface);
+}
+.text::selection { background: color-mix(in srgb, var(--k-color-primary) 45%, transparent); }
+.count { color: var(--k-color-on-surface-variant); white-space: nowrap; padding: 0 var(--k-space-xs); }
+.card--empty .count { color: var(--k-color-error); }
+.card--empty { animation: shake var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast); }
+@keyframes shake { 30% { transform: translateX(-4px); } 60% { transform: translateX(3px); } }
+.divider { width: 1px; height: 24px; margin: 0 var(--k-space-xxs); background: var(--k-color-outline-variant); }
+.toggle[aria-pressed="true"] { background: var(--k-color-secondary-container); color: var(--k-color-on-secondary-container); border-radius: var(--k-shape-small); }

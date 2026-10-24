@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toItems, toNavigation } from "./tabs-model.js";
+import { toItems, toNavigation, splitEdges } from "./tabs-model.js";
 
 test("fixadas primeiro, depois por index", () => {
   const tabs = [
@@ -40,4 +40,49 @@ test("aba carregando usa a URL pendente como título", () => {
   const [item] = toItems([{ id: 1, index: 0, title: "", url: "", pendingUrl: "https://m3.material.io/", pinned: false }], 1);
   assert.equal(item.title, "https://m3.material.io/");
   assert.equal(item.url, "https://m3.material.io/");
+});
+
+test("aba carregando é marcada", () => {
+  const [a, b] = toItems([
+    { id: 1, index: 0, title: "a", url: "https://a", status: "loading", pinned: false },
+    { id: 2, index: 1, title: "b", url: "https://b", status: "complete", pinned: false },
+  ], 1);
+  assert.equal(a.loading, true);
+  assert.equal(b.loading, false);
+});
+
+test("aba dormindo é marcada", () => {
+  const [a] = toItems([{ id: 1, index: 0, title: "a", url: "https://a", discarded: true, pinned: false }], 2);
+  assert.equal(a.asleep, true);
+});
+
+test("aba tocando som ou silenciada é marcada", () => {
+  const tabs = [
+    { id: 1, index: 0, audible: true, url: "https://a.dev/" },
+    { id: 2, index: 1, audible: true, mutedInfo: { muted: true }, url: "https://b.dev/" },
+    { id: 3, index: 2, url: "https://c.dev/" },
+  ];
+  assert.deepEqual(toItems(tabs, 1).map((t) => t.audio), ["playing", "muted", ""]);
+});
+
+test("navegação: ranga:// vira a página interna", () => {
+  assert.deepEqual(toNavigation("ranga://extensions"), { kind: "url", url: "chrome://extensions" });
+  assert.deepEqual(toNavigation("ranga://settings/privacy"), { kind: "url", url: "chrome://settings/privacy" });
+  assert.deepEqual(toNavigation("ranga://configurações"), { kind: "url", url: "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html" });
+});
+
+test("título que é URL interna aparece como ranga://", () => {
+  const [item] = toItems([{ id: 1, index: 0, url: "chrome://extensions/", title: "" }], 1);
+  assert.equal(item.title, "ranga://extensions/");
+});
+
+test("abas em tela dividida ficam juntas", () => {
+  const items = toItems([
+    { id: 1, index: 0, url: "a", splitViewId: -1 },
+    { id: 2, index: 1, url: "b", splitViewId: 7 },
+    { id: 3, index: 2, url: "c", splitViewId: 7 },
+    { id: 4, index: 3, url: "d" },
+  ], 2);
+  assert.deepEqual(items.map((i) => i.split), [null, 7, 7, null]);
+  assert.deepEqual(splitEdges(items), ["", "first", "last", ""]);
 });

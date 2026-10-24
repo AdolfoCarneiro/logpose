@@ -7,8 +7,8 @@
 +namespace {
 +
 +bool RangaHidesNativeChrome(const BrowserWindowInterface* browser) {
-+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-+             "ranga-hide-native-chrome") &&
++  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
++             "ranga-native-chrome") &&
 +         browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL;
 +}
 +

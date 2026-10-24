@@ -1,0 +1,42 @@
+Primeira abertura: o Ranga mostra o próprio onboarding (onboarding.html da barra lateral) no lugar do Helium Setup. Ele grava o consentimento dos serviços do Helium e marca o onboarding como feito, por isso a pref helium.completed_onboarding entra na lista do settingsPrivate.
+
+--- a/chrome/browser/ranga/ranga_sidebar.h
++++ b/chrome/browser/ranga/ranga_sidebar.h
+@@ -12,4 +12,7 @@
+ 
+ inline constexpr char kRangaSidebarResourcesDir[] = "ranga-sidebar";
+ 
++inline constexpr char kRangaOnboardingURL[] =
++    "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/onboarding.html";
++
+ #endif  // CHROME_BROWSER_RANGA_RANGA_SIDEBAR_H_
+--- a/chrome/browser/ui/startup/startup_browser_creator_impl.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
+@@ -64,6 +64,7 @@
+ #include "chrome/common/pref_names.h"
+ #include "chrome/common/webui_url_constants.h"
+ #include "components/custom_handlers/protocol_handler_registry.h"
++#include "chrome/browser/ranga/ranga_sidebar.h"
+ #include "components/helium_services/pref_names.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/sessions/core/serialized_navigation_entry.h"
+@@ -654,7 +655,7 @@
+       base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kNoFirstRun);
+   if (!is_incognito_or_guest && !no_first_run) {
+     if (!profile_->GetPrefs()->GetBoolean(prefs::kHeliumDidOnboarding)) {
+-      UrlsToTabs({GURL(chrome::kHeliumSetupURL)}, &tabs);
++      UrlsToTabs({GURL(kRangaOnboardingURL)}, &tabs);
+       return {tabs, LaunchResult::kWithGivenUrls};
+     }
+   }
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -501,6 +501,8 @@
+       settings_api::PrefType::kString;
+   (*s_allowlist)[::prefs::kHeliumServicesConsented] =
+       settings_api::PrefType::kBoolean;
++  (*s_allowlist)[::prefs::kHeliumDidOnboarding] =
++      settings_api::PrefType::kBoolean;
+ 
+   // Privacy Guide
+   (*s_allowlist)[::prefs::kPrivacyGuideViewed] =

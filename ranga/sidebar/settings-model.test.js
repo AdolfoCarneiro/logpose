@@ -27,10 +27,40 @@ test("URL completa quando configurado", () => {
 });
 
 test("páginas internas aparecem com o esquema", () => {
-  assert.equal(displayUrl("chrome://settings/appearance", false), "chrome://settings");
+  assert.equal(displayUrl("chrome://settings/appearance", false), "ranga://settings");
 });
 
 test("URL inválida ou vazia não quebra", () => {
   assert.equal(displayUrl("", false), "");
   assert.equal(displayUrl("nao é url", false), "nao é url");
+});
+
+test("opacidade do material: padrão 85, aceita 0 a 100 inteiro", () => {
+  assert.equal(loadSettings(undefined).materialOpacity, 85);
+  assert.equal(loadSettings({ materialOpacity: 40 }).materialOpacity, 40);
+  assert.equal(loadSettings({ materialOpacity: 140 }).materialOpacity, 85);
+  assert.equal(loadSettings({ materialOpacity: -1 }).materialOpacity, 85);
+  assert.equal(loadSettings({ materialOpacity: 50.5 }).materialOpacity, 85);
+});
+
+test("dormir e arquivar: padrões e só as escolhas válidas", () => {
+  const d = loadSettings(undefined);
+  assert.equal(d.sleepAfterMinutes, 30);
+  assert.equal(d.archiveAfterHours, 12);
+  assert.equal(loadSettings({ sleepAfterMinutes: 0 }).sleepAfterMinutes, 0);
+  assert.equal(loadSettings({ sleepAfterMinutes: 45 }).sleepAfterMinutes, 30);
+  assert.equal(loadSettings({ archiveAfterHours: 168 }).archiveAfterHours, 168);
+  assert.equal(loadSettings({ archiveAfterHours: "12" }).archiveAfterHours, 12);
+});
+
+test("nova aba não mostra endereço", () => {
+  assert.equal(displayUrl("chrome://newtab/", false), "");
+  assert.equal(displayUrl("chrome://newtab/", true), "");
+});
+
+test("páginas internas aparecem como ranga://", () => {
+  assert.equal(displayUrl("chrome://extensions/?id=x", true), "ranga://extensions/?id=x");
+  assert.equal(displayUrl("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html", false), "ranga://configurações");
+  assert.equal(displayUrl("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/newtab.html", false), "");
+  assert.equal(displayUrl("chrome-extension://outra/popup.html", false), "chrome-extension://outra");
 });

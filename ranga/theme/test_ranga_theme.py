@@ -58,6 +58,89 @@ class ToCss(unittest.TestCase):
             ranga_theme.to_css({"background": "#000000"})
 
 
+class Frame(unittest.TestCase):
+    COLORS = {"background": "#1b1f28", "foreground": "#c6ccdb", "accent": "#71b1ec"}
+
+    def test_frame_color_is_tinted_low_surface(self):
+        low = ranga_theme.mix("#1b1f28", "#c6ccdb", 0.06)
+        container = ranga_theme.mix("#1b1f28", "#71b1ec", 0.26)
+        self.assertEqual(ranga_theme.frame_color(self.COLORS), ranga_theme.mix(low, container, 0.35))
+
+    def test_css_exposes_frame(self):
+        css = ranga_theme.to_css(self.COLORS)
+        self.assertIn(f"--ranga-frame: {ranga_theme.frame_color(self.COLORS)};", css)
+
+    def test_main_writes_theme_and_frame_files(self):
+        d = tempfile.mkdtemp()
+        src = os.path.join(d, "colors.toml")
+        with open(src, "w") as f:
+            f.write('background = "#1b1f28"\nforeground = "#c6ccdb"\naccent = "#71b1ec"\n')
+        dest = os.path.join(d, "out", "theme.css")
+        ranga_theme.main(src, dest)
+        with open(os.path.join(d, "out", "frame-color")) as f:
+            self.assertEqual(f.read(), ranga_theme.with_alpha(ranga_theme.frame_color(self.COLORS), ranga_theme.DEFAULT_OPACITY) + "\n")
+        self.assertTrue(os.path.exists(dest))
+
+
+class Palette(unittest.TestCase):
+    COLORS = {"background": "#1b1f28", "foreground": "#c6ccdb", "accent": "#71b1ec"}
+
+    def test_palette_mirrors_kurobe_tokens(self):
+        lines = dict(line.split(" ", 1) for line in ranga_theme.palette(self.COLORS).splitlines())
+        self.assertEqual(lines["scheme"], "dark")
+        self.assertEqual(lines["surface"], "#1b1f28")
+        self.assertEqual(lines["surface-container-high"], ranga_theme.mix("#1b1f28", "#c6ccdb", 0.14))
+        self.assertEqual(lines["primary"], "#71b1ec")
+        self.assertEqual(lines["primary-container"], ranga_theme.mix("#1b1f28", "#71b1ec", 0.26))
+        self.assertEqual(lines["on-primary"], ranga_theme.on_color("#71b1ec"))
+
+    def test_light_scheme(self):
+        self.assertTrue(ranga_theme.palette({**self.COLORS, "mode": "light"}).startswith("scheme light\n"))
+
+    def test_main_writes_palette(self):
+        d = tempfile.mkdtemp()
+        src = os.path.join(d, "colors.toml")
+        with open(src, "w") as f:
+            f.write('background = "#1b1f28"\nforeground = "#c6ccdb"\naccent = "#71b1ec"\n')
+        ranga_theme.main(src, os.path.join(d, "out", "theme.css"))
+        with open(os.path.join(d, "out", "palette")) as f:
+            self.assertEqual(f.read(), ranga_theme.palette(self.COLORS))
+
+
+class Opacity(unittest.TestCase):
+    COLORS = {"background": "#1b1f28", "foreground": "#c6ccdb", "accent": "#71b1ec"}
+
+    def test_with_alpha(self):
+        self.assertEqual(ranga_theme.with_alpha("#2d2d1e", 100), "#2d2d1eff")
+        self.assertEqual(ranga_theme.with_alpha("#2d2d1e", 0), "#2d2d1e00")
+        self.assertEqual(ranga_theme.with_alpha("#2d2d1e", 85), "#2d2d1ed9")
+
+    def test_read_opacity_defaults_and_clamps(self):
+        d = tempfile.mkdtemp()
+        self.assertEqual(ranga_theme.read_opacity(os.path.join(d, "nada")), ranga_theme.DEFAULT_OPACITY)
+        p = os.path.join(d, "material-opacity")
+        for raw, want in [("70\n", 70), ("150", 100), ("-3", 0), ("abc", ranga_theme.DEFAULT_OPACITY)]:
+            with open(p, "w") as f:
+                f.write(raw)
+            self.assertEqual(ranga_theme.read_opacity(p), want)
+
+    def test_main_applies_opacity(self):
+        d = tempfile.mkdtemp()
+        src = os.path.join(d, "colors.toml")
+        with open(src, "w") as f:
+            f.write('background = "#1b1f28"\nforeground = "#c6ccdb"\naccent = "#71b1ec"\n')
+        out = os.path.join(d, "out")
+        os.makedirs(out)
+        with open(os.path.join(out, "material-opacity"), "w") as f:
+            f.write("50")
+        ranga_theme.main(src, os.path.join(out, "theme.css"))
+        frame = ranga_theme.with_alpha(ranga_theme.frame_color(self.COLORS), 50)
+        with open(os.path.join(out, "frame-color")) as f:
+            self.assertEqual(f.read(), frame + "\n")
+        with open(os.path.join(out, "theme.css")) as f:
+            self.assertIn(f"--ranga-frame: {frame};", f.read())
+
+
 class Host(unittest.TestCase):
     def test_encode(self):
         raw = ranga_theme_host.encode({"type": "theme", "css": "x"})
@@ -87,3 +170,38 @@ class Host(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HostMessages(unittest.TestCase):
+    def test_decode_reads_one_message(self):
+        import io
+        raw = ranga_theme_host.encode({"type": "set-opacity", "value": 70})
+        self.assertEqual(ranga_theme_host.decode(io.BytesIO(raw)), {"type": "set-opacity", "value": 70})
+
+    def test_decode_end_of_stream(self):
+        import io
+        self.assertIsNone(ranga_theme_host.decode(io.BytesIO(b"")))
+
+    def test_set_opacity_writes_file_and_regenerates(self):
+        d = tempfile.mkdtemp()
+        colors = os.path.join(d, "colors.toml")
+        with open(colors, "w") as f:
+            f.write('background = "#1b1f28"\nforeground = "#c6ccdb"\naccent = "#71b1ec"\n')
+        theme = os.path.join(d, "state", "theme.css")
+        ranga_theme_host.handle({"type": "set-opacity", "value": 40}, colors, theme)
+        with open(os.path.join(d, "state", "material-opacity")) as f:
+            self.assertEqual(f.read(), "40\n")
+        with open(os.path.join(d, "state", "frame-color")) as f:
+            self.assertTrue(f.read().strip().endswith("66"))
+
+    def test_handle_ignores_unknown_and_clamps(self):
+        d = tempfile.mkdtemp()
+        colors = os.path.join(d, "colors.toml")
+        with open(colors, "w") as f:
+            f.write('background = "#1b1f28"\nforeground = "#c6ccdb"\naccent = "#71b1ec"\n')
+        theme = os.path.join(d, "state", "theme.css")
+        ranga_theme_host.handle({"type": "outra-coisa"}, colors, theme)
+        self.assertFalse(os.path.exists(os.path.join(d, "state", "material-opacity")))
+        ranga_theme_host.handle({"type": "set-opacity", "value": 300}, colors, theme)
+        with open(os.path.join(d, "state", "material-opacity")) as f:
+            self.assertEqual(f.read(), "100\n")

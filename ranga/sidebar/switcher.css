@@ -1,0 +1,46 @@
+html, body { height: 100%; margin: 0; background: transparent; overflow: hidden; font-family: var(--k-type-family); color: var(--k-color-on-surface); }
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.28); animation: fade-in var(--k-motion-spring-effects-default-duration) var(--k-motion-spring-effects-default); }
+@keyframes fade-in { from { opacity: 0; } }
+.card {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100vw - 64px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--k-space-md);
+  padding: var(--k-space-lg);
+  border-radius: 36px;
+  background: var(--k-color-surface-container-high);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.45);
+  animation: card-in var(--k-motion-spring-spatial-default-duration) var(--k-motion-spring-spatial-default);
+}
+@keyframes card-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); border-radius: var(--k-shape-large); } }
+.tiles { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--k-space-sm); overflow: hidden; }
+.tile {
+  position: relative;
+  width: 112px;
+  height: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--k-space-sm);
+  padding: var(--k-space-sm);
+  box-sizing: border-box;
+  border-radius: var(--k-shape-large);
+  background: var(--k-color-surface-container-highest);
+  cursor: pointer;
+  transition:
+    border-radius var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast),
+    transform var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast),
+    background-color var(--k-motion-spring-effects-default-duration) var(--k-motion-spring-effects-default);
+}
+.tile img, .tile .glyph { width: 32px; height: 32px; font-size: 28px; border-radius: var(--k-shape-small); }
+.tile .title { width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--k-color-on-surface-variant); }
+.tile .space { position: absolute; top: 6px; right: 6px; font-size: 14px; color: var(--k-color-on-surface-variant); }
+.tile--selected { background: var(--k-color-primary-container); border-radius: 32px; transform: scale(1.06); }
+.tile--selected .title { color: var(--k-color-on-primary-container); }
+.caption { max-width: 560px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--k-color-on-surface); }

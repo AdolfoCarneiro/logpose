@@ -247,10 +247,11 @@
   appearance: none;
   border: 0;
   height: 40px;
-  padding: 0 var(--k-space-lg);
+  padding: 0 var(--k-space-md);
   background: transparent;
   color: var(--k-color-on-surface);
   font: inherit;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -263,4 +264,71 @@
   .k-state::before, .k-icon-button, .k-button, .k-text-field, .k-list-item, .k-menu, .k-switch, .k-switch::after {
     transition-duration: 0ms !important;
   }
+}
+
+.k-slider {
+  appearance: none;
+  width: 220px;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  --k-slider-fill: 50%;
+}
+
+.k-slider::-webkit-slider-runnable-track {
+  height: 16px;
+  border-radius: var(--k-shape-full);
+  background: linear-gradient(to right,
+    var(--k-color-primary) 0 calc(var(--k-slider-fill) - 6px),
+    transparent calc(var(--k-slider-fill) - 6px) calc(var(--k-slider-fill) + 6px),
+    var(--k-color-secondary-container) calc(var(--k-slider-fill) + 6px) 100%);
+}
+
+.k-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 4px;
+  height: 44px;
+  margin-top: -14px;
+  border-radius: var(--k-shape-full);
+  background: var(--k-color-primary);
+  transition: width var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast);
+}
+
+.k-slider:active::-webkit-slider-thumb { width: 2px; }
+
+.k-snackbar {
+  position: fixed;
+  left: var(--k-space-sm);
+  right: var(--k-space-sm);
+  bottom: 64px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--k-space-sm);
+  min-height: 48px;
+  padding: var(--k-space-xs) var(--k-space-xs) var(--k-space-xs) var(--k-space-lg);
+  border-radius: var(--k-shape-large);
+  background: color-mix(in srgb, var(--k-color-on-surface) 92%, var(--k-color-primary));
+  color: var(--k-color-surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  transform-origin: bottom center;
+  transition:
+    opacity var(--k-motion-spring-effects-fast-duration) var(--k-motion-spring-effects-fast),
+    transform var(--k-motion-spring-spatial-default-duration) var(--k-motion-spring-spatial-default);
+}
+
+.k-snackbar[hidden] { display: flex; opacity: 0; transform: translateY(24px) scale(0.92); pointer-events: none; }
+.k-snackbar__text { flex: 1; min-width: 0; }
+.k-snackbar__action {
+  appearance: none;
+  border: 0;
+  height: 36px;
+  padding: 0 var(--k-space-md);
+  border-radius: var(--k-shape-full);
+  background: transparent;
+  color: color-mix(in srgb, var(--k-color-primary) 70%, var(--k-color-surface));
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }

@@ -1,0 +1,397 @@
+Procurar na página do Ranga: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotlight abrem um cartão MD3 (find.html da barra lateral) no canto da página, no lugar da barra de busca nativa. A busca usa rangaPrivate.find / stopFinding. O overlay do spotlight vira genérico (página e modo).
+
+--- a/chrome/browser/ui/views/frame/ranga_spotlight_view.h
++++ b/chrome/browser/ui/views/frame/ranga_spotlight_view.h
+@@ -1,9 +1,15 @@
+ #ifndef CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SPOTLIGHT_VIEW_H_
+ #define CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SPOTLIGHT_VIEW_H_
++
++#include <string>
++#include <string_view>
+ 
+ #include "base/functional/callback.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/views/controls/webview/webview.h"
++
++class BrowserView;
++class BrowserWindowInterface;
+ 
+ namespace content {
+ class BrowserContext;
+@@ -20,18 +26,26 @@
+ 
+  public:
+   RangaSpotlightView(content::BrowserContext* browser_context,
++                     std::string page,
+                      base::RepeatingClosure on_hidden);
+   ~RangaSpotlightView() override;
+ 
+-  void Show(bool new_tab, const gfx::Rect& bounds);
++  const std::string& page() const { return page_; }
++  void Show(std::string_view mode, const gfx::Rect& bounds);
+   void Hide();
+ 
+   void CloseContents(content::WebContents* source) override;
+   void TitleWasSet(content::NavigationEntry* entry) override;
+ 
+  private:
++  std::string page_;
+   base::RepeatingClosure on_hidden_;
+   int generation_ = 0;
+ };
+ 
++RangaSpotlightView* RangaOverlayFor(BrowserView* browser_view,
++                                    std::string_view page);
++
++bool RangaShowFind(BrowserWindowInterface* browser, int step);
++
+ #endif  // CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SPOTLIGHT_VIEW_H_
+--- a/chrome/browser/ui/views/frame/ranga_spotlight_view.cc
++++ b/chrome/browser/ui/views/frame/ranga_spotlight_view.cc
+@@ -3,7 +3,11 @@
+ #include <string>
+ 
+ #include "base/strings/string_number_conversions.h"
++#include "base/command_line.h"
+ #include "base/strings/string_util.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/skia/include/core/SkColor.h"
+@@ -13,21 +17,24 @@
+ #include "url/gurl.h"
+ 
+ RangaSpotlightView::RangaSpotlightView(content::BrowserContext* browser_context,
++                                       std::string page,
+                                        base::RepeatingClosure on_hidden)
+-    : views::WebView(browser_context), on_hidden_(std::move(on_hidden)) {
++    : views::WebView(browser_context),
++      page_(std::move(page)),
++      on_hidden_(std::move(on_hidden)) {
+   SetVisible(false);
+ }
+ 
+ RangaSpotlightView::~RangaSpotlightView() = default;
+ 
+-void RangaSpotlightView::Show(bool new_tab, const gfx::Rect& bounds) {
++void RangaSpotlightView::Show(std::string_view mode, const gfx::Rect& bounds) {
+   SetBoundsRect(bounds);
+   content::WebContents* contents = GetWebContents();
+   contents->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
+   const GURL url(
+-      std::string("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/"
+-                  "spotlight.html#") +
+-      (new_tab ? "new-" : "current-") + base::NumberToString(++generation_));
++      std::string("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/") +
++      page_ + "#" + std::string(mode) + "-" +
++      base::NumberToString(++generation_));
+   content::NavigationController::LoadURLParams params(url);
+   params.transition_type = ui::PAGE_TRANSITION_AUTO_TOPLEVEL;
+   params.should_replace_current_entry =
+@@ -57,3 +64,50 @@
+ 
+ BEGIN_METADATA(RangaSpotlightView)
+ END_METADATA
++
++RangaSpotlightView* RangaOverlayFor(BrowserView* browser_view,
++                                    std::string_view page) {
++  RangaSpotlightView* overlay = nullptr;
++  for (views::View* child : browser_view->children()) {
++    if (auto* found = views::AsViewClass<RangaSpotlightView>(child);
++        found && found->page() == page) {
++      overlay = found;
++    }
++  }
++  if (!overlay) {
++    overlay = browser_view->AddChildView(std::make_unique<RangaSpotlightView>(
++        browser_view->browser()->GetProfile(), std::string(page),
++        base::BindRepeating(
++            [](BrowserView* view) {
++              if (views::WebView* contents = view->GetActiveContentsWebView()) {
++                contents->RequestFocus();
++              }
++            },
++            base::Unretained(browser_view))));
++  }
++  browser_view->ReorderChildView(overlay, browser_view->children().size());
++  return overlay;
++}
++
++bool RangaShowFind(BrowserWindowInterface* browser, int step) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "ranga-native-chrome") ||
++      browser->GetType() != BrowserWindowInterface::Type::TYPE_NORMAL) {
++    return false;
++  }
++  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
++  views::WebView* contents =
++      browser_view ? browser_view->GetActiveContentsWebView() : nullptr;
++  if (!contents) {
++    return false;
++  }
++  constexpr int kWidth = 440;
++  constexpr int kHeight = 84;
++  const gfx::Rect area = views::View::ConvertRectToTarget(
++      contents, browser_view, contents->GetLocalBounds());
++  const gfx::Rect card(area.right() - kWidth - 4, area.y() + 4, kWidth,
++                       kHeight);
++  RangaOverlayFor(browser_view, "find.html")
++      ->Show(step == 0 ? "open" : step > 0 ? "next" : "previous", card);
++  return true;
++}
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -1493,25 +1493,8 @@
+ }
+ 
+ void ShowRangaSpotlight(BrowserView* browser_view, bool new_tab) {
+-  RangaSpotlightView* spotlight = nullptr;
+-  for (views::View* child : browser_view->children()) {
+-    if (auto* found = views::AsViewClass<RangaSpotlightView>(child)) {
+-      spotlight = found;
+-    }
+-  }
+-  if (!spotlight) {
+-    spotlight = browser_view->AddChildView(std::make_unique<RangaSpotlightView>(
+-        browser_view->browser()->GetProfile(),
+-        base::BindRepeating(
+-            [](BrowserView* view) {
+-              if (views::WebView* contents = view->GetActiveContentsWebView()) {
+-                contents->RequestFocus();
+-              }
+-            },
+-            base::Unretained(browser_view))));
+-  }
+-  browser_view->ReorderChildView(spotlight, browser_view->children().size());
+-  spotlight->Show(new_tab, browser_view->GetLocalBounds());
++  RangaOverlayFor(browser_view, "spotlight.html")
++      ->Show(new_tab ? "new" : "current", browser_view->GetLocalBounds());
+ }
+ 
+ void DispatchRangaCommand(BrowserView* browser_view, std::string_view command) {
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -277,6 +277,7 @@
+ #include "chrome/browser/ui/toasts/toast_controller.h"
+ #include "chrome/browser/ui/toasts/toast_features.h"
+ #include "chrome/browser/ui/views/contextual_tasks/contextual_tasks_close_button_controller.h"
++#include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
+ #endif
+ 
+ namespace {
+@@ -2555,6 +2556,10 @@
+ void FindInPage(BrowserWindowInterface* browser,
+                 bool find_next,
+                 bool forward_direction) {
++  if (RangaShowFind(browser,
++                    find_next ? (forward_direction ? 1 : -1) : 0)) {
++    return;
++  }
+   FindBarController::From(browser)->Show(find_next, forward_direction);
+ }
+ 
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -40,7 +40,15 @@
+     DOMString container;
+   };
+ 
++  // Where a find in the page stands.
++  dictionary FindResult {
++    long matches;
++    // The highlighted match, from 1; 0 when there is none.
++    long active;
++  };
++
+   callback ExtensionActionsCallback = void(ExtensionAction[] actions);
++  callback FindCallback = void(FindResult result);
+   callback TabIdCallback = void(long tabId);
+   callback TabContainersCallback = void(TabContainer[] tabs);
+   callback CommandsCallback = void(DOMString[] commands);
+@@ -73,6 +81,19 @@
+         DOMString command,
+         optional DoneCallback callback);
+ 
++    // Finds <code>text</code> in the window's active tab, from the
++    // highlighted match on, and highlights the next (or previous) one.
++    static void find(
++        long windowId,
++        DOMString text,
++        boolean forward,
++        boolean matchCase,
++        FindCallback callback);
++
++    // Ends the find in the window's active tab, keeping the highlighted
++    // match selected.
++    static void stopFinding(long windowId, optional DoneCallback callback);
++
+     // Opens a tab in a container. The tab keeps the container across
+     // navigations, and the tabs and windows it opens inherit it.
+     static void createTab(CreateTabOptions options, TabIdCallback callback);
+--- a/chrome/browser/extensions/api/ranga_private/BUILD.gn
++++ b/chrome/browser/extensions/api/ranga_private/BUILD.gn
+@@ -20,6 +20,7 @@
+     "//chrome/browser/ui/extensions",
+     "//chrome/browser/ui/toolbar",
+     "//chrome/common/extensions/api",
++    "//components/find_in_page",
+     "//components/tabs:public",
+     "//content/public/browser",
+     "//services/network/public/mojom",
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -5,6 +5,9 @@
+ #ifndef CHROME_BROWSER_EXTENSIONS_API_RANGA_PRIVATE_RANGA_PRIVATE_API_H_
+ #define CHROME_BROWSER_EXTENSIONS_API_RANGA_PRIVATE_RANGA_PRIVATE_API_H_
+ 
++#include "base/scoped_observation.h"
++#include "components/find_in_page/find_result_observer.h"
++#include "components/find_in_page/find_tab_helper.h"
+ #include "extensions/browser/extension_function.h"
+ 
+ namespace extensions {
+@@ -45,6 +48,36 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateFindFunction : public ExtensionFunction,
++                                  public find_in_page::FindResultObserver {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.find", UNKNOWN)
++
++  void OnFindResultAvailable(content::WebContents* web_contents) override;
++  void OnFindEmptyText(content::WebContents* web_contents) override;
++  void OnFindTabHelperDestroyed(find_in_page::FindTabHelper* helper) override;
++
++ protected:
++  ~RangaPrivateFindFunction() override = default;
++  ResponseAction Run() override;
++
++ private:
++  void Finish(int matches, int active);
++
++  base::ScopedObservation<find_in_page::FindTabHelper,
++                          find_in_page::FindResultObserver>
++      observation_{this};
++};
++
++class RangaPrivateStopFindingFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.stopFinding", UNKNOWN)
++
++ protected:
++  ~RangaPrivateStopFindingFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class RangaPrivateCreateTabFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("rangaPrivate.createTab", UNKNOWN)
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/extensions/api/ranga_private/ranga_private_api.h"
+ 
++#include <algorithm>
+ #include <array>
+ #include <string>
+ #include <utility>
+@@ -27,6 +28,8 @@
+ #include "chrome/browser/ui/toolbar/toolbar_actions_model.h"
+ #include "chrome/common/extensions/api/ranga_private.h"
+ #include "chrome/common/webui_url_constants.h"
++#include "components/find_in_page/find_notification_details.h"
++#include "components/find_in_page/find_types.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/storage_partition.h"
+@@ -206,6 +209,86 @@
+     }
+   }
+   return RespondNow(Error(kNoCommandError, params->command));
++}
++
++ExtensionFunction::ResponseAction RangaPrivateFindFunction::Run() {
++  auto params = ranga_private::Find::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  content::WebContents* contents = ActiveContents(browser);
++  auto* helper =
++      contents ? find_in_page::FindTabHelper::FromWebContents(contents)
++               : nullptr;
++  if (!helper) {
++    return RespondNow(Error("The active tab can't be searched."));
++  }
++  if (params->text.empty()) {
++    helper->StopFinding(find_in_page::SelectionAction::kClear);
++    return RespondNow(ArgumentList(ranga_private::Find::Results::Create(
++        ranga_private::FindResult())));
++  }
++  observation_.Observe(helper);
++  AddRef();
++  helper->StartFinding(base::UTF8ToUTF16(params->text), params->forward,
++                       params->match_case, /*find_match=*/true);
++  return RespondLater();
++}
++
++void RangaPrivateFindFunction::OnFindResultAvailable(
++    content::WebContents* web_contents) {
++  const find_in_page::FindNotificationDetails& details =
++      observation_.GetSource()->find_result();
++  if (!details.final_update()) {
++    return;
++  }
++  Finish(details.number_of_matches(), details.active_match_ordinal());
++}
++
++void RangaPrivateFindFunction::OnFindEmptyText(
++    content::WebContents* web_contents) {
++  Finish(0, 0);
++}
++
++void RangaPrivateFindFunction::OnFindTabHelperDestroyed(
++    find_in_page::FindTabHelper* helper) {
++  Finish(0, 0);
++}
++
++void RangaPrivateFindFunction::Finish(int matches, int active) {
++  if (!observation_.IsObserving()) {
++    return;
++  }
++  observation_.Reset();
++  ranga_private::FindResult result;
++  result.matches = std::max(matches, 0);
++  result.active = std::max(active, 0);
++  Respond(ArgumentList(ranga_private::Find::Results::Create(result)));
++  Release();
++}
++
++ExtensionFunction::ResponseAction RangaPrivateStopFindingFunction::Run() {
++  auto params = ranga_private::StopFinding::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  content::WebContents* contents = ActiveContents(browser);
++  if (auto* helper =
++          contents ? find_in_page::FindTabHelper::FromWebContents(contents)
++                   : nullptr) {
++    helper->StopFinding(find_in_page::SelectionAction::kKeep);
++  }
++  return RespondNow(NoArguments());
+ }
+ 
+ ExtensionFunction::ResponseAction RangaPrivateCreateTabFunction::Run() {

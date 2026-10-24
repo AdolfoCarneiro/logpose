@@ -1,0 +1,23 @@
+Página da barra lateral do Ranga com base transparente, pra transparência do material aparecer por trás dela.
+
+--- a/chrome/browser/ui/extensions/extension_side_panel_coordinator_views.cc
++++ b/chrome/browser/ui/extensions/extension_side_panel_coordinator_views.cc
+@@ -28,6 +28,8 @@
+ #include "extensions/browser/extension_icon_image.h"
+ #include "extensions/browser/extension_registry.h"
+ #include "extensions/common/extension.h"
++#include "content/public/browser/web_contents.h"
++#include "third_party/skia/include/core/SkColor.h"
+ #include "ui/actions/actions.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/view.h"
+@@ -61,6 +63,9 @@
+       return std::make_unique<views::WebView>(/*browser_context=*/nullptr);
+     }
+ 
++    if (coordinator_->extension()->id() == "hncljkmljckjojdjincglklbdihcaeko") {
++      host->host_contents()->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
++    }
+     auto extension_view =
+         std::make_unique<ExtensionViewViews>(coordinator_->profile(), host);
+     extension_view->SetVisible(true);

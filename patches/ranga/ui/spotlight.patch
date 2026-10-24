@@ -1,0 +1,170 @@
+Spotlight do Ranga: Ctrl+T, Ctrl+L, Alt+D e Ctrl+K abrem uma camada sobre a janela
+com a página spotlight.html da barra lateral (fundo transparente), em vez da nova
+aba e da barra de endereço nativas.
+
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -3551,6 +3551,8 @@
+       "views/frame/base_tab_strip_region_view.cc",
+       "views/frame/base_tab_strip_region_view.h",
+       "views/frame/browser_view.cc",
++      "views/frame/ranga_spotlight_view.cc",
++      "views/frame/ranga_spotlight_view.h",
+       "views/frame/horizontal_tab_strip_region_view.cc",
+       "views/frame/horizontal_tab_strip_region_view.h",
+       "views/frame/vertical_tab_strip_region_view.cc",
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -177,6 +177,7 @@
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_delegate_impl.h"
+ #include "chrome/browser/ui/views/frame/main_background_region_view.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
++#include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view_delegate.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
+ #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
+@@ -1489,6 +1490,28 @@
+          browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL;
+ }
+ 
++void ShowRangaSpotlight(BrowserView* browser_view, bool new_tab) {
++  RangaSpotlightView* spotlight = nullptr;
++  for (views::View* child : browser_view->children()) {
++    if (auto* found = views::AsViewClass<RangaSpotlightView>(child)) {
++      spotlight = found;
++    }
++  }
++  if (!spotlight) {
++    spotlight = browser_view->AddChildView(std::make_unique<RangaSpotlightView>(
++        browser_view->browser()->GetProfile(),
++        base::BindRepeating(
++            [](BrowserView* view) {
++              if (views::WebView* contents = view->GetActiveContentsWebView()) {
++                contents->RequestFocus();
++              }
++            },
++            base::Unretained(browser_view))));
++  }
++  browser_view->ReorderChildView(spotlight, browser_view->children().size());
++  spotlight->Show(new_tab, browser_view->GetLocalBounds());
++}
++
+ }  // namespace
+ 
+ bool BrowserView::GetTabStripVisible() const {
+@@ -6028,6 +6051,13 @@
+   }
+ 
+   UpdateAcceleratorMetrics(accelerator, command_id);
++
++  if (RangaHidesNativeChrome(browser_) &&
++      (command_id == IDC_NEW_TAB || command_id == IDC_FOCUS_LOCATION ||
++       command_id == IDC_FOCUS_SEARCH)) {
++    ShowRangaSpotlight(this, command_id == IDC_NEW_TAB);
++    return true;
++  }
+ 
+   if (command_id == IDC_CLEAR_BROWSING_DATA) {
+     views::ElementTrackerViews::GetInstance()->NotifyCustomEvent(
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/ranga_spotlight_view.h
+@@ -0,0 +1,37 @@
++#ifndef CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SPOTLIGHT_VIEW_H_
++#define CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SPOTLIGHT_VIEW_H_
++
++#include "base/functional/callback.h"
++#include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/views/controls/webview/webview.h"
++
++namespace content {
++class BrowserContext;
++class NavigationEntry;
++class WebContents;
++}  // namespace content
++
++namespace gfx {
++class Rect;
++}  // namespace gfx
++
++class RangaSpotlightView : public views::WebView {
++  METADATA_HEADER(RangaSpotlightView, views::WebView)
++
++ public:
++  RangaSpotlightView(content::BrowserContext* browser_context,
++                     base::RepeatingClosure on_hidden);
++  ~RangaSpotlightView() override;
++
++  void Show(bool new_tab, const gfx::Rect& bounds);
++  void Hide();
++
++  void CloseContents(content::WebContents* source) override;
++  void TitleWasSet(content::NavigationEntry* entry) override;
++
++ private:
++  base::RepeatingClosure on_hidden_;
++  int generation_ = 0;
++};
++
++#endif  // CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SPOTLIGHT_VIEW_H_
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/ranga_spotlight_view.cc
+@@ -0,0 +1,59 @@
++#include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
++
++#include <string>
++
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_util.h"
++#include "content/public/browser/navigation_controller.h"
++#include "content/public/browser/web_contents.h"
++#include "third_party/skia/include/core/SkColor.h"
++#include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/base/page_transition_types.h"
++#include "ui/gfx/geometry/rect.h"
++#include "url/gurl.h"
++
++RangaSpotlightView::RangaSpotlightView(content::BrowserContext* browser_context,
++                                       base::RepeatingClosure on_hidden)
++    : views::WebView(browser_context), on_hidden_(std::move(on_hidden)) {
++  SetVisible(false);
++}
++
++RangaSpotlightView::~RangaSpotlightView() = default;
++
++void RangaSpotlightView::Show(bool new_tab, const gfx::Rect& bounds) {
++  SetBoundsRect(bounds);
++  content::WebContents* contents = GetWebContents();
++  contents->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
++  const GURL url(
++      std::string("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/"
++                  "spotlight.html#") +
++      (new_tab ? "new-" : "current-") + base::NumberToString(++generation_));
++  content::NavigationController::LoadURLParams params(url);
++  params.transition_type = ui::PAGE_TRANSITION_AUTO_TOPLEVEL;
++  params.should_replace_current_entry =
++      contents->GetController().GetEntryCount() > 0;
++  contents->GetController().LoadURLWithParams(params);
++  SetVisible(true);
++  RequestFocus();
++}
++
++void RangaSpotlightView::Hide() {
++  if (!GetVisible()) {
++    return;
++  }
++  SetVisible(false);
++  on_hidden_.Run();
++}
++
++void RangaSpotlightView::CloseContents(content::WebContents* source) {
++  Hide();
++}
++
++void RangaSpotlightView::TitleWasSet(content::NavigationEntry* entry) {
++  if (base::StartsWith(GetWebContents()->GetTitle(), u"ranga-spotlight:close")) {
++    Hide();
++  }
++}
++
++BEGIN_METADATA(RangaSpotlightView)
++END_METADATA
