@@ -57,5 +57,10 @@ for (const ev of ["onCreated", "onRemoved", "onUpdated", "onActivated", "onMoved
   chrome.tabs[ev].addListener(render);
 }
 
+const themePort = chrome.runtime.connectNative("ranga.theme");
+themePort.onMessage.addListener((msg) => {
+  if (msg.type === "theme") document.getElementById("ranga-theme").textContent = msg.css;
+});
+
 windowId = (await chrome.windows.getCurrent()).id;
 render();
