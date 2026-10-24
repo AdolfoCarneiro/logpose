@@ -1,0 +1,8 @@
+body { margin: 0; min-height: 100vh; background: var(--k-color-surface); }
+main { max-width: 720px; margin: 0 auto; padding: var(--k-space-huge) var(--k-space-xxl); display: flex; flex-direction: column; gap: var(--k-space-xxl); }
+h1 { margin: 0; }
+.card { display: flex; flex-direction: column; padding: var(--k-space-sm) 0; border-radius: var(--k-shape-extra-large); background: var(--k-color-surface-container); }
+.card h2 { margin: 0; padding: var(--k-space-lg) var(--k-space-xxl) var(--k-space-sm); color: var(--k-color-primary); }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: var(--k-space-xxl); padding: var(--k-space-md) var(--k-space-xxl); cursor: pointer; }
+.text { display: flex; flex-direction: column; gap: var(--k-space-xxs); }
+.hint { color: var(--k-color-on-surface-variant); }

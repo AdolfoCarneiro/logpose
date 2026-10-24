@@ -1,0 +1,196 @@
+:where(:root) {
+  --k-color-bg: #1b1f28;
+  --k-color-fg: #c6ccdb;
+  --k-color-primary: #71b1ec;
+  --k-color-on-primary: #0f1117;
+  --k-color-secondary: #90add3;
+  --k-color-tertiary: #b59ad4;
+  --k-color-error: #d8737a;
+  --k-color-on-error: #0f1117;
+}
+
+:root {
+  --k-color-surface: var(--k-color-bg);
+  --k-color-surface-container-low: color-mix(in srgb, var(--k-color-bg), var(--k-color-fg) 6%);
+  --k-color-surface-container: color-mix(in srgb, var(--k-color-bg), var(--k-color-fg) 10%);
+  --k-color-surface-container-high: color-mix(in srgb, var(--k-color-bg), var(--k-color-fg) 14%);
+  --k-color-surface-container-highest: color-mix(in srgb, var(--k-color-bg), var(--k-color-fg) 18%);
+  --k-color-on-surface: var(--k-color-fg);
+  --k-color-on-surface-variant: color-mix(in srgb, var(--k-color-fg), var(--k-color-bg) 12%);
+  --k-color-outline: color-mix(in srgb, var(--k-color-bg), var(--k-color-fg) 32%);
+  --k-color-outline-variant: color-mix(in srgb, var(--k-color-bg), var(--k-color-fg) 16%);
+  --k-color-primary-container: color-mix(in srgb, var(--k-color-bg), var(--k-color-primary) 26%);
+  --k-color-on-primary-container: color-mix(in srgb, var(--k-color-fg), var(--k-color-primary) 18%);
+  --k-color-secondary-container: color-mix(in srgb, var(--k-color-bg), var(--k-color-secondary) 30%);
+  --k-color-on-secondary-container: color-mix(in srgb, var(--k-color-fg), var(--k-color-secondary) 18%);
+  --k-color-tertiary-container: color-mix(in srgb, var(--k-color-bg), var(--k-color-tertiary) 30%);
+  --k-color-on-tertiary-container: color-mix(in srgb, var(--k-color-fg), var(--k-color-tertiary) 18%);
+  --k-color-error-container: color-mix(in srgb, var(--k-color-bg), var(--k-color-error) 30%);
+  --k-color-on-error-container: color-mix(in srgb, var(--k-color-fg), var(--k-color-error) 18%);
+  --k-color-scrim: var(--k-color-bg);
+  --k-shape-none: 0px;
+  --k-shape-extra-small: 4px;
+  --k-shape-small: 8px;
+  --k-shape-medium: 12px;
+  --k-shape-large: 16px;
+  --k-shape-large-increased: 20px;
+  --k-shape-extra-large: 28px;
+  --k-shape-extra-large-increased: 32px;
+  --k-shape-extra-extra-large: 48px;
+  --k-shape-full: 9999px;
+  --k-space-xxs: 2px;
+  --k-space-xs: 4px;
+  --k-space-sm: 8px;
+  --k-space-md: 12px;
+  --k-space-lg: 16px;
+  --k-space-xl: 20px;
+  --k-space-xxl: 24px;
+  --k-space-xxxl: 32px;
+  --k-space-huge: 48px;
+  --k-state-hover: 0.08;
+  --k-state-focus: 0.1;
+  --k-state-pressed: 0.1;
+  --k-state-dragged: 0.16;
+  --k-state-disabled: 0.38;
+  --k-motion-duration-short: 150ms;
+  --k-motion-duration-medium: 280ms;
+  --k-motion-duration-long: 420ms;
+  --k-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --k-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --k-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --k-motion-easing-springy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --k-motion-spring-spatial-fast: linear(0, 0.0206, 0.0754, 0.1544, 0.2492, 0.3524, 0.458, 0.5613, 0.6588, 0.7479, 0.8269, 0.895, 0.952, 0.9981, 1.0338, 1.0603, 1.0783, 1.0893, 1.0942, 1.0943, 1.0906, 1.0842, 1.0759, 1.0665, 1.0565, 1.0465, 1.037, 1.0281, 1.0201, 1.0131, 1.0072, 1.0023, 0.9984, 0.9955, 0.9934, 0.992, 0.9912, 0.991, 0.9912, 0.9917, 0.9924, 0.9932, 0.9942, 0.9951, 0.996, 0.9969, 0.9977, 0.9984, 1);
+  --k-motion-spring-spatial-fast-duration: 360ms;
+  --k-motion-spring-spatial-default: linear(0, 0.0142, 0.0516, 0.1056, 0.1705, 0.2419, 0.3163, 0.3909, 0.4636, 0.533, 0.598, 0.6579, 0.7123, 0.7611, 0.8044, 0.8423, 0.8751, 0.9033, 0.9271, 0.9471, 0.9636, 0.977, 0.9877, 0.9961, 1.0026, 1.0074, 1.0108, 1.0131, 1.0144, 1.0151, 1.0151, 1.0148, 1.0141, 1.0132, 1.0122, 1.0111, 1.01, 1.0088, 1.0077, 1.0067, 1.0058, 1.0049, 1.0041, 1.0034, 1.0027, 1.0022, 1.0017, 1.0013, 1);
+  --k-motion-spring-spatial-default-duration: 435ms;
+  --k-motion-spring-spatial-slow: linear(0, 0.0142, 0.0517, 0.1057, 0.1706, 0.2421, 0.3166, 0.3912, 0.464, 0.5334, 0.5984, 0.6583, 0.7127, 0.7615, 0.8047, 0.8426, 0.8755, 0.9036, 0.9274, 0.9473, 0.9638, 0.9771, 0.9878, 0.9962, 1.0027, 1.0074, 1.0108, 1.0131, 1.0144, 1.0151, 1.0151, 1.0148, 1.0141, 1.0132, 1.0122, 1.0111, 1.0099, 1.0088, 1.0077, 1.0067, 1.0057, 1.0049, 1.0041, 1.0034, 1.0027, 1.0022, 1.0017, 1.0013, 1);
+  --k-motion-spring-spatial-slow-duration: 600ms;
+  --k-motion-spring-effects-fast: linear(0, 0.0163, 0.0576, 0.1147, 0.1807, 0.2507, 0.3214, 0.3902, 0.4558, 0.5172, 0.5737, 0.6253, 0.6718, 0.7136, 0.7508, 0.7837, 0.8128, 0.8383, 0.8606, 0.8801, 0.897, 0.9117, 0.9244, 0.9353, 0.9448, 0.9529, 0.9599, 0.9658, 0.9709, 0.9753, 0.979, 0.9822, 0.9849, 0.9872, 0.9892, 0.9909, 0.9923, 0.9935, 0.9945, 0.9954, 0.9961, 0.9967, 0.9972, 0.9977, 0.998, 0.9983, 0.9986, 0.9988, 1);
+  --k-motion-spring-effects-fast-duration: 150ms;
+  --k-motion-spring-effects-default: linear(0, 0.0163, 0.0576, 0.1145, 0.1805, 0.2504, 0.3211, 0.3899, 0.4555, 0.5168, 0.5733, 0.6249, 0.6714, 0.7132, 0.7504, 0.7834, 0.8125, 0.838, 0.8604, 0.8799, 0.8968, 0.9115, 0.9242, 0.9352, 0.9446, 0.9528, 0.9597, 0.9657, 0.9708, 0.9752, 0.979, 0.9822, 0.9849, 0.9872, 0.9892, 0.9908, 0.9922, 0.9934, 0.9945, 0.9953, 0.9961, 0.9967, 0.9972, 0.9976, 0.998, 0.9983, 0.9986, 0.9988, 1);
+  --k-motion-spring-effects-default-duration: 231ms;
+  --k-motion-spring-effects-slow: linear(0, 0.0163, 0.0577, 0.1147, 0.1807, 0.2508, 0.3215, 0.3904, 0.456, 0.5173, 0.5738, 0.6254, 0.672, 0.7137, 0.7509, 0.7839, 0.8129, 0.8384, 0.8607, 0.8802, 0.8971, 0.9118, 0.9244, 0.9354, 0.9448, 0.9529, 0.9599, 0.9659, 0.971, 0.9753, 0.9791, 0.9822, 0.985, 0.9873, 0.9892, 0.9909, 0.9923, 0.9935, 0.9945, 0.9954, 0.9961, 0.9967, 0.9972, 0.9977, 0.998, 0.9983, 0.9986, 0.9988, 1);
+  --k-motion-spring-effects-slow-duration: 327ms;
+  --k-type-family: "Kurobe Recursive", Recursive, "Adwaita Sans", sans-serif;
+  --k-type-scale-caption: 11px;
+  --k-type-scale-body-small: 12px;
+  --k-type-scale-label: 13px;
+  --k-type-scale-body: 14px;
+  --k-type-scale-subtitle: 22px;
+  --k-type-scale-title: 24px;
+  --k-type-scale-heading: 28px;
+  --k-type-scale-display: 36px;
+  --k-type-scale-display-large: 45px;
+  --k-type-hero-size: 45px;
+  --k-type-display-size: 36px;
+  --k-type-headline-size: 28px;
+  --k-type-title-size: 22px;
+  --k-type-panel-size: 14px;
+  --k-type-section-size: 11px;
+  --k-type-body-size: 13px;
+  --k-type-label-size: 12px;
+  --k-type-button-size: 12px;
+  --k-type-caption-size: 11px;
+  --k-type-numeric-size: 12px;
+  --k-type-code-size: 12px;
+}
+
+.k-type-hero {
+  font-family: var(--k-type-family);
+  font-size: 45px;
+  line-height: 1.2;
+  font-weight: 800;
+  font-variation-settings: "MONO" 0, "CASL" 1, "wght" 800, "slnt" 0, "CRSV" 0.5;
+  letter-spacing: -0.02em;
+}
+
+.k-type-display {
+  font-family: var(--k-type-family);
+  font-size: 36px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variation-settings: "MONO" 0, "CASL" 1, "wght" 700, "slnt" 0, "CRSV" 0.5;
+  letter-spacing: -0.01em;
+}
+
+.k-type-headline {
+  font-family: var(--k-type-family);
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variation-settings: "MONO" 0, "CASL" 1, "wght" 700, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-title {
+  font-family: var(--k-type-family);
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 600;
+  font-variation-settings: "MONO" 0, "CASL" 0.5, "wght" 600, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-panel {
+  font-family: var(--k-type-family);
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+  font-variation-settings: "MONO" 0, "CASL" 0.5, "wght" 600, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-section {
+  font-family: var(--k-type-family);
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 600;
+  font-variation-settings: "MONO" 0, "CASL" 0, "wght" 600, "slnt" 0, "CRSV" 0.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.k-type-body {
+  font-family: var(--k-type-family);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 400;
+  font-variation-settings: "MONO" 0, "CASL" 0, "wght" 400, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-label {
+  font-family: var(--k-type-family);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 500;
+  font-variation-settings: "MONO" 0, "CASL" 0, "wght" 500, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-button {
+  font-family: var(--k-type-family);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+  font-variation-settings: "MONO" 0, "CASL" 0, "wght" 600, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-caption {
+  font-family: var(--k-type-family);
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 400;
+  font-variation-settings: "MONO" 0, "CASL" 0, "wght" 400, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-numeric {
+  font-family: var(--k-type-family);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 500;
+  font-variation-settings: "MONO" 1, "CASL" 0, "wght" 500, "slnt" 0, "CRSV" 0.5;
+}
+
+.k-type-code {
+  font-family: var(--k-type-family);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 400;
+  font-variation-settings: "MONO" 1, "CASL" 0, "wght" 400, "slnt" 0, "CRSV" 0.5;
+}

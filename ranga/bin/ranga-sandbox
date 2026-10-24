@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+sandbox="${CIEL_SANDBOX_BIN:-$HOME/dotfiles/shell/bin/ciel-sandbox}"
+name="${RANGA_SANDBOX:-ranga}"
+binary="$root/build/src/out/Default/helium"
+extension="$root/ranga/sidebar"
+extension_id="hncljkmljckjojdjincglklbdihcaeko"
+debug_port="${RANGA_DEBUG_PORT:-9333}"
+
+usage() {
+  echo "uso: ranga-sandbox up | open [url...] | key <tecla> [modificador...] | eval <js> | shot <saida.png> | theme <id> | down" >&2
+  exit 2
+}
+
+in_sandbox() {
+  "$sandbox" run "$name" -- "$@"
+}
+
+profile() {
+  in_sandbox bash -c 'echo "$HOME/.local/share/ranga/dev-profile"'
+}
+
+case "${1:-}" in
+  up)
+    "$sandbox" list | grep -qw "$name" || "$sandbox" new "$name" >/dev/null 2>&1
+    "$sandbox" list | grep -qw "$name" || "$sandbox" start "$name"
+    in_sandbox env RANGA_PROFILE="$(profile)" "$root/ranga/bin/ranga-theme-install" "$extension_id"
+    ;;
+  open)
+    shift
+    p="$(profile)"
+    pkill -f "^$binary --user-data-dir=$p"
+    sleep 1
+    in_sandbox setsid -f "$binary" --user-data-dir="$p" --ozone-platform=wayland \
+      --ranga-hide-native-chrome --load-extension="$extension" --password-store=basic --remote-debugging-port="$debug_port" --enable-logging=stderr "$@" >"${RANGA_LOG:-/dev/null}" 2>&1
+    in_sandbox timeout 30 bash -c 'until hyprctl clients -j | jq -e "any(.[]; .class==\"helium\")" >/dev/null; do sleep 1; done'
+    sleep 3
+    in_sandbox wtype -M ctrl -M shift -k s -m shift -m ctrl
+    sleep 1.5
+    ;;
+  key)
+    shift
+    key="$1"; shift
+    args=()
+    for m in "$@"; do args+=(-M "$m"); done
+    args+=(-k "$key")
+    for m in "$@"; do args+=(-m "$m"); done
+    in_sandbox wtype "${args[@]}"
+    ;;
+  shot)
+    "$sandbox" shot "$name" "${2:?saida.png}"
+    ;;
+  eval)
+    node "$root/ranga/bin/ranga-eval.mjs" "$debug_port" "$extension_id" "${2:?expressao}"
+    ;;
+  theme)
+    in_sandbox ciel theme set "${2:?id do tema}"
+    ;;
+  down)
+    "$sandbox" stop "$name"
+    ;;
+  *)
+    usage
+    ;;
+esac

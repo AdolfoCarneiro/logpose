@@ -3,8 +3,8 @@ export function toItems(tabs, activeTabId) {
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.index - b.index)
     .map((t) => ({
       id: t.id,
-      title: t.title || t.url,
-      url: t.url,
+      title: t.title || t.url || t.pendingUrl || "",
+      url: t.url || t.pendingUrl || "",
       favIconUrl: t.favIconUrl || "",
       active: t.id === activeTabId,
       pinned: Boolean(t.pinned),

@@ -35,3 +35,9 @@ test("navegação: texto com espaço é busca", () => {
 test("navegação: palavra solta é busca", () => {
   assert.deepEqual(toNavigation("helium"), { kind: "search", text: "helium" });
 });
+
+test("aba carregando usa a URL pendente como título", () => {
+  const [item] = toItems([{ id: 1, index: 0, title: "", url: "", pendingUrl: "https://m3.material.io/", pinned: false }], 1);
+  assert.equal(item.title, "https://m3.material.io/");
+  assert.equal(item.url, "https://m3.material.io/");
+});

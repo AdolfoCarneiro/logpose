@@ -10,21 +10,44 @@ import ranga_theme_host
 
 
 class ToCss(unittest.TestCase):
-    def test_maps_ciel_keys(self):
-        css = ranga_theme.to_css({
-            "background": "#1b1f28",
-            "lighter_background": "#262c3a",
-            "foreground": "#c6ccdb",
-            "muted": "#495262",
-            "accent": "#71b1ec",
-        })
-        self.assertIn("--ranga-bg: #1b1f28;", css)
-        self.assertIn("--ranga-surface: #262c3a;", css)
-        self.assertIn("--ranga-fg: #c6ccdb;", css)
-        self.assertIn("--ranga-muted: #495262;", css)
-        self.assertIn("--ranga-accent: #71b1ec;", css)
-        self.assertIn("--ranga-on-accent: #0f1117;", css)
+    BASE = {
+        "mode": "dark",
+        "background": "#1b1f28",
+        "lighter_background": "#262c3a",
+        "foreground": "#c6ccdb",
+        "muted": "#495262",
+        "accent": "#71b1ec",
+        "red": "#d8737a",
+    }
+
+    def test_maps_ciel_keys_to_kurobe(self):
+        css = ranga_theme.to_css(dict(self.BASE, secondary="#90add3", tertiary="#b59ad4"))
         self.assertTrue(css.startswith(":root {"))
+        self.assertIn("--k-color-bg: #1b1f28;", css)
+        self.assertIn("--k-color-fg: #c6ccdb;", css)
+        self.assertIn("--k-color-primary: #71b1ec;", css)
+        self.assertIn("--k-color-on-primary: #0f1117;", css)
+        self.assertIn("--k-color-secondary: #90add3;", css)
+        self.assertIn("--k-color-tertiary: #b59ad4;", css)
+        self.assertIn("--k-color-error: #d8737a;", css)
+        self.assertIn("--k-color-on-error: #0f1117;", css)
+        self.assertIn("color-scheme: dark;", css)
+
+    def test_derives_secondary_and_tertiary_like_ciel(self):
+        css = ranga_theme.to_css(self.BASE)
+        self.assertIn(f"--k-color-secondary: {ranga_theme.mix('#71b1ec', '#c6ccdb', 0.45)};", css)
+        self.assertIn(f"--k-color-tertiary: {ranga_theme.mix('#71b1ec', '#1b1f28', 0.25)};", css)
+
+    def test_tertiary_falls_back_to_magenta(self):
+        css = ranga_theme.to_css(dict(self.BASE, magenta="#b59ad4"))
+        self.assertIn("--k-color-tertiary: #b59ad4;", css)
+
+    def test_light_mode(self):
+        css = ranga_theme.to_css(dict(self.BASE, mode="light", background="#fafafa", foreground="#111111"))
+        self.assertIn("color-scheme: light;", css)
+
+    def test_mix(self):
+        self.assertEqual(ranga_theme.mix("#000000", "#ffffff", 0.5), "#808080")
 
     def test_on_color(self):
         self.assertEqual(ranga_theme.on_color("#ffffff"), "#0f1117")

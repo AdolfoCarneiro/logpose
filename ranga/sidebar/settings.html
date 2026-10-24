@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Configurações do Ranga</title>
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
+  <link rel="stylesheet" href="settings.css">
+  <style id="ranga-theme"></style>
+</head>
+<body class="k-surface k-type-body">
+  <main>
+    <h1 class="k-type-headline">Configurações do Ranga</h1>
+
+    <section class="card">
+      <h2 class="k-type-section">Aparência</h2>
+      <label class="setting">
+        <span class="text"><span class="k-type-panel">Seguir o tema do Ciel</span><span class="k-type-caption hint">Cores da barra e das páginas do Ranga mudam junto com o tema do Ciel.</span></span>
+        <input class="k-switch" type="checkbox" data-key="followCielTheme">
+      </label>
+      <div class="setting">
+        <span class="text"><span class="k-type-panel">Densidade</span><span class="k-type-caption hint">Tamanho das linhas e dos botões da barra lateral.</span></span>
+        <div class="k-segmented" data-key="density">
+          <button class="k-segmented__option k-type-label" data-value="comfortable">Confortável</button>
+          <button class="k-segmented__option k-type-label" data-value="compact">Compacta</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="k-type-section">Barra lateral</h2>
+      <label class="setting">
+        <span class="text"><span class="k-type-panel">Mostrar URL completa</span><span class="k-type-caption hint">Desligado, o campo de endereço mostra só o domínio.</span></span>
+        <input class="k-switch" type="checkbox" data-key="showFullUrl">
+      </label>
+      <label class="setting">
+        <span class="text"><span class="k-type-panel">Botão de destacar aba</span><span class="k-type-caption hint">Abre a aba numa janela própria.</span></span>
+        <input class="k-switch" type="checkbox" data-key="showDetachButton">
+      </label>
+      <div class="setting">
+        <span class="text"><span class="k-type-panel">Posição da barra</span><span class="k-type-caption hint">Esquerda por padrão. Por enquanto, muda em Configurações do navegador → Aparência → Painel lateral.</span></span>
+        <button id="browser-appearance" class="k-button k-button--tonal k-type-button">Abrir</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

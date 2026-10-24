@@ -2,22 +2,45 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
   <link rel="stylesheet" href="sidebar.css">
   <style id="ranga-theme"></style>
 </head>
-<body>
-  <header>
-    <nav>
-      <button id="back" title="Voltar">‹</button>
-      <button id="forward" title="Avançar">›</button>
-      <button id="reload" title="Recarregar">↻</button>
+<body class="k-surface k-type-body">
+  <header class="top">
+    <nav class="nav">
+      <button id="back" class="k-icon-button k-state" title="Voltar" data-icon="arrow-left"></button>
+      <button id="forward" class="k-icon-button k-state" title="Avançar" data-icon="arrow-right"></button>
+      <button id="reload" class="k-icon-button k-state" title="Recarregar" data-icon="rotate-cw"></button>
     </nav>
-    <input id="address" type="text" placeholder="Buscar ou digitar endereço" autocomplete="off">
+    <button id="menu-button" class="k-icon-button k-state" title="Menu" data-icon="ellipsis-vertical" aria-haspopup="menu"></button>
+    <ul id="menu" class="k-menu k-type-label" role="menu" hidden>
+      <li class="k-menu__item k-state" data-action="ranga-settings"><span class="k-icon" data-icon="settings"></span>Configurações do Ranga</li>
+      <li class="k-menu__item k-state" data-action="chrome://downloads"><span class="k-icon" data-icon="download"></span>Downloads</li>
+      <li class="k-menu__item k-state" data-action="chrome://history"><span class="k-icon" data-icon="history"></span>Histórico</li>
+      <li class="k-menu__item k-state" data-action="chrome://extensions"><span class="k-icon" data-icon="puzzle"></span>Extensões</li>
+      <li class="k-menu__item k-state" data-action="chrome://settings"><span class="k-icon" data-icon="sliders-horizontal"></span>Configurações do navegador</li>
+    </ul>
   </header>
-  <ul id="tabs"></ul>
-  <footer>
-    <button id="new-tab">+ Nova aba</button>
-  </footer>
+
+  <label class="address">
+    <span id="address-icon" class="k-icon" data-icon="globe"></span>
+    <input id="address" class="k-text-field k-type-label" type="text" placeholder="Buscar ou digitar endereço" autocomplete="off" spellcheck="false">
+  </label>
+
+  <section id="pinned" class="favorites" hidden></section>
+
+  <div class="today-header">
+    <span class="k-type-section">Hoje</span>
+    <button id="clear-today" class="clear k-state k-type-label" title="Fechar as abas de hoje, menos a atual"><span class="k-icon" data-icon="arrow-down"></span>Limpar</button>
+  </div>
+  <div id="new-tab" class="k-list-item k-state k-type-label new-tab">
+    <span class="k-list-item__leading"><span class="k-icon" data-icon="plus"></span></span>
+    <span class="k-list-item__label">Nova aba</span>
+  </div>
+  <ul id="tabs" class="k-list"></ul>
+
   <script type="module" src="sidebar.js"></script>
 </body>
 </html>
