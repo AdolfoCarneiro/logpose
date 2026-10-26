@@ -1,0 +1,13 @@
+A barra e o onboarding do Ranga podem ler e marcar helium.services.schema_version. Sem isso o Ranga nunca aceitava a versão dos serviços (o aviso do Helium fica no menu escondido) e as listas do uBlock não atualizavam.
+
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -503,6 +503,8 @@
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kHeliumDidOnboarding] =
+       settings_api::PrefType::kBoolean;
++  (*s_allowlist)[::prefs::kHeliumSchemaVersion] =
++      settings_api::PrefType::kNumber;
+ 
+   // Privacy Guide
+   (*s_allowlist)[::prefs::kPrivacyGuideViewed] =

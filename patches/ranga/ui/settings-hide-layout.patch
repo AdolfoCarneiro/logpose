@@ -1,0 +1,110 @@
+Em chrome://settings/appearance, sem a interface nativa (fora do --ranga-native-chrome), some o que não vale no Ranga: a seção Layout (abas verticais, layout compacto, barra de endereço, modo sem moldura), Personalizar barra de ferramentas, botão Página inicial, barra de favoritos, grupos de abas na barra de favoritos e cartões ao passar o mouse nas abas.
+
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -12,6 +12,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/memory/ptr_util.h"
+ #include "base/strings/strcat.h"
+@@ -355,6 +356,9 @@
+           profile);
+   html_source->AddBoolean("isEeaChoiceCountry",
+                           regional_capabilties->IsInEeaCountry());
++  html_source->AddBoolean("rangaMode",
++                          !base::CommandLine::ForCurrentProcess()->HasSwitch(
++                              "ranga-native-chrome"));
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+   html_source->AddBoolean(
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page_index.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page_index.ts
+@@ -10,6 +10,7 @@
+ import type {CrViewManagerElement} from 'chrome://resources/cr_elements/cr_view_manager/cr_view_manager.js';
+ import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
+ 
++import {loadTimeData} from '../i18n_setup.js';
+ import {routes} from '../route.js';
+ import type {Route, SettingsRoutes} from '../router.js';
+ import {RouteObserverMixinLit} from '../router.js';
+@@ -48,10 +49,15 @@
+       routes_: {
+         type: Object,
+       },
++      rangaMode_: {
++        type: Boolean,
++      },
+     };
+   }
+ 
+   protected accessor routes_: SettingsRoutes = routes;
++  protected accessor rangaMode_: boolean =
++      loadTimeData.getBoolean('rangaMode');
+ 
+   private showDefaultViews_() {
+     const views = this.$.viewManager.querySelectorAll(
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page_index.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page_index.html.ts
+@@ -11,8 +11,10 @@
+   return html`<!--_html_template_start_-->
+ <cr-view-manager id="viewManager" class="cr-centered-card-container"
+     ?show-all="${this.shouldShowAll}">
+-  <settings-appearance-layout-page slot="view" id="layout">
+-  </settings-appearance-layout-page>
++  ${!this.rangaMode_ ? html`
++    <settings-appearance-layout-page slot="view" id="layout">
++    </settings-appearance-layout-page>
++  ` : ''}
+ 
+   <settings-appearance-page slot="view" id="appearance">
+   </settings-appearance-page>
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -129,6 +129,7 @@
+   static override get properties() {
+     return {
+       pageVisibility_: {type: Object},
++      rangaMode_: {type: Boolean},
+       defaultZoom_: {type: Number},
+ 
+       defaultFontSizePref_: {type: Object},
+@@ -183,8 +184,14 @@
+   /**
+    * Dictionary defining page visibility.
+    */
+-  protected accessor pageVisibility_: AppearancePageVisibility =
+-      normalizePageVisibility(pageVisibility?.appearance);
++  protected accessor pageVisibility_: AppearancePageVisibility = {
++    ...normalizePageVisibility(pageVisibility?.appearance),
++    ...(loadTimeData.getBoolean('rangaMode') ?
++            {bookmarksBar: false, homeButton: false, hoverCard: false} :
++            {}),
++  };
++  protected accessor rangaMode_: boolean =
++      loadTimeData.getBoolean('rangaMode');
+   protected accessor defaultZoom_: number = 1.0;
+ 
+   // Mirrored prefs.
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+@@ -49,7 +49,7 @@
+       </div>
+ </if>
+     </div>
+-    <div id="toolbarRow" class="settings-row">
++    <div id="toolbarRow" class="settings-row" ?hidden="${this.rangaMode_}">
+       <cr-link-row id="customizeToolbar"
+           label="$i18n{customizeToolbar}"
+           @click="${this.onCustomizeToolbarClick_}" external>
+@@ -151,7 +151,7 @@
+     <settings-toggle-button class="hr" id="showSavedTabGroups"
+         pref-key="bookmark_bar.show_tab_groups"
+         label="$i18n{showTabGroupsInBookmarksBar}"
+-        ?hidden="${this.showOrganizerPanelEnabled_}">
++        ?hidden="${this.showOrganizerPanelEnabled_ || this.rangaMode_}">
+     </settings-toggle-button>
+ 
+     ${this.showCtrlTabMru_ ? html`

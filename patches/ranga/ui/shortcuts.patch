@@ -1,0 +1,424 @@
+Atalhos do Ranga configuráveis: rangaPrivate.setShortcuts recebe o mapa tecla → comando, cada janela registra as teclas com prioridade alta (antes da página e dos atalhos do Chromium) e manda rangaPrivate.onShortcut pra barra lateral. executeCommand ganha openLocation (spotlight na aba atual). Leitura das teclas adaptada do patch 0016 do Flecha.
+
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/ranga_shortcuts.h
+@@ -0,0 +1,25 @@
++// Copyright 2026 The Ranga Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SHORTCUTS_H_
++#define CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SHORTCUTS_H_
++
++#include <map>
++#include <optional>
++#include <string>
++#include <string_view>
++
++#include "ui/base/accelerators/accelerator.h"
++
++class BrowserView;
++
++std::optional<ui::Accelerator> ParseRangaAccelerator(std::string_view text);
++
++void RangaSetShortcuts(std::map<ui::Accelerator, std::string> shortcuts);
++
++bool RangaHasShortcut(const ui::Accelerator& accelerator);
++
++void RangaRegisterShortcuts(BrowserView* browser_view);
++
++#endif  // CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SHORTCUTS_H_
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/ranga_shortcuts.cc
+@@ -0,0 +1,224 @@
++// Copyright 2026 The Ranga Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/views/frame/ranga_shortcuts.h"
++
++#include <memory>
++#include <utility>
++#include <vector>
++
++#include "base/memory/raw_ptr.h"
++#include "base/no_destructor.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
++#include "base/strings/string_util.h"
++#include "base/values.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ranga/ranga_sidebar.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "extensions/browser/event_router.h"
++#include "extensions/browser/extension_event_histogram_value.h"
++#include "ui/base/class_property.h"
++#include "ui/events/event_constants.h"
++#include "ui/events/keycodes/keyboard_codes.h"
++#include "ui/views/focus/focus_manager.h"
++
++namespace {
++
++std::map<ui::Accelerator, std::string>& Shortcuts() {
++  static base::NoDestructor<std::map<ui::Accelerator, std::string>> shortcuts;
++  return *shortcuts;
++}
++
++std::optional<ui::KeyboardCode> KeyFor(std::string_view name) {
++  if (name.size() == 1) {
++    const char c = base::ToUpperASCII(name[0]);
++    if (c >= 'A' && c <= 'Z') {
++      return static_cast<ui::KeyboardCode>(ui::VKEY_A + (c - 'A'));
++    }
++    if (c >= '0' && c <= '9') {
++      return static_cast<ui::KeyboardCode>(ui::VKEY_0 + (c - '0'));
++    }
++    switch (c) {
++      case '[':
++        return ui::VKEY_OEM_4;
++      case ']':
++        return ui::VKEY_OEM_6;
++      case '=':
++        return ui::VKEY_OEM_PLUS;
++      case '-':
++        return ui::VKEY_OEM_MINUS;
++      case ',':
++        return ui::VKEY_OEM_COMMA;
++      case '.':
++        return ui::VKEY_OEM_PERIOD;
++      case '/':
++        return ui::VKEY_OEM_2;
++      case ';':
++        return ui::VKEY_OEM_1;
++      case '\'':
++        return ui::VKEY_OEM_7;
++      case '`':
++        return ui::VKEY_OEM_3;
++      case '\\':
++        return ui::VKEY_OEM_5;
++    }
++    return std::nullopt;
++  }
++  const std::string key = base::ToLowerASCII(name);
++  static constexpr struct {
++    const char* name;
++    ui::KeyboardCode code;
++  } kNamed[] = {
++      {"plus", ui::VKEY_OEM_PLUS},   {"tab", ui::VKEY_TAB},
++      {"space", ui::VKEY_SPACE},     {"enter", ui::VKEY_RETURN},
++      {"escape", ui::VKEY_ESCAPE},   {"backspace", ui::VKEY_BACK},
++      {"delete", ui::VKEY_DELETE},   {"up", ui::VKEY_UP},
++      {"down", ui::VKEY_DOWN},       {"left", ui::VKEY_LEFT},
++      {"right", ui::VKEY_RIGHT},     {"home", ui::VKEY_HOME},
++      {"end", ui::VKEY_END},         {"pageup", ui::VKEY_PRIOR},
++      {"pagedown", ui::VKEY_NEXT},
++  };
++  for (const auto& named : kNamed) {
++    if (key == named.name) {
++      return named.code;
++    }
++  }
++  int f = 0;
++  if (key.size() >= 2 && key[0] == 'f' &&
++      base::StringToInt(std::string_view(key).substr(1), &f) && f >= 1 &&
++      f <= 24) {
++    return static_cast<ui::KeyboardCode>(ui::VKEY_F1 + (f - 1));
++  }
++  return std::nullopt;
++}
++
++std::optional<int> ModifierFor(std::string_view name) {
++  const std::string modifier = base::ToLowerASCII(name);
++  if (modifier == "ctrl") {
++    return ui::EF_CONTROL_DOWN;
++  }
++  if (modifier == "alt") {
++    return ui::EF_ALT_DOWN;
++  }
++  if (modifier == "shift") {
++    return ui::EF_SHIFT_DOWN;
++  }
++  if (modifier == "super") {
++    return ui::EF_COMMAND_DOWN;
++  }
++  return std::nullopt;
++}
++
++class RangaShortcutTarget : public ui::AcceleratorTarget {
++ public:
++  explicit RangaShortcutTarget(BrowserView* browser_view)
++      : browser_view_(browser_view) {}
++
++  ~RangaShortcutTarget() override { Unregister(); }
++
++  void Register() {
++    Unregister();
++    focus_manager_ = browser_view_->GetFocusManager();
++    if (!focus_manager_) {
++      return;
++    }
++    for (const auto& [accelerator, command] : Shortcuts()) {
++      focus_manager_->RegisterAccelerator(
++          accelerator, ui::AcceleratorManager::kHighPriority, this);
++    }
++  }
++
++  void Unregister() {
++    if (focus_manager_) {
++      focus_manager_->UnregisterAccelerators(this);
++      focus_manager_ = nullptr;
++    }
++  }
++
++  bool AcceleratorPressed(const ui::Accelerator& accelerator) override {
++    const auto it = Shortcuts().find(
++        ui::Accelerator(accelerator.key_code(), accelerator.modifiers()));
++    if (it == Shortcuts().end()) {
++      return false;
++    }
++    BrowserWindowInterface* browser = browser_view_->browser();
++    Profile* profile = browser->GetProfile()->GetOriginalProfile();
++    base::ListValue args;
++    args.Append(it->second);
++    args.Append(browser->GetSessionID().id());
++    auto event = std::make_unique<extensions::Event>(
++        extensions::events::COMMANDS_ON_COMMAND, "rangaPrivate.onShortcut",
++        std::move(args), profile);
++    event->user_gesture = extensions::EventRouter::UserGestureState::kEnabled;
++    extensions::EventRouter::Get(profile)->DispatchEventToExtension(
++        kRangaSidebarExtensionId, std::move(event));
++    return true;
++  }
++
++  bool CanHandleAccelerators() const override {
++    return browser_view_->IsActive();
++  }
++
++ private:
++  raw_ptr<BrowserView> browser_view_;
++  raw_ptr<views::FocusManager> focus_manager_ = nullptr;
++};
++
++}  // namespace
++
++DEFINE_UI_CLASS_PROPERTY_TYPE(RangaShortcutTarget*)
++DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(RangaShortcutTarget,
++                                   kRangaShortcutTargetKey)
++
++std::optional<ui::Accelerator> ParseRangaAccelerator(std::string_view text) {
++  const std::vector<std::string_view> parts = base::SplitStringPiece(
++      text, "+", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
++  if (parts.empty() || parts.back().empty()) {
++    return std::nullopt;
++  }
++  int modifiers = ui::EF_NONE;
++  for (size_t i = 0; i + 1 < parts.size(); ++i) {
++    const std::optional<int> modifier = ModifierFor(parts[i]);
++    if (!modifier) {
++      return std::nullopt;
++    }
++    modifiers |= *modifier;
++  }
++  const std::optional<ui::KeyboardCode> key = KeyFor(parts.back());
++  if (!key) {
++    return std::nullopt;
++  }
++  return ui::Accelerator(*key, modifiers);
++}
++
++void RangaSetShortcuts(std::map<ui::Accelerator, std::string> shortcuts) {
++  Shortcuts() = std::move(shortcuts);
++  GlobalBrowserCollection::GetInstance()->ForEach(
++      [](BrowserWindowInterface* browser) {
++        if (BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser);
++            view && view->GetProperty(kRangaShortcutTargetKey)) {
++          view->GetProperty(kRangaShortcutTargetKey)->Register();
++        }
++        return true;
++      });
++}
++
++bool RangaHasShortcut(const ui::Accelerator& accelerator) {
++  return Shortcuts().contains(
++      ui::Accelerator(accelerator.key_code(), accelerator.modifiers()));
++}
++
++void RangaRegisterShortcuts(BrowserView* browser_view) {
++  RangaShortcutTarget* target =
++      browser_view->GetProperty(kRangaShortcutTargetKey);
++  if (!target) {
++    target = browser_view->SetProperty(
++        kRangaShortcutTargetKey,
++        std::make_unique<RangaShortcutTarget>(browser_view));
++  }
++  target->Register();
++}
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -3553,6 +3553,8 @@
+       "views/frame/browser_view.cc",
+       "views/frame/ranga_spotlight_view.cc",
+       "views/frame/ranga_spotlight_view.h",
++      "views/frame/ranga_shortcuts.cc",
++      "views/frame/ranga_shortcuts.h",
+       "views/frame/horizontal_tab_strip_region_view.cc",
+       "views/frame/horizontal_tab_strip_region_view.h",
+       "views/frame/vertical_tab_strip_region_view.cc",
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -177,6 +177,7 @@
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_delegate_impl.h"
+ #include "chrome/browser/ui/views/frame/main_background_region_view.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
++#include "chrome/browser/ui/views/frame/ranga_shortcuts.h"
+ #include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
+ #include "extensions/browser/event_router.h"
+ #include "extensions/browser/extension_event_histogram_value.h"
+@@ -2370,6 +2371,7 @@
+ 
+   if (RangaHidesNativeChrome(browser_)) {
+     RangaOverlayFor(this, "switcher.html")->Preload();
++    RangaRegisterShortcuts(this);
+     for (views::View* child : children()) {
+       if (auto* shadow = views::AsViewClass<ShadowFrameView>(child)) {
+         shadow->SetShadowCornerRadius(12);
+@@ -4000,6 +4002,13 @@
+     return result;
+   }
+ 
++  if (RangaHidesNativeChrome(browser_) &&
++      event.GetType() == blink::WebInputEvent::Type::kRawKeyDown &&
++      RangaHasShortcut(accelerator) &&
++      focus_manager->ProcessAccelerator(accelerator)) {
++    return content::KeyboardEventProcessingResult::HANDLED;
++  }
++
+   int id;
+   if (!FindCommandIdForAccelerator(accelerator, &id)) {
+     // |accelerator| is not a browser command, it may be handled by ash (e.g.
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -57,6 +57,15 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateSetShortcutsFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.setShortcuts", UNKNOWN)
++
++ protected:
++  ~RangaPrivateSetShortcutsFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class RangaPrivateExecuteCommandFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("rangaPrivate.executeCommand", UNKNOWN)
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <algorithm>
+ #include <array>
++#include <map>
+ #include <string>
+ #include <utility>
+ #include <vector>
+@@ -24,6 +25,8 @@
+ #include "chrome/browser/ui/extensions/ranga_crashed_session.h"
+ #include "chrome/browser/ui/extensions/ranga_popup_anchor.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
++#include "chrome/browser/ui/views/frame/ranga_shortcuts.h"
++#include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/toolbar/toolbar_action_view_model.h"
+ #include "chrome/browser/ui/toolbar/toolbar_actions_model.h"
+@@ -224,6 +227,26 @@
+   return RespondNow(NoArguments());
+ }
+ 
++ExtensionFunction::ResponseAction RangaPrivateSetShortcutsFunction::Run() {
++  auto params = ranga_private::SetShortcuts::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::map<ui::Accelerator, std::string> shortcuts;
++  std::vector<std::string> rejected;
++  for (const auto [keys, command] : params->shortcuts.additional_properties) {
++    const std::optional<ui::Accelerator> accelerator =
++        ParseRangaAccelerator(keys);
++    if (!accelerator || !command.is_string()) {
++      rejected.push_back(keys);
++      continue;
++    }
++    shortcuts[*accelerator] = command.GetString();
++  }
++  RangaSetShortcuts(std::move(shortcuts));
++  return RespondNow(ArgumentList(
++      ranga_private::SetShortcuts::Results::Create(rejected)));
++}
++
+ ExtensionFunction::ResponseAction RangaPrivateExecuteCommandFunction::Run() {
+   auto params = ranga_private::ExecuteCommand::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
+@@ -234,6 +257,10 @@
+   if (!browser) {
+     return RespondNow(Error(std::move(error)));
+   }
++  if (params->command == "openLocation" &&
++      RangaShowSpotlight(browser, "current")) {
++    return RespondNow(NoArguments());
++  }
+   for (const Command& command : kCommands) {
+     if (params->command == command.name &&
+         chrome::ExecuteCommand(browser, command.id)) {
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -53,6 +53,7 @@
+   callback TabContainersCallback = void(TabContainer[] tabs);
+   callback CommandsCallback = void(DOMString[] commands);
+   callback CrashedSessionCallback = void(boolean offered);
++  callback RejectedCallback = void(DOMString[] rejected);
+   callback DoneCallback = void();
+ 
+   interface Functions {
+@@ -81,6 +82,15 @@
+         long windowId,
+         CrashedSessionCallback callback);
+ 
++    // Ranga's keyboard shortcuts: <code>shortcuts</code> maps keys
++    // ("Ctrl+Shift+C"; modifiers Ctrl, Alt, Shift and Super) to command ids.
++    // Every window takes these keys before the page and before Chromium's own
++    // shortcuts and sends them to onShortcut. Replaces the previous map. The
++    // callback gets the keys that couldn't be read.
++    static void setShortcuts(
++        object shortcuts,
++        optional RejectedCallback callback);
++
+     // Answers the offer: reopens the crashed session in the window, or lets
+     // it go.
+     static void resolveCrashedSession(
+@@ -88,9 +98,9 @@
+         boolean restore,
+         optional DoneCallback callback);
+ 
+-    // Runs a browser command in the window: newTab, installPwa, createShortcut,
+-    // openInApp, print, find, zoomIn, zoomOut, zoomReset, savePage,
+-    // viewSource, devTools, taskManager or clearBrowsingData.
++    // Runs a browser command in the window: newTab, openLocation, installPwa,
++    // createShortcut, openInApp, print, find, zoomIn, zoomOut, zoomReset,
++    // savePage, viewSource, devTools, taskManager or clearBrowsingData.
+     static void executeCommand(
+         long windowId,
+         DOMString command,
+@@ -124,4 +134,9 @@
+         DOMString container,
+         optional DoneCallback callback);
+   };
++
++  interface Events {
++    // A shortcut from setShortcuts() was pressed in the window.
++    static void onShortcut(DOMString command, long windowId);
++  };
+ };

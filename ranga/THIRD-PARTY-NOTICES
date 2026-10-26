@@ -2,7 +2,7 @@ Ranga inclui trechos adaptados dos projetos abaixo.
 
 == Flecha ==
 https://github.com/lucianodiisouza/flecha-browser
-Usado em: patches/ranga/ui/side-panel-left.patch, patches/ranga/ui/ranga-private-api.patch (registro da API privada, a partir do flechaPrivate), patches/ranga/ui/containers.patch (partição fixa por aba, a partir do patch 0034), patches/ranga/ui/sidebar-component.patch (barra como extensão de componente, a partir do patch 0021)
+Usado em: patches/ranga/ui/side-panel-left.patch, patches/ranga/ui/ranga-private-api.patch (registro da API privada, a partir do flechaPrivate), patches/ranga/ui/containers.patch (partição fixa por aba, a partir do patch 0034), patches/ranga/ui/sidebar-component.patch (barra como extensão de componente, a partir do patch 0021), patches/ranga/ui/page-shadow.patch (sombra sob a página, a partir do patch 0041), patches/ranga/ui/shortcuts.patch (leitura das teclas e registro com prioridade alta, a partir do patch 0016)
 
 MIT License
 

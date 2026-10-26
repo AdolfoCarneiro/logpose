@@ -1,0 +1,169 @@
+O spotlight e a barra de endereço da barra lateral leem o texto como a barra de endereço do Chromium: !bangs do Helium e palavras-chave de mecanismos de busca (rangaPrivate.resolveInput).
+
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -75,6 +75,19 @@
+     PeekCard card;
+   };
+ 
++  // What resolveInput() makes of the text, as the address bar would.
++  dictionary ResolvedInput {
++    // Where Enter in the address bar would go.
++    DOMString url;
++    // "url" for an address, "search" for the default search engine, or
++    // "keyword" for another engine, chosen by its keyword or !bang.
++    DOMString kind;
++    // The engine of a "keyword" search.
++    DOMString? engine;
++    // What a "keyword" search looks for, without the keyword.
++    DOMString? query;
++  };
++
+   callback ExtensionActionsCallback = void(ExtensionAction[] actions);
+   callback SearchEnginesCallback = void(SearchEngine[] engines);
+   callback FindCallback = void(FindResult result);
+@@ -84,6 +97,7 @@
+   callback CrashedSessionCallback = void(boolean offered);
+   callback RejectedCallback = void(DOMString[] rejected);
+   callback PeekCallback = void(optional PeekState peek);
++  callback ResolvedInputCallback = void(ResolvedInput input);
+   callback DoneCallback = void();
+ 
+   interface Functions {
+@@ -152,6 +166,14 @@
+         DOMString command,
+         optional DoneCallback callback);
+ 
++    // Reads <code>text</code> as the window's address bar would: an
++    // address, a search, or a search with another engine when it starts
++    // with the engine's keyword or has a !bang.
++    static void resolveInput(
++        long windowId,
++        DOMString text,
++        ResolvedInputCallback callback);
++
+     // Finds <code>text</code> in the window's active tab, from the
+     // highlighted match on, and highlights the next (or previous) one.
+     static void find(
+--- a/chrome/browser/extensions/api/ranga_private/BUILD.gn
++++ b/chrome/browser/extensions/api/ranga_private/BUILD.gn
+@@ -13,6 +13,7 @@
+   deps = [
+     "//base",
+     "//chrome/app:command_ids",
++    "//chrome/browser/autocomplete",
+     "//chrome/browser/extensions",
+     "//chrome/browser/profiles",
+     "//chrome/browser/ranga",
+@@ -22,10 +23,12 @@
+     "//chrome/browser/ui/toolbar",
+     "//chrome/common/extensions/api",
+     "//components/find_in_page",
++    "//components/omnibox/browser",
+     "//components/search_engines",
+     "//components/tabs:public",
+     "//content/public/browser",
+     "//services/network/public/mojom",
++    "//third_party/metrics_proto",
+     "//extensions/browser",
+     "//ui/base",
+     "//ui/gfx",
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -102,6 +102,15 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateResolveInputFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.resolveInput", UNKNOWN)
++
++ protected:
++  ~RangaPrivateResolveInputFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class RangaPrivateFindFunction : public ExtensionFunction,
+                                   public find_in_page::FindResultObserver {
+  public:
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -14,6 +14,7 @@
+ #include "base/base64.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
+ #include "chrome/browser/extensions/extension_tab_util.h"
+ #include "chrome/browser/extensions/window_controller.h"
+ #include "chrome/browser/profiles/profile.h"
+@@ -40,6 +41,9 @@
+ #include "chrome/common/webui_url_constants.h"
+ #include "components/find_in_page/find_notification_details.h"
+ #include "components/find_in_page/find_types.h"
++#include "components/omnibox/browser/autocomplete_classifier.h"
++#include "components/omnibox/browser/autocomplete_match.h"
++#include "components/omnibox/browser/autocomplete_match_type.h"
+ #include "components/search_engines/choice_made_location.h"
+ #include "components/search_engines/template_url.h"
+ #include "components/search_engines/template_url_service.h"
+@@ -52,6 +56,7 @@
+ #include "services/network/public/mojom/clear_data_filter.mojom.h"
+ #include "services/network/public/mojom/cookie_manager.mojom.h"
+ #include "services/network/public/mojom/network_context.mojom.h"
++#include "third_party/metrics_proto/omnibox_event.pb.h"
+ #include "ui/base/base_window.h"
+ #include "ui/base/models/image_model.h"
+ #include "ui/base/page_transition_types.h"
+@@ -73,6 +78,7 @@
+ constexpr char kNoActionError[] = "No extension action with id *.";
+ constexpr char kNoCommandError[] = "Unknown or disabled command *.";
+ constexpr char kBadUrlError[] = "Invalid url *.";
++constexpr char kBadInputError[] = "Nowhere to go for *.";
+ constexpr char kNoContainerError[] = "Only a container can be cleared.";
+ constexpr char kNoPeekError[] = "The window has no Peek.";
+ constexpr char kNotLittleError[] = "The window isn't a small window.";
+@@ -364,6 +370,44 @@
+   return RespondNow(Error(kNoCommandError, params->command));
+ }
+ 
++ExtensionFunction::ResponseAction RangaPrivateResolveInputFunction::Run() {
++  auto params = ranga_private::ResolveInput::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  Profile* profile = browser->GetProfile();
++  AutocompleteMatch match;
++  AutocompleteClassifierFactory::GetForProfile(profile)->Classify(
++      AutocompleteMatch::SanitizeString(base::UTF8ToUTF16(params->text)),
++      /*in_keyword_mode=*/false, /*allow_exact_keyword_match=*/true,
++      metrics::OmniboxEventProto::OTHER, &match, nullptr);
++  if (!match.destination_url.is_valid()) {
++    return RespondNow(Error(kBadInputError, params->text));
++  }
++  ranga_private::ResolvedInput input;
++  input.url = match.destination_url.spec();
++  input.kind = AutocompleteMatch::IsSearchType(match.type) ? "search" : "url";
++  TemplateURLService* service =
++      TemplateURLServiceFactory::GetForProfile(profile);
++  const TemplateURL* engine =
++      service &&
++              match.type == omnibox::AutocompleteMatchType::kSearchOtherEngine
++          ? match.GetTemplateURL(service)
++          : nullptr;
++  if (engine && engine != service->GetDefaultSearchProvider()) {
++    input.kind = "keyword";
++    input.engine = base::UTF16ToUTF8(engine->short_name());
++    input.query = base::UTF16ToUTF8(match.contents);
++  }
++  return RespondNow(
++      ArgumentList(ranga_private::ResolveInput::Results::Create(input)));
++}
++
+ ExtensionFunction::ResponseAction RangaPrivateFindFunction::Run() {
+   auto params = ranga_private::Find::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);

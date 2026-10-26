@@ -1,0 +1,166 @@
+Informações do site (conexão, permissões, cookies, ruído contra fingerprinting) pelo cadeado da barra lateral e pelo spotlight: rangaPrivate.showPageInfo e o comando pageInfo, no canto de cima da página.
+
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -160,12 +160,18 @@
+ 
+     // Runs a browser command in the window: newTab, openLocation, installPwa,
+     // createShortcut, openInApp, print, find, zoomIn, zoomOut, zoomReset,
+-    // savePage, viewSource, devTools, taskManager or clearBrowsingData.
++    // savePage, viewSource, devTools, taskManager, clearBrowsingData or
++    // pageInfo.
+     static void executeCommand(
+         long windowId,
+         DOMString command,
+         optional DoneCallback callback);
+ 
++    // Opens the site's information (connection, permissions, cookies) for
++    // the window's active tab, at the top of the page, as a click on the
++    // address bar's lock would.
++    static void showPageInfo(long windowId, optional DoneCallback callback);
++
+     // Reads <code>text</code> as the window's address bar would: an
+     // address, a search, or a search with another engine when it starts
+     // with the engine's keyword or has a !bang.
+--- a/chrome/browser/extensions/api/ranga_private/BUILD.gn
++++ b/chrome/browser/extensions/api/ranga_private/BUILD.gn
+@@ -19,7 +19,9 @@
+     "//chrome/browser/ranga",
+     "//chrome/browser/ui",
+     "//chrome/browser/ui:browser_window_header",
++    "//chrome/browser/ui:bubble_anchor_util",
+     "//chrome/browser/ui/extensions",
++    "//chrome/browser/ui/page_info",
+     "//chrome/browser/ui/toolbar",
+     "//chrome/common/extensions/api",
+     "//components/find_in_page",
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -102,6 +102,15 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateShowPageInfoFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.showPageInfo", UNKNOWN)
++
++ protected:
++  ~RangaPrivateShowPageInfoFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class RangaPrivateResolveInputFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("rangaPrivate.resolveInput", UNKNOWN)
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -12,6 +12,7 @@
+ #include <vector>
+ 
+ #include "base/base64.h"
++#include "base/functional/callback_helpers.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
+@@ -25,9 +26,11 @@
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
++#include "chrome/browser/ui/bubble_anchor_util.h"
+ #include "chrome/browser/ui/extensions/extensions_container.h"
+ #include "chrome/browser/ui/extensions/ranga_crashed_session.h"
+ #include "chrome/browser/ui/extensions/ranga_popup_anchor.h"
++#include "chrome/browser/ui/page_info/page_info_dialog.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/views/frame/ranga_peek_view.h"
+ #include "chrome/browser/ui/views/frame/ranga_shortcuts.h"
+@@ -50,6 +53,7 @@
+ #include "components/search_engines/template_url_starter_pack_data.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/navigation_controller.h"
++#include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/page_navigator.h"
+ #include "content/public/browser/storage_partition.h"
+ #include "content/public/browser/web_contents.h"
+@@ -80,6 +84,7 @@
+ constexpr char kBadUrlError[] = "Invalid url *.";
+ constexpr char kBadInputError[] = "Nowhere to go for *.";
+ constexpr char kNoContainerError[] = "Only a container can be cleared.";
++constexpr char kNoPageInfoError[] = "The active tab has no site information.";
+ constexpr char kNoPeekError[] = "The window has no Peek.";
+ constexpr char kNotLittleError[] = "The window isn't a small window.";
+ constexpr char kNoMainWindowError[] = "Can't move the page to a main window.";
+@@ -89,6 +94,8 @@
+   int id;
+ };
+ 
++constexpr char kPageInfoCommand[] = "pageInfo";
++
+ constexpr auto kCommands = std::to_array<Command>({
+     {"newTab", IDC_NEW_TAB},
+     {"installPwa", IDC_INSTALL_PWA},
+@@ -123,6 +130,21 @@
+   return tab ? tab->GetContents() : nullptr;
+ }
+ 
++content::WebContents* PageInfoContents(BrowserWindowInterface* browser) {
++  content::WebContents* contents =
++      browser->GetTabStripModel()->GetActiveWebContents();
++  if (!contents ||
++      contents->GetController().GetVisibleEntry()->IsInitialEntry()) {
++    return nullptr;
++  }
++  return contents;
++}
++
++bool ShowPageInfo(BrowserWindowInterface* browser) {
++  return ShowPageInfoDialog(PageInfoContents(browser), base::DoNothing(),
++                            bubble_anchor_util::Anchor::kLocationBar);
++}
++
+ std::string IconDataUrl(ToolbarActionViewModel* action,
+                         content::WebContents* contents) {
+   ui::ImageModel model =
+@@ -219,6 +241,9 @@
+       enabled.push_back(command.name);
+     }
+   }
++  if (PageInfoContents(browser)) {
++    enabled.push_back(kPageInfoCommand);
++  }
+   return RespondNow(ArgumentList(
+       ranga_private::GetEnabledCommands::Results::Create(enabled)));
+ }
+@@ -361,6 +386,9 @@
+       RangaShowSpotlight(browser, "current")) {
+     return RespondNow(NoArguments());
+   }
++  if (params->command == kPageInfoCommand && ShowPageInfo(browser)) {
++    return RespondNow(NoArguments());
++  }
+   for (const Command& command : kCommands) {
+     if (params->command == command.name &&
+         chrome::ExecuteCommand(browser, command.id)) {
+@@ -370,6 +398,22 @@
+   return RespondNow(Error(kNoCommandError, params->command));
+ }
+ 
++ExtensionFunction::ResponseAction RangaPrivateShowPageInfoFunction::Run() {
++  auto params = ranga_private::ShowPageInfo::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  if (!ShowPageInfo(browser)) {
++    return RespondNow(Error(kNoPageInfoError));
++  }
++  return RespondNow(NoArguments());
++}
++
+ ExtensionFunction::ResponseAction RangaPrivateResolveInputFunction::Run() {
+   auto params = ranga_private::ResolveInput::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);

@@ -1,0 +1,47 @@
+Mais comandos pro spotlight e pro menu da barra lateral: capturar tela, QR code da página e perfis (seletor de perfis). A seleção da captura cobre a página certa quando ela não começa no canto da janela (a barra lateral à esquerda deslocava a camada).
+
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -160,8 +160,8 @@
+ 
+     // Runs a browser command in the window: newTab, openLocation, installPwa,
+     // createShortcut, openInApp, print, find, zoomIn, zoomOut, zoomReset,
+-    // savePage, viewSource, devTools, taskManager, clearBrowsingData or
+-    // pageInfo.
++    // savePage, viewSource, devTools, taskManager, clearBrowsingData,
++    // pageInfo, screenshot, qrCode or profiles.
+     static void executeCommand(
+         long windowId,
+         DOMString command,
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -111,6 +111,9 @@
+     {"devTools", IDC_DEV_TOOLS},
+     {"taskManager", IDC_TASK_MANAGER},
+     {"clearBrowsingData", IDC_CLEAR_BROWSING_DATA},
++    {"screenshot", IDC_SHARING_HUB_SCREENSHOT},
++    {"qrCode", IDC_QRCODE_GENERATOR},
++    {"profiles", IDC_MANAGE_CHROME_PROFILES},
+ });
+ 
+ BrowserWindowInterface* BrowserForWindow(ExtensionFunction* function,
+--- a/chrome/browser/image_editor/screenshot_flow.cc
++++ b/chrome/browser/image_editor/screenshot_flow.cc
+@@ -132,7 +132,7 @@
+ #else
+   const gfx::NativeWindow& native_window = web_contents_->GetNativeView();
+   ui::Layer* content_layer = native_window->layer();
+-  const gfx::Rect bounds = native_window->bounds();
++  const gfx::Rect bounds(native_window->bounds().size());
+   // Capture mouse down and drag events on our window.
+   event_capture_.Observe(native_window);
+ #endif
+@@ -371,7 +371,7 @@
+   }
+ #else
+   const gfx::NativeWindow& native_window = web_contents_->GetNativeView();
+-  const gfx::Rect bounds = native_window->bounds();
++  const gfx::Rect bounds(native_window->bounds().size());
+ #endif
+   screen_capture_layer_->SetBounds(bounds);
+ }

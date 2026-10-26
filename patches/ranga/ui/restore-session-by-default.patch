@@ -1,0 +1,15 @@
+O Ranga abre de onde parou por padrão (perfil novo ou sem escolha feita). A escolha continua em Configurações do Ranga → Navegador → Ao abrir.
+
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -66,7 +66,9 @@
+ #if BUILDFLAG(IS_CHROMEOS)
+   return SessionStartupPref::LAST;
+ #else
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_LINUX)
++  return SessionStartupPref::LAST;
++#elif BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+   if (features::kSetDefaultToContinueSession.Get()) {
+     return SessionStartupPref::LAST;
+   }

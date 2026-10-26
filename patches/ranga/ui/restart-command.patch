@@ -1,0 +1,23 @@
+rangaPrivate.executeCommand(window, "restart") reinicia o navegador com as abas (chrome::AttemptRestart). Extensão não pode abrir chrome://restart; a barra usa isso no aviso "Reinicie para atualizar".
+
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -18,6 +18,7 @@
+ #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
+ #include "chrome/browser/extensions/extension_tab_util.h"
+ #include "chrome/browser/extensions/window_controller.h"
++#include "chrome/browser/lifetime/application_lifetime.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ranga/ranga_containers.h"
+ #include "chrome/browser/ranga/ranga_links.h"
+@@ -392,6 +393,10 @@
+   if (params->command == kPageInfoCommand && ShowPageInfo(browser)) {
+     return RespondNow(NoArguments());
+   }
++  if (params->command == "restart") {
++    chrome::AttemptRestart();
++    return RespondNow(NoArguments());
++  }
+   for (const Command& command : kCommands) {
+     if (params->command == command.name &&
+         chrome::ExecuteCommand(browser, command.id)) {

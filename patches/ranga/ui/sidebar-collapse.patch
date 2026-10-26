@@ -1,0 +1,343 @@
+Barra lateral recolhível: rangaPrivate.setSidebarMode põe a janela em "docked" (ao lado da página), "collapsed" (a barra sai da janela e deixa 6px pra dentro; a página da barra percebe o mouse ali) ou "floating" (a barra por cima da página, sem empurrar). Cada troca vai pra barra em rangaPrivate.onSidebarModeChanged.
+
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/ranga_sidebar_mode.h
+@@ -0,0 +1,26 @@
++// Copyright 2026 The Ranga Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SIDEBAR_MODE_H_
++#define CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SIDEBAR_MODE_H_
++
++#include <optional>
++#include <string_view>
++
++class BrowserWindowInterface;
++
++enum class RangaSidebarMode { kDocked, kCollapsed, kFloating };
++
++std::optional<RangaSidebarMode> ParseRangaSidebarMode(std::string_view mode);
++
++RangaSidebarMode RangaGetSidebarMode(const BrowserWindowInterface* browser);
++
++void RangaSetSidebarMode(BrowserWindowInterface* browser,
++                         RangaSidebarMode mode);
++
++// How much of a collapsed sidebar stays inside the window: the page in it
++// notices the pointer there and floats the sidebar back over the page.
++inline constexpr int kRangaSidebarEdgeWidth = 6;
++
++#endif  // CHROME_BROWSER_UI_VIEWS_FRAME_RANGA_SIDEBAR_MODE_H_
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/ranga_sidebar_mode.cc
+@@ -0,0 +1,160 @@
++// Copyright 2026 The Ranga Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/views/frame/ranga_sidebar_mode.h"
++
++#include <memory>
++#include <string>
++#include <utility>
++
++#include "base/containers/flat_map.h"
++#include "base/memory/raw_ptr.h"
++#include "base/no_destructor.h"
++#include "base/values.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ranga/ranga_sidebar.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/side_panel/side_panel.h"
++#include "components/sessions/core/session_id.h"
++#include "extensions/browser/event_router.h"
++#include "extensions/browser/extension_event_histogram_value.h"
++#include "ui/aura/window.h"
++#include "ui/aura/window_observer.h"
++#include "ui/events/event.h"
++#include "ui/events/event_handler.h"
++#include "ui/gfx/geometry/point_f.h"
++#include "ui/gfx/geometry/size.h"
++#include "ui/views/widget/widget.h"
++
++namespace {
++
++base::flat_map<SessionID::id_type, RangaSidebarMode>& Modes() {
++  static base::NoDestructor<base::flat_map<SessionID::id_type, RangaSidebarMode>>
++      modes;
++  return *modes;
++}
++
++std::string ModeName(RangaSidebarMode mode) {
++  switch (mode) {
++    case RangaSidebarMode::kDocked:
++      return "docked";
++    case RangaSidebarMode::kCollapsed:
++      return "collapsed";
++    case RangaSidebarMode::kFloating:
++      return "floating";
++  }
++}
++
++// A collapsed sidebar keeps only a thin strip inside the window, and window
++// managers with gaps leave the screen edge outside of it: a pointer pushed to
++// the edge crosses the strip between two events. Reaching the window's edge
++// on the sidebar's side, or leaving the window through it, floats the sidebar.
++class EdgeWatcher : public ui::EventHandler, public aura::WindowObserver {
++ public:
++  EdgeWatcher(BrowserWindowInterface* browser, aura::Window* root)
++      : browser_(browser), id_(browser->GetSessionID().id()), root_(root) {
++    root_->AddPreTargetHandler(this);
++    root_->AddObserver(this);
++  }
++  EdgeWatcher(const EdgeWatcher&) = delete;
++  EdgeWatcher& operator=(const EdgeWatcher&) = delete;
++  ~EdgeWatcher() override {
++    root_->RemovePreTargetHandler(this);
++    root_->RemoveObserver(this);
++  }
++
++  void OnMouseEvent(ui::MouseEvent* event) override {
++    const bool exited = event->type() == ui::EventType::kMouseExited;
++    if ((!exited && event->type() != ui::EventType::kMouseMoved) ||
++        RangaGetSidebarMode(browser_) != RangaSidebarMode::kCollapsed) {
++      return;
++    }
++    BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser_);
++    if (!view || !view->side_panel()) {
++      return;
++    }
++    const gfx::PointF point = event->root_location_f();
++    const gfx::Size size = root_->bounds().size();
++    const float side = view->side_panel()->IsRightAligned()
++                           ? size.width() - point.x()
++                           : point.x();
++    const float reach = exited ? kReach : kRangaSidebarEdgeWidth;
++    if (side <= reach && side < point.y() && side < size.height() - point.y()) {
++      RangaSetSidebarMode(browser_, RangaSidebarMode::kFloating);
++    }
++  }
++
++  void OnWindowDestroying(aura::Window* window) override;
++
++ private:
++  static constexpr float kReach = 48;
++
++  const raw_ptr<BrowserWindowInterface> browser_;
++  const SessionID::id_type id_;
++  const raw_ptr<aura::Window> root_;
++};
++
++base::flat_map<SessionID::id_type, std::unique_ptr<EdgeWatcher>>& Watchers() {
++  static base::NoDestructor<
++      base::flat_map<SessionID::id_type, std::unique_ptr<EdgeWatcher>>>
++      watchers;
++  return *watchers;
++}
++
++void EdgeWatcher::OnWindowDestroying(aura::Window* window) {
++  Watchers().erase(id_);
++}
++
++void WatchEdge(BrowserWindowInterface* browser, BrowserView* view) {
++  const SessionID::id_type id = browser->GetSessionID().id();
++  if (Watchers().contains(id) || !view->GetWidget()) {
++    return;
++  }
++  aura::Window* root = view->GetWidget()->GetNativeWindow()->GetRootWindow();
++  if (root) {
++    Watchers()[id] = std::make_unique<EdgeWatcher>(browser, root);
++  }
++}
++
++}  // namespace
++
++std::optional<RangaSidebarMode> ParseRangaSidebarMode(std::string_view mode) {
++  for (RangaSidebarMode candidate :
++       {RangaSidebarMode::kDocked, RangaSidebarMode::kCollapsed,
++        RangaSidebarMode::kFloating}) {
++    if (mode == ModeName(candidate)) {
++      return candidate;
++    }
++  }
++  return std::nullopt;
++}
++
++RangaSidebarMode RangaGetSidebarMode(const BrowserWindowInterface* browser) {
++  auto it = Modes().find(browser->GetSessionID().id());
++  return it == Modes().end() ? RangaSidebarMode::kDocked : it->second;
++}
++
++void RangaSetSidebarMode(BrowserWindowInterface* browser,
++                         RangaSidebarMode mode) {
++  if (RangaGetSidebarMode(browser) == mode) {
++    return;
++  }
++  Modes()[browser->GetSessionID().id()] = mode;
++  if (BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser)) {
++    if (mode == RangaSidebarMode::kCollapsed) {
++      WatchEdge(browser, view);
++    }
++    view->InvalidateLayout();
++  }
++  Profile* profile = browser->GetProfile()->GetOriginalProfile();
++  base::ListValue args;
++  args.Append(ModeName(mode));
++  args.Append(browser->GetSessionID().id());
++  extensions::EventRouter::Get(profile)->DispatchEventToExtension(
++      kRangaSidebarExtensionId,
++      std::make_unique<extensions::Event>(
++          extensions::events::COMMANDS_ON_COMMAND,
++          "rangaPrivate.onSidebarModeChanged", std::move(args), profile));
++}
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -3555,6 +3555,8 @@
+       "views/frame/ranga_spotlight_view.h",
+       "views/frame/ranga_shortcuts.cc",
+       "views/frame/ranga_shortcuts.h",
++      "views/frame/ranga_sidebar_mode.cc",
++      "views/frame/ranga_sidebar_mode.h",
+       "views/frame/horizontal_tab_strip_region_view.cc",
+       "views/frame/horizontal_tab_strip_region_view.h",
+       "views/frame/vertical_tab_strip_region_view.cc",
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -39,6 +39,7 @@
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_impl.h"
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_params.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
++#include "chrome/browser/ui/views/frame/ranga_sidebar_mode.h"
+ #include "chrome/browser/ui/views/frame/shadow_frame_view.h"
+ #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.h"
+@@ -1221,8 +1222,17 @@
+ 
+     // Not all of the width may be visible on the screen.
+     const int target_width = horizontal_layout.side_panel_width;
++    const RangaSidebarMode ranga_mode =
++        base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "ranga-native-chrome")
++            ? RangaSidebarMode::kDocked
++            : RangaGetSidebarMode(
++                  views::AsViewClass<BrowserView>(views().browser_view.get())
++                      ->browser());
+     const int visible_width =
+-        base::ClampFloor(target_width * side_panel_reveal_amount);
++        ranga_mode == RangaSidebarMode::kCollapsed
++            ? kRangaSidebarEdgeWidth
++            : base::ClampFloor(target_width * side_panel_reveal_amount);
+ 
+     // Add `container_inset_padding` to the top of the side panel to separate it
+     // from the horizontal tab strip. SidePanel draws the top on top of the top
+@@ -1254,10 +1264,12 @@
+                       side_panel_animation_content_bounds);
+     }
+ 
+-    params.InsetHorizontal(visible_width, side_panel_leading);
+-    if (side_panel_reveal_amount == 1.0) {
+-      InsetHorizontal(unclipped_contents_region, visible_width,
+-                      side_panel_leading);
++    if (ranga_mode == RangaSidebarMode::kDocked) {
++      params.InsetHorizontal(visible_width, side_panel_leading);
++      if (side_panel_reveal_amount == 1.0) {
++        InsetHorizontal(unclipped_contents_region, visible_width,
++                        side_panel_leading);
++      }
+     }
+   }
+ 
+@@ -1426,7 +1438,10 @@
+           "ranga-native-chrome") &&
+       !is_fullscreen(layout_data_->window_state)) {
+     const bool panel_shown =
+-        views().side_panel && views().side_panel->GetVisible();
++        views().side_panel && views().side_panel->GetVisible() &&
++        RangaGetSidebarMode(
++            views::AsViewClass<BrowserView>(views().browser_view.get())
++                ->browser()) == RangaSidebarMode::kDocked;
+     const bool panel_right =
+         panel_shown && views().side_panel->IsRightAligned();
+     ranga_contents_bounds.Inset(
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -66,6 +66,15 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateSetSidebarModeFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.setSidebarMode", UNKNOWN)
++
++ protected:
++  ~RangaPrivateSetSidebarModeFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class RangaPrivateExecuteCommandFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("rangaPrivate.executeCommand", UNKNOWN)
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -26,6 +26,7 @@
+ #include "chrome/browser/ui/extensions/ranga_popup_anchor.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/views/frame/ranga_shortcuts.h"
++#include "chrome/browser/ui/views/frame/ranga_sidebar_mode.h"
+ #include "chrome/browser/ui/views/frame/ranga_spotlight_view.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/toolbar/toolbar_action_view_model.h"
+@@ -247,6 +248,25 @@
+       ranga_private::SetShortcuts::Results::Create(rejected)));
+ }
+ 
++ExtensionFunction::ResponseAction RangaPrivateSetSidebarModeFunction::Run() {
++  auto params = ranga_private::SetSidebarMode::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  const std::optional<RangaSidebarMode> mode =
++      ParseRangaSidebarMode(params->mode);
++  if (!mode) {
++    return RespondNow(Error("Unknown sidebar mode: " + params->mode));
++  }
++  RangaSetSidebarMode(browser, *mode);
++  return RespondNow(NoArguments());
++}
++
+ ExtensionFunction::ResponseAction RangaPrivateExecuteCommandFunction::Run() {
+   auto params = ranga_private::ExecuteCommand::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -91,6 +91,14 @@
+         object shortcuts,
+         optional RejectedCallback callback);
+ 
++    // How the window shows the sidebar: "docked" beside the page,
++    // "collapsed" out of sight (the window's edge brings it back) or
++    // "floating" over the page.
++    static void setSidebarMode(
++        long windowId,
++        DOMString mode,
++        optional DoneCallback callback);
++
+     // Answers the offer: reopens the crashed session in the window, or lets
+     // it go.
+     static void resolveCrashedSession(
+@@ -138,5 +146,8 @@
+   interface Events {
+     // A shortcut from setShortcuts() was pressed in the window.
+     static void onShortcut(DOMString command, long windowId);
++
++    // The window's sidebar mode changed (see setSidebarMode()).
++    static void onSidebarModeChanged(DOMString mode, long windowId);
+   };
+ };

@@ -1,0 +1,158 @@
+rangaPrivate.getSearchEngines / setDefaultSearchEngine: as configurações do Ranga escolhem o mecanismo de busca padrão sem passar pelo chrome://settings.
+
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -47,7 +47,18 @@
+     long active;
+   };
+ 
++  // A search engine the user can make the default.
++  dictionary SearchEngine {
++    // Stable id (the engine's sync GUID).
++    DOMString id;
++    DOMString name;
++    DOMString keyword;
++    DOMString? favIconUrl;
++    boolean isDefault;
++  };
++
+   callback ExtensionActionsCallback = void(ExtensionAction[] actions);
++  callback SearchEnginesCallback = void(SearchEngine[] engines);
+   callback FindCallback = void(FindResult result);
+   callback TabIdCallback = void(long tabId);
+   callback TabContainersCallback = void(TabContainer[] tabs);
+@@ -99,6 +110,14 @@
+         DOMString mode,
+         optional DoneCallback callback);
+ 
++    // The search engines that can be the default, the default one marked.
++    static void getSearchEngines(SearchEnginesCallback callback);
++
++    // Makes the engine with <code>id</code> the default search engine.
++    static void setDefaultSearchEngine(
++        DOMString id,
++        optional DoneCallback callback);
++
+     // Answers the offer: reopens the crashed session in the window, or lets
+     // it go.
+     static void resolveCrashedSession(
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -75,6 +75,24 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateGetSearchEnginesFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.getSearchEngines", UNKNOWN)
++
++ protected:
++  ~RangaPrivateGetSearchEnginesFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class RangaPrivateSetDefaultSearchEngineFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.setDefaultSearchEngine", UNKNOWN)
++
++ protected:
++  ~RangaPrivateSetDefaultSearchEngineFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class RangaPrivateExecuteCommandFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("rangaPrivate.executeCommand", UNKNOWN)
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -18,6 +18,7 @@
+ #include "chrome/browser/extensions/window_controller.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ranga/ranga_containers.h"
++#include "chrome/browser/search_engines/template_url_service_factory.h"
+ #include "chrome/browser/tab_list/tab_list_interface.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+@@ -35,6 +36,10 @@
+ #include "chrome/common/webui_url_constants.h"
+ #include "components/find_in_page/find_notification_details.h"
+ #include "components/find_in_page/find_types.h"
++#include "components/search_engines/choice_made_location.h"
++#include "components/search_engines/template_url.h"
++#include "components/search_engines/template_url_service.h"
++#include "components/search_engines/template_url_starter_pack_data.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/storage_partition.h"
+@@ -267,6 +272,61 @@
+   return RespondNow(NoArguments());
+ }
+ 
++ExtensionFunction::ResponseAction RangaPrivateGetSearchEnginesFunction::Run() {
++  TemplateURLService* service = TemplateURLServiceFactory::GetForProfile(
++      Profile::FromBrowserContext(browser_context()));
++  if (!service) {
++    return RespondNow(Error("No search engines"));
++  }
++  service->Load();
++  const TemplateURL* current = service->GetDefaultSearchProvider();
++  std::vector<ranga_private::SearchEngine> engines;
++  for (const TemplateURL* engine : service->GetTemplateURLs()) {
++    if (engine->starter_pack_id() !=
++            template_url_starter_pack_data::StarterPackId::kNone ||
++        (engine != current &&
++         (!service->CanMakeDefault(engine) ||
++          (engine->prepopulate_id() <= 0 &&
++           engine->is_active() != TemplateURLData::ActiveStatus::kTrue)))) {
++      continue;
++    }
++    ranga_private::SearchEngine result;
++    result.id = engine->sync_guid();
++    result.name = base::UTF16ToUTF8(engine->short_name());
++    result.keyword = base::UTF16ToUTF8(engine->keyword());
++    if (engine->favicon_url().is_valid()) {
++      result.fav_icon_url = engine->favicon_url().spec();
++    }
++    result.is_default = engine == current;
++    engines.push_back(std::move(result));
++  }
++  return RespondNow(ArgumentList(
++      ranga_private::GetSearchEngines::Results::Create(engines)));
++}
++
++ExtensionFunction::ResponseAction
++RangaPrivateSetDefaultSearchEngineFunction::Run() {
++  auto params = ranga_private::SetDefaultSearchEngine::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  TemplateURLService* service = TemplateURLServiceFactory::GetForProfile(
++      Profile::FromBrowserContext(browser_context()));
++  TemplateURL* engine =
++      service ? service->GetTemplateURLForGUID(params->id) : nullptr;
++  if (!engine) {
++    return RespondNow(Error("Unknown search engine: " + params->id));
++  }
++  if (engine == service->GetDefaultSearchProvider()) {
++    return RespondNow(NoArguments());
++  }
++  if (!service->CanMakeDefault(engine)) {
++    return RespondNow(Error("Unknown search engine: " + params->id));
++  }
++  service->SetUserSelectedDefaultSearchProvider(
++      engine, search_engines::ChoiceMadeLocation::kSearchSettings);
++  return RespondNow(NoArguments());
++}
++
+ ExtensionFunction::ResponseAction RangaPrivateExecuteCommandFunction::Run() {
+   auto params = ranga_private::ExecuteCommand::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
+--- a/chrome/browser/extensions/api/ranga_private/BUILD.gn
++++ b/chrome/browser/extensions/api/ranga_private/BUILD.gn
+@@ -21,6 +21,7 @@
+     "//chrome/browser/ui/toolbar",
+     "//chrome/common/extensions/api",
+     "//components/find_in_page",
++    "//components/search_engines",
+     "//components/tabs:public",
+     "//content/public/browser",
+     "//services/network/public/mojom",
