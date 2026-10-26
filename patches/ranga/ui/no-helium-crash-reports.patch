@@ -1,0 +1,27 @@
+O Ranga não manda relatório de falha pro servidor do Helium: sem URL de envio e modo padrão desligado, então o diálogo "Would you like to send crash reports?" do Helium não aparece.
+
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -1536,7 +1536,7 @@
+   BrowserProcessImpl::RegisterPrefs(registry);
+   registry->RegisterIntegerPref(
+       prefs::kHeliumCrashReportingMode,
+-      static_cast<int>(helium::CrashReportingMode::kAsk));
++      static_cast<int>(helium::CrashReportingMode::kDisabled));
+   ChromeContentBrowserClient::RegisterLocalStatePrefs(registry);
+ #if BUILDFLAG(CHROME_FOR_TESTING)
+   chrome_for_testing::RegisterPrefs(registry);
+--- a/components/crash/core/app/crash_reporter_client.cc
++++ b/components/crash/core/app/crash_reporter_client.cc
+@@ -153,11 +153,7 @@
+   }
+ #endif
+ 
+-#if defined(OFFICIAL_BUILD)
+-  return "https://crash.helium.computer/crash";
+-#else
+   return std::string();
+-#endif
+ }
+ 
+ bool CrashReporterClient::ShouldRateLimitUploads() {

@@ -1,0 +1,14 @@
+{
+  "chrome/app/generated_resources.grd": {
+    "IDS_TAB_CXMENU_SOUND_MUTE_TAB": "{NUM_TABS,plural, =1{Desativar som da aba}one{Desativar som da aba}other{Desativar som das abas}}",
+    "IDS_TAB_CXMENU_SOUND_UNMUTE_TAB": "{NUM_TABS,plural, =1{Ativar som da aba}one{Ativar som da aba}other{Ativar som das abas}}",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_TITLE": "Importar de outros navegadores",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_SUBTITLE": "Transfira seus favoritos, histórico e extensões de outros navegadores.",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_PROMPT_TITLE": "Encontrar navegadores para importar",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_PROMPT_PERMISSION": "Permita que o Ranga procure outros navegadores neste dispositivo para você escolher o que transferir.",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_NO_BROWSERS": "Nenhum navegador compatível foi encontrado.",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_DISCOVERY_ERROR": "Ocorreu um erro. Tente novamente.",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_MAC_NOTICE_TITLE": "Não encontrou seu navegador anterior?",
+    "IDS_HELIUM_ONBOARDING_DATA_IMPORT_MAC_NOTICE_BODY": "O macOS impede que alguns navegadores sejam detectados automaticamente. Para ver mais opções, permita que o Ranga acesse esses navegadores nos <ph name=\"BEGIN_LINK_SETTINGS\"/>Ajustes do Sistema<ph name=\"END_LINK_SETTINGS\"/>."
+  }
+}

@@ -106,6 +106,15 @@ helium_resources() {
     python3 "$_main_repo/utils/replace_resources.py" "$_main_repo/resources/helium_resources.txt" "$_main_repo/resources" "$_src_dir"
 }
 
+ranga_branding() {
+    python3 "$_root_dir/ranga/tools/ranga_name_substitution.py" --sub \
+        -t "$_src_dir" --backup-path "$_build_dir/ranga-namesubs.tar.gz"
+    python3 "$_root_dir/ranga/tools/ranga_resources.py" "$_src_dir"
+    python3 "$_root_dir/ranga/tools/ranga_translations.py" "$_src_dir"
+    sed -i "s/kRangaVersion\[\] = \"[^\"]*\"/kRangaVersion[] = \"$(cat "$_root_dir/ranga/VERSION")\"/" \
+        "$_src_dir/chrome/browser/ranga/ranga_version.h"
+}
+
 write_gn_args() {
     mkdir -p "${_out_dir}"
 
