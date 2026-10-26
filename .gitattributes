@@ -1,1 +1,2 @@
 *.patch linguist-language=C++
+README.md merge=ours

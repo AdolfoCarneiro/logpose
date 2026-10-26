@@ -1,125 +1,144 @@
-# helium-linux
-Linux builds, packaging, and development tooling for the
-[Helium Browser](https://github.com/imputnet/helium).
+<div align="center">
 
-## Downloads
-Helium is available in multiple formats depending on your distribution.<br>
-We offer builds for `x86_64/amd64` and `arm64/aarch64` platforms.
+<img src="ranga/branding/icon.svg" width="112" alt="Ranga">
+
+# Ranga
+
+**Um navegador pessoal pra Linux, com barra lateral, espaços e cara de desktop.**
+
+Feito sobre o [Helium](https://github.com/imputnet/helium) (Chromium sem Google), com a barra lateral no estilo do Arc, Material 3 e as cores do tema do sistema.
+
+![versão](https://img.shields.io/badge/versão-0.3.0-7cc2a8?style=flat-square)
+![Chromium](https://img.shields.io/badge/Chromium-156-4c8bf5?style=flat-square)
+![Linux](https://img.shields.io/badge/Linux-x86__64-e0a64b?style=flat-square)
+![licença](https://img.shields.io/badge/licença-GPL--3.0-b07ce8?style=flat-square)
+
+<img src="ranga/docs/img/hero.webp" alt="Ranga com a barra lateral aberta: espaço Pessoal, fixadas, favoritos e abas de hoje ao lado da página" width="100%">
+
+</div>
 
 > [!NOTE]
-> Packaging not listed here is not officially maintained and should be
-> used with extreme caution.
+> O Ranga ainda está em desenvolvimento (0.x). Uso diário, mas pensado pra minha máquina (Omarchy + Hyprland); em outro Linux deve funcionar, sem garantia.
 
-### Fedora
-1. Enable [Helium COPR](https://copr.fedorainfracloud.org/coprs/imput/helium/):
-    ```bash
-    sudo dnf copr enable imput/helium
-    ```
+## Por que o Ranga
 
-1. Install Helium:
-    ```bash
-    sudo dnf install helium-bin
-    ```
+O Chromium guarda abas numa faixa no topo, configurações em dois lugares e trata a janela como moldura. O Ranga troca isso por uma barra lateral que organiza o dia: **espaços** pra separar trabalho e vida, **fixadas** pros sites de sempre, **hoje** pras abas que vêm e vão (e que se arquivam sozinhas). A página vira um cartão e o resto sai do caminho.
 
-### Debian/Ubuntu
-1. Add Helium's signing public key:
-    ```bash
-    curl -fsSL https://raw.githubusercontent.com/imputnet/helium-linux/main/pubkey.asc | sudo gpg --dearmor -o /usr/share/keyrings/helium.gpg
-    ```
+<table>
+<tr>
+<td width="33%" valign="top"><img src="ranga/docs/img/sidebar.webp" alt="Barra lateral do Ranga"></td>
+<td valign="top">
 
-1. Add Helium's repo:
-    ```bash
-    echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/helium.gpg] https://pkg.helium.computer/deb stable main" | sudo tee /etc/apt/sources.list.d/helium.list
-    ```
-    For prerelease builds, replace `stable` with `prerelease`
+### A barra lateral
 
-1. Update apt lists and install Helium:
-    ```bash
-    sudo apt update && sudo apt install helium-bin
-    ```
+- **Espaços** com ícone, cor e container próprios. Ctrl+Shift+← / → ou rolar de lado troca de espaço; cada um lembra a última aba.
+- **Fixadas** em grade de cartões, com pastas. Um link aberto de uma fixada aparece num **Peek** por cima da página.
+- **Hoje**: as abas do dia. Paradas dormem e as esquecidas são arquivadas, com Desfazer.
+- **Favoritos**, downloads com anel de progresso, extensões fixadas e o endereço da aba atual.
+- Renomear abas com duplo clique, Ctrl/Shift+clique pra marcar várias e fechar, mover ou fixar todas de uma vez.
 
-### AppImage and binary tarball
-[Download the latest release on GitHub](https://github.com/imputnet/helium-linux/releases/latest)
+</td>
+</tr>
+</table>
 
-### Flatpak/Flathub
-We will not support Flatpak as long as it's impossible to package Chromium
-without [breaking its sandbox](https://discuss.privacyguides.net/t/does-flatpak-weaken-chromium-firefoxs-sandbox/13373/7).
-We recommend that you use AppImage if an official distro package isn't
-available.
+## Destaques
 
-## Credits
+<table>
+<tr>
+<td width="50%" valign="top">
 
-### Depot
-Big thank you to [Depot](https://depot.dev/) for sponsoring our runners,
-which handle the Linux builds of Helium. Their high-performance infrastructure
-lets us compile, package, and release new builds of Helium within hours,
-not days.
+**Spotlight**
 
-### ungoogled-chromium
-This repo uses some stuff that originally came from
-[ungoogled-chromium-portablelinux](https://github.com/ungoogled-software/ungoogled-chromium-portablelinux)
-before we fully remade it and forked it for Helium.
+Ctrl+T e Ctrl+L abrem uma busca única: abas abertas, histórico, favoritos, comandos do navegador e `!bangs`. A aba só nasce quando você escolhe um resultado.
 
-## Contributing
-Before contributing to this repo, please read the guidelines in main repo's
-[CONTRIBUTING.md](https://github.com/imputnet/helium/blob/main/CONTRIBUTING.md).
+<img src="ranga/docs/img/spotlight.webp" alt="Spotlight buscando 'lobo'">
 
-## License
-All code, patches, modified portions of imported code or patches, and
-any other content that is unique to Helium and not imported from other
-repositories is licensed under GPL-3.0. See [LICENSE](LICENSE).
+</td>
+<td width="50%" valign="top">
 
-Any content imported from other projects retains its original license (for
-example, any original unmodified code imported from ungoogled-chromium remains
-licensed under their [BSD 3-Clause license](LICENSE.ungoogled_chromium)).
+**Gaveta flutuante**
 
-## Building
-To build the binary, run `scripts/docker-build.sh` from the repo root.
+Ctrl+Shift+S recolhe a barra e a página ocupa a janela. Encostar o mouse na borda traz a barra como um cartão solto por cima da página.
 
-The `scripts/docker-build.sh` script will:
-1. Create a Docker image of a Debian-based building environment with all
-   required packages (llvm, nodejs and distro packages) included.
-2. Run `scripts/build.sh` inside the Docker image to build Helium.
+<img src="ranga/docs/img/floating.webp" alt="Barra lateral como cartão flutuante sobre a página">
 
-Running `scripts/build.sh` directly will not work unless you're running a
-Debian-based distro and have all necessary dependencies installed. This repo is
-designed to avoid having to configure the building environment on your Linux
-installation.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
-### Packaging
-After building, run `scripts/package.sh`. Alternatively, you can run
-`package/docker-package.sh` to build inside a Docker image. Either of these
-scripts will create `tar.xz` and `AppImage` files under `build/`.
+**Cobrinha de carregamento**
 
-If you would like to also generate a .deb file, you can set `MAKE_DEB=1` when
-running the release script.
+Enquanto a página carrega, um traço na cor do tema corre pela borda do cartão e fecha a volta quando termina.
 
-### Development
-By default, the build script uses tarball. If you need to use a source tree
-clone, you can run `scripts/docker-build.sh -c` instead. This may be useful if
-a tarball for a release isn't available yet.
+<img src="ranga/docs/img/loading.webp" alt="Cobrinha de carregamento contornando o cartão da página">
 
-### Signature
-AppImage builds (since [0.5.7.1](https://github.com/imputnet/helium-linux/releases/tag/0.5.7.1)),
-binary tarballs (since [0.7.7.2](https://github.com/imputnet/helium-linux/releases/tag/0.7.7.2)),
-and the .deb repository (since [0.10.7.1](https://github.com/imputnet/helium-linux/releases/tag/0.10.7.1))
-are signed with the following key:
+</td>
+<td width="50%" valign="top">
 
+**Várias abas de uma vez**
+
+Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de espaço, abrir num container, fixar, copiar os links.
+
+<img src="ranga/docs/img/multiselect.webp" alt="Três abas marcadas e o menu de ações em lote">
+
+</td>
+</tr>
+</table>
+
+**Configurações num lugar só.** As opções do Ranga e as do Chromium que fazem sentido estão na mesma página, com busca e navegação. As telas grandes (senhas, permissões de cada site) abrem a página do Chromium e voltam com Esc.
+
+<img src="ranga/docs/img/settings.webp" alt="Página de configurações do Ranga na seção Privacidade e segurança" width="100%">
+
+## Também
+
+- **Privacidade do Helium**: sem serviços do Google, uBlock Origin embutido, ruído contra fingerprinting, Global Privacy Control e só HTTPS.
+- **Containers**: cookies e logins separados por container. Duas contas do mesmo site lado a lado.
+- **Tema do sistema**: segue as cores do Ciel (o shell do meu desktop) e a transparência do material, no claro e no escuro.
+- **Janela pequena**: links vindos de outros apps abrem numa janela compacta; "Abrir no Ranga" leva pra janela principal.
+- **Volta de onde parou**: abas, espaços e nomes de aba voltam ao reabrir, até depois de uma falha.
+- **Atalhos configuráveis**, procurar na página num cartão, zoom em chip no endereço, informações do site pelo cadeado, captura de tela, QR code.
+- **Funciona com o 1Password**, Widevine (streaming) e PWAs.
+
+## Atalhos
+
+| Atalho | O que faz |
+|---|---|
+| Ctrl+T | Spotlight pra nova aba |
+| Ctrl+L | Buscar ou trocar o endereço da aba |
+| Ctrl+Shift+S | Recolher ou fixar a barra lateral |
+| Ctrl+Shift+← / → | Espaço anterior / próximo |
+| Ctrl+D | Fixar ou desafixar a aba |
+| Ctrl+Shift+D | Dividir a tela com a aba anterior |
+| Ctrl+Shift+C | Copiar o link da aba |
+| Ctrl+Tab | Abas recentes |
+| Ctrl+, | Configurações |
+
+Todos (menos Ctrl+Tab) mudam em Configurações → Atalhos.
+
+## Instalar
+
+Precisa de Linux x86_64, `zstd` e `pkexec` (polkit). Baixe a [release mais nova](https://github.com/taigakilla/ranga/releases/latest) e rode o instalador:
+
+```bash
+curl -s https://api.github.com/repos/taigakilla/ranga/releases/latest \
+  | grep -o 'https://[^"]*x86_64\.tar\.zst' | head -1 | xargs curl -LO
+tar -I zstd -xf ranga-*-x86_64.tar.zst
+ranga-*-x86_64/install.sh
 ```
------BEGIN PGP PUBLIC KEY BLOCK-----
-Comment: BE67 7C19 89D3 5EAB 2C5F  26C9 3516 01AD 01D6 378E
-Comment: Helium signing key (https://helium.computer/)
 
-xjMEaOqhEBYJKwYBBAHaRw8BAQdA+0OK9OgI98hQGR0ZI5aVuXxdeDU+6eyLiKhH
-4pwAaH7NQEhlbGl1bSBzaWduaW5nIGtleSAoaHR0cHM6Ly9oZWxpdW0uY29tcHV0
-ZXIvKSA8aGVsaXVtQGltcHV0Lm5ldD7CmQQTFgoAQRYhBL5nfBmJ016rLF8myTUW
-Aa0B1jeOBQJo6qEQAhsDBQkFo5qABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheA
-AAoJEDUWAa0B1jeO31AA/0w52qczu5T4w0miS3up03c4uIJtdw2MfHFLIEAQN7T2
-AP9ZI9ozR7C2/isB0GLeQM6o10DGiXGNA0T2kmNEJqIXC844BGjqoRASCisGAQQB
-l1UBBQEBB0AoNTUK0xOCCMLTWO1Nvhe9el/bNuyTyMmincD7hXu5JwMBCAfCfgQY
-FgoAJhYhBL5nfBmJ016rLF8myTUWAa0B1jeOBQJo6qEQAhsMBQkFo5qAAAoJEDUW
-Aa0B1jeOLYEA/ReQcxHx9axm3rYYad+1XeQQyiIPCjclCVMyeAXqS5XOAP0RBc9/
-md8JlXqOCGwmHuOk3VVkR5EjCgm2KJ8hqdhwBA==
-=Chk7
------END PGP PUBLIC KEY BLOCK-----
-```
+O Ranga vai pra `/opt/ranga` (do root, como o 1Password pede) e ganha o comando `ranga`, o atalho no menu de apps e o `ranga-update`.
+
+**Atualizar:** `ranga-update`, ou `ciel update` com o Ciel. A versão nova é instalada ao lado da aberta e a barra lateral avisa *Atualização instalada · Reiniciar*.
+
+## Compilar
+
+O Ranga é um conjunto de patches sobre o Helium (`patches/ranga/`) e a barra lateral como extensão de componente (`ranga/sidebar/`). Build, sandbox de testes, pacote e releases estão em [`ranga/README.md`](ranga/README.md).
+
+## Créditos
+
+- [Helium](https://github.com/imputnet/helium) e [helium-linux](https://github.com/imputnet/helium-linux), da imput, de onde este repositório é um fork.
+- [ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium) e o [Chromium](https://www.chromium.org/).
+- O nome e o lobo de chifre e estrela vêm do Ranga, de *Tensei Shitara Slime Datta Ken*.
+
+Licença GPL-3.0, como o Helium. Ver [LICENSE](LICENSE) e [LICENSE.ungoogled_chromium](LICENSE.ungoogled_chromium).
