@@ -3,8 +3,15 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 profile="${RANGA_PROFILE:-$HOME/.local/share/ranga/dev-profile}"
+onepassword="$HOME/.config/chromium/NativeMessagingHosts/com.1password.1password.json"
 
-exec "$root/build/src/out/Default/helium" \
+if [ -f "$onepassword" ] && [ ! -f "$profile/NativeMessagingHosts/com.1password.1password.json" ]; then
+  mkdir -p "$profile/NativeMessagingHosts"
+  cp "$onepassword" "$profile/NativeMessagingHosts/"
+fi
+
+export LANGUAGE="${RANGA_LANGUAGE:-pt_BR}"
+exec "$root/build/src/out/Default/ranga" \
   --user-data-dir="$profile" \
   --ozone-platform=wayland \
   --ranga-sidebar-dir="$root/ranga/sidebar" \

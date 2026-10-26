@@ -24,6 +24,7 @@ if git merge-base --is-ancestor "$latest" HEAD; then
   exit 0
 fi
 
+git config merge.ours.driver true
 git merge --no-edit "$latest"
 validate
 echo "merged $latest"

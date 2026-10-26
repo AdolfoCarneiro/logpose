@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+repo="${RANGA_UPDATE_REPO:-taigakilla/ranga}"
+sha="$(git -C "$root" rev-parse "${1:-HEAD}")"
+short="$(git -C "$root" rev-parse --short=10 "$sha")"
+tag="build-$short"
+
+say() {
+  echo "$*"
+  notify-send -a Ranga -i ranga "Ranga" "$*" 2>/dev/null || true
+}
+fail() {
+  say "Release $short não publicada: $*"
+  exit 1
+}
+
+mkdir -p "$root/build/release"
+exec 9>"$root/build/release/.release.lock"
+flock 9
+
+[ "$(git -C "$root" rev-parse HEAD)" = "$sha" ] || fail "o checkout não está nesse commit"
+[ -z "$(git -C "$root" status --porcelain)" ] || fail "há mudanças não commitadas"
+
+for _ in $(seq 120); do
+  [ "$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)" = "$sha" ] && break
+  sleep 5
+done
+[ "$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)" = "$sha" ] || fail "o commit não chegou no GitHub"
+gh release view "$tag" -R "$repo" >/dev/null 2>&1 && { echo "release $tag já existe"; exit 0; }
+
+"$root/ranga/bin/ranga-dev" 'nice -n 10 bash -c "source scripts/dev.sh && cd build/src && configure_remoteexec; SISO_PATH=third_party/siso/cipd/siso python3 third_party/depot_tools/autoninja.py -C out/Release chrome"' \
+  || fail "o build falhou"
+(cd "$root/ranga/sidebar" && node --test >/dev/null) || fail "os testes da barra falharam"
+package="$("$root/ranga/bin/ranga-package" | tail -1)"
+[ "$(tar -I zstd -xOf "$package" --wildcards '*/BUILD' | head -1)" = "$short" ] || fail "o pacote não é do commit $short"
+(cd "$(dirname "$package")" && sha256sum "$(basename "$package")" > "$package.sha256")
+
+previous="$(gh release view -R "$repo" --json tagName -q .tagName 2>/dev/null || true)"
+range="$sha"
+[ -n "$previous" ] && git -C "$root" cat-file -e "${previous#build-}" 2>/dev/null && range="${previous#build-}..$sha"
+notes="$(git -C "$root" log --format='- %s' "$range" | head -50)"
+version="$(cat "$root/ranga/VERSION")"
+
+gh release create "$tag" "$package" "$package.sha256" -R "$repo" --target "$sha" \
+  --title "Ranga $version ($short)" --notes "$notes" --latest \
+  || fail "o GitHub recusou a release"
+say "Release $short publicada"
