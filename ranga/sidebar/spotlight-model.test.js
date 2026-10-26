@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { suggestions } from "./spotlight-model.js";
+import { mayHaveKeyword, suggestions } from "./spotlight-model.js";
 
 const sources = {
   tabs: [{ id: 1, windowId: 9, title: "GitHub - ranga", url: "https://github.com/taigakilla/ranga" }],
@@ -67,4 +67,35 @@ test("palavra do título com 4 letras ou mais também põe o comando na frente",
   assert.equal(list[0].command, "copyMarkdown");
   assert.equal(suggestions("link limpo", { commands: ["copyCleanLink"] })[0].command, "copyCleanLink");
   assert.equal(suggestions("pdf", { commands: ["print"] })[0].kind, "search");
+});
+
+test("aba sem título de verdade mostra o endereço do Ranga", async () => {
+  const { tabTitle } = await import("./spotlight-model.js");
+  assert.equal(tabTitle({ title: "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/onboarding.html", url: "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/onboarding.html" }), "ranga://bem-vindo");
+  assert.equal(tabTitle({ title: "", url: "chrome://extensions/" }), "ranga://extensions/");
+  assert.equal(tabTitle({ title: "GitHub", url: "https://github.com/" }), "GitHub");
+});
+
+test("busca com outro mecanismo mostra o mecanismo e os termos", () => {
+  const resolved = { kind: "keyword", url: "https://www.youtube.com/results?search_query=lofi", engine: "YouTube", query: "lofi" };
+  const [first] = suggestions("!yt lofi", { resolved });
+  assert.deepEqual(first, { kind: "search", title: "Buscar em YouTube: “lofi”", text: "!yt lofi" });
+  assert.equal(suggestions("!yt lofi", { resolved: { kind: "search", url: "https://x/" } })[0].title, "Buscar “!yt lofi”");
+});
+
+test("só texto com mais de uma palavra pode ter palavra-chave", () => {
+  assert.ok(mayHaveKeyword("!yt lofi"));
+  assert.ok(mayHaveKeyword("yt lofi"));
+  assert.ok(!mayHaveKeyword("!yt"));
+  assert.ok(!mayHaveKeyword("  lofi "));
+});
+
+test("informações do site, captura, QR code e perfis aparecem quando habilitados", () => {
+  const enabled = ["pageInfo", "screenshot", "qrCode", "profiles"];
+  assert.equal(suggestions("informacoes", { commands: enabled })[0].command, "pageInfo");
+  assert.ok(suggestions("permissoes", { commands: enabled }).some((s) => s.command === "pageInfo"));
+  assert.equal(suggestions("capturar", { commands: enabled })[0].command, "screenshot");
+  assert.equal(suggestions("qr", { commands: enabled })[0].command, "qrCode");
+  assert.equal(suggestions("perfis", { commands: enabled })[0].command, "profiles");
+  assert.ok(!suggestions("perfis", { commands: [] }).some((s) => s.kind === "command"));
 });

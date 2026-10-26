@@ -4,13 +4,13 @@ function archivable(tab) {
   return /^https?:\/\//.test(tab.url || "");
 }
 
-export function plan(tabs, now, { sleepAfterMinutes, archiveAfterHours }) {
+export function plan(tabs, now, { sleepAfterMinutes, archiveAfterHours }, kept = new Set()) {
   const sleep = [];
   const archive = [];
   for (const tab of tabs) {
     if (!tab.lastAccessed || tab.active) continue;
     const idle = now - tab.lastAccessed;
-    if (archiveAfterHours > 0 && !tab.pinned && archivable(tab) && idle >= archiveAfterHours * 60 * MINUTE) {
+    if (archiveAfterHours > 0 && !tab.pinned && !kept.has(tab.id) && archivable(tab) && idle >= archiveAfterHours * 60 * MINUTE) {
       archive.push(tab.id);
     } else if (sleepAfterMinutes > 0 && !tab.audible && !tab.discarded && idle >= sleepAfterMinutes * MINUTE) {
       sleep.push(tab.id);

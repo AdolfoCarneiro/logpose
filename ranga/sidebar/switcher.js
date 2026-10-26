@@ -1,5 +1,6 @@
 import { glyph } from "./kurobe/icons.mjs";
 import { recentTabs, step } from "./switcher-model.js";
+import { painted } from "./motion.js";
 
 const tiles = document.getElementById("tiles");
 const caption = document.getElementById("caption");
@@ -19,8 +20,10 @@ function faviconFor(url) {
   return src.toString();
 }
 
-function close() {
+async function close() {
   open = false;
+  document.body.classList.add("closed");
+  await painted();
   document.title = `ranga-spotlight:close:${Date.now()}`;
 }
 
@@ -66,6 +69,7 @@ async function start(direction) {
   selected = direction > 0 ? 1 : tabs.length - 1;
   tiles.replaceChildren(...tabs.map(tile));
   document.title = "Ranga";
+  document.body.classList.remove("closed");
   open = true;
   pressed = false;
   for (const el of [document.getElementById("card"), document.getElementById("scrim")]) {

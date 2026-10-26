@@ -13,8 +13,14 @@ export function formatBytes(bytes) {
 }
 
 export function fileName(item) {
-  const path = item.filename || item.finalUrl || item.url || "";
-  return path.split(/[\\/]/).filter(Boolean).pop() || "download";
+  if (item.filename) return item.filename.split(/[\\/]/).filter(Boolean).pop() || "download";
+  try {
+    const url = new URL(item.finalUrl || item.url);
+    const name = /^(https?|ftp|file):$/.test(url.protocol) && url.pathname.split("/").filter(Boolean).pop();
+    return name ? decodeURIComponent(name) : "download";
+  } catch {
+    return "download";
+  }
 }
 
 export function progress(item) {

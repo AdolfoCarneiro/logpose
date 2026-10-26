@@ -1,4 +1,5 @@
 import { toNavigation } from "./tabs-model.js";
+import { rangaUrl } from "./settings-model.js";
 
 export const COMMANDS = [
   { command: "installPwa", title: "Instalar como app", icon: "app-window", words: "pwa aplicativo install" },
@@ -6,6 +7,9 @@ export const COMMANDS = [
   { command: "createShortcut", title: "Criar atalho", icon: "external-link", words: "shortcut desktop app" },
   { command: "copyCleanLink", title: "Copiar link limpo", icon: "link", words: "url copiar rastreamento utm" },
   { command: "copyMarkdown", title: "Copiar como Markdown", icon: "file-text", words: "link markdown copiar" },
+  { command: "pageInfo", title: "Informações do site", icon: "shield-check", words: "site permissoes cookies seguranca conexao certificado cadeado ruido fingerprinting" },
+  { command: "screenshot", title: "Capturar tela", icon: "camera", words: "screenshot captura imagem foto" },
+  { command: "qrCode", title: "QR code da página", icon: "qr-code", words: "qrcode criar compartilhar celular link" },
   { command: "print", title: "Imprimir", icon: "printer", words: "print pdf" },
   { command: "find", title: "Procurar na página", icon: "text-search", words: "localizar buscar find" },
   { command: "zoomIn", title: "Aumentar zoom", icon: "zoom-in", words: "zoom mais ampliar" },
@@ -16,7 +20,14 @@ export const COMMANDS = [
   { command: "devTools", title: "Ferramentas de desenvolvedor", icon: "code-xml", words: "devtools inspecionar console" },
   { command: "taskManager", title: "Gerenciador de tarefas", icon: "activity", words: "memoria processos task" },
   { command: "clearBrowsingData", title: "Limpar dados de navegação", icon: "trash-2", words: "cache cookies historico" },
+  { command: "profiles", title: "Perfis", icon: "users", words: "profile perfil conta trocar" },
 ];
+
+export function tabTitle(tab) {
+  const title = tab.title || "";
+  if (!title || title === tab.url || /^(chrome|chrome-extension):\/\//.test(title)) return rangaUrl(tab.url || "");
+  return title;
+}
 
 function fold(text) {
   return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -49,16 +60,25 @@ function score(entry, q, base) {
   return base + starts + Math.min(entry.visitCount ?? 0, 50) / 50;
 }
 
-export function suggestions(query, { tabs = [], bookmarks = [], history = [], commands = [] }, limit = 8) {
+export function mayHaveKeyword(query) {
+  return /\S\s+\S/.test(query);
+}
+
+function searchTitle(text, resolved) {
+  if (resolved?.kind === "keyword" && resolved.engine && resolved.query) return `Buscar em ${resolved.engine}: “${resolved.query}”`;
+  return `Buscar “${text}”`;
+}
+
+export function suggestions(query, { tabs = [], bookmarks = [], history = [], commands = [], resolved = null }, limit = 8) {
   const text = query.trim();
   const q = text.toLowerCase();
-  if (!q) return tabs.slice(0, limit).map((t) => ({ kind: "tab", title: t.title || t.url, url: t.url, tabId: t.id, windowId: t.windowId }));
+  if (!q) return tabs.slice(0, limit).map((t) => ({ kind: "tab", title: tabTitle(t), url: t.url, tabId: t.id, windowId: t.windowId }));
   const nav = toNavigation(text);
   const first = nav.kind === "url"
     ? { kind: "url", title: nav.url, url: nav.url }
-    : { kind: "search", title: `Buscar “${text}”`, text };
+    : { kind: "search", title: searchTitle(text, resolved), text };
   const pool = [
-    ...tabs.filter((t) => matches(t, q)).map((t) => ({ kind: "tab", title: t.title || t.url, url: t.url, tabId: t.id, windowId: t.windowId, score: score(t, q, 6) })),
+    ...tabs.filter((t) => matches(t, q)).map((t) => ({ kind: "tab", title: tabTitle(t), url: t.url, tabId: t.id, windowId: t.windowId, score: score(t, q, 6) })),
     ...bookmarks.filter((b) => b.url && matches(b, q)).map((b) => ({ kind: "bookmark", title: b.title || b.url, url: b.url, score: score(b, q, 4) })),
     ...history.filter((h) => matches(h, q)).map((h) => ({ kind: "history", title: h.title || h.url, url: h.url, score: score(h, q, 2) })),
   ].sort((a, b) => b.score - a.score);

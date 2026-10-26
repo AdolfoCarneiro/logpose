@@ -1,4 +1,5 @@
 import { glyph } from "./kurobe/icons.mjs";
+import { painted } from "./motion.js";
 import { call } from "./ranga-private.js";
 
 const card = document.getElementById("card");
@@ -41,6 +42,8 @@ async function close() {
   count.textContent = "";
   card.classList.remove("card--empty");
   await call("stopFinding", windowId).catch(() => {});
+  document.body.classList.add("closed");
+  await painted();
   document.title = `ranga-spotlight:close:${Date.now()}`;
 }
 
@@ -53,6 +56,7 @@ async function open() {
     } catch {}
   }
   document.title = "Ranga";
+  document.body.classList.remove("closed");
   card.style.animation = "none";
   void card.offsetWidth;
   card.style.animation = "";

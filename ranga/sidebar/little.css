@@ -1,0 +1,21 @@
+html, body { height: 100%; margin: 0; background: transparent; overflow: hidden; font-family: var(--k-type-family); color: var(--k-color-on-surface); }
+.bar {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--k-space-sm);
+  padding: 0 0 0 var(--k-space-xs);
+  user-select: none;
+  animation: bar-in var(--k-motion-spring-spatial-default-duration) var(--k-motion-spring-spatial-default);
+}
+@keyframes bar-in { from { opacity: 0; transform: translateY(-6px); } }
+.leading { width: 18px; height: 18px; flex: none; display: grid; place-items: center; color: var(--k-color-on-surface-variant); }
+.leading img { width: 16px; height: 16px; border-radius: var(--k-shape-extra-small); }
+.leading .k-icon { font-size: 16px; }
+.text { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--k-space-sm); }
+.title { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.host { min-width: 0; flex: 0 10000 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--k-color-on-surface-variant); }
+.main { height: 32px; padding: 0 var(--k-space-md); flex: none; }
+.main .k-icon { font-size: 15px; }
+.main:disabled { opacity: var(--k-state-disabled); cursor: default; }

@@ -2,7 +2,8 @@ import { toItems, toNavigation } from "./tabs-model.js";
 import { loadSettings, displayUrl } from "./settings-model.js";
 import {
   initialState, createSpace, renameSpace, deleteSpace, assignTab, forgetTab,
-  visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore, spaceOfTab,
+  visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore, spaceOfTab, containerOf,
+  storeSnapshot, pickSnapshot, forgetSnapshot, reopenedSpace, setTitle,
 } from "./spaces-model.js";
 import { glyph } from "./kurobe/icons.mjs";
 import { createTabList } from "./tab-list.js";
@@ -15,12 +16,12 @@ import { archiveEntry, pushArchive } from "./lifecycle-model.js";
 import { setupExtensions } from "./extensions.js";
 import { setupContainers } from "./containers.js";
 import { setupDownloads } from "./downloads.js";
+import { setupPins } from "./pins.js";
 import { available as rangaPrivate, call } from "./ranga-private.js";
 
 const SPACE_ICONS = ["house", "briefcase", "code", "book-open", "music", "gamepad-2", "heart", "star", "palette"];
 const SPACE_COLORS = [null, "#71b1ec", "#7cc2a8", "#d9c08a", "#d49a78", "#d8737a", "#b59ad4"];
 
-const pinned = document.getElementById("pinned");
 const address = document.getElementById("address");
 const menu = document.getElementById("menu");
 const spaceBar = document.getElementById("spaces");
@@ -34,9 +35,26 @@ let settings = loadSettings();
 let spaces = initialState();
 let themeCss = "";
 let activeUrl = "";
+let activeTabId = null;
 let menuSpaceId = null;
 let lastWheel = 0;
+let sidebarMode = "docked";
+let incognito = false;
+let fullscreenCollapsed = false;
+let rightAligned = false;
+let leaveTimer;
+let ready = false;
+let snapshotTimer;
 const containers = setupContainers({ windowId: () => windowId });
+const pins = setupPins({
+  section: document.getElementById("pins"),
+  grid: document.getElementById("pins-grid"),
+  windowId: () => windowId,
+  spaceId: () => activeSpace(spaces, windowId).id,
+  assign: (tabId) => moveTabToSpace(tabId, activeSpace(spaces, windowId).id),
+  container: () => (containers.available ? containerOf(spaces, windowId) : ""),
+  changed: () => render(),
+});
 
 function paintIcons(root = document) {
   for (const el of root.querySelectorAll("[data-icon]")) {
@@ -49,14 +67,25 @@ function paintIcons(root = document) {
   }
 }
 
-async function saveSpaces() {
-  const { spaces: list, active, lastTab, tabSpace } = spaces;
+async function saveSnapshot() {
   const tabs = await chrome.tabs.query({ windowId });
-  await chrome.storage.local.set({
-    spaces: { spaces: list, active, lastTab, tabSpace },
-    spaceSnapshot: snapshot(spaces, tabs, windowId),
-  });
+  if (!ready || incognito) return tabs;
+  const { spaceSnapshot } = await chrome.storage.local.get("spaceSnapshot");
+  await chrome.storage.local.set({ spaceSnapshot: storeSnapshot(spaceSnapshot, windowId, snapshot(spaces, tabs, windowId)) });
+  return tabs;
+}
+
+function queueSnapshot() {
+  clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(saveSnapshot, 800);
+}
+
+async function saveSpaces() {
+  const { spaces: list, active, lastTab, tabSpace, tabTitle } = spaces;
+  await chrome.storage.local.set({ spaces: { spaces: list, active, lastTab, tabSpace, tabTitle } });
+  const tabs = await saveSnapshot();
   await containers.save(tabs);
+  await pins.save();
 }
 
 async function moveTabToSpace(tabId, spaceId) {
@@ -69,25 +98,36 @@ async function activeTab() {
   return tab;
 }
 
-async function reopenInContainer(item, container) {
-  const space = spaceOfTab(spaces, item.id, windowId);
-  const id = await containers.reopen(await chrome.tabs.get(item.id), container);
-  await moveTabToSpace(id, space);
+async function reopenInContainer(ids, container) {
+  tabList.clearSelection();
+  for (const tabId of ids) {
+    const space = spaceOfTab(spaces, tabId, windowId);
+    const id = await containers.reopen(await chrome.tabs.get(tabId), container);
+    await moveTabToSpace(id, space);
+  }
   render();
 }
 
-function containerEntries(item) {
+function containerEntries(items) {
   if (!containers.available) return [];
-  const current = item.container?.id ?? "";
+  const ids = items.map((i) => i.id);
+  const current = items.length === 1 ? items[0].container?.id ?? "" : null;
+  const choices = containers.list().filter((c) => c.id !== current);
+  const contained = items.some((i) => i.container);
+  if (!choices.length && !contained) return [];
   return [
     "divider",
-    ...containers.list().filter((c) => c.id !== current).map((c) => ({
-      icon: c.icon,
-      label: `Abrir no container ${c.name}`,
-      action: () => reopenInContainer(item, c.id),
-    })),
-    ...(current ? [{ icon: "log-out", label: "Tirar do container", action: () => reopenInContainer(item, "") }] : []),
+    { heading: "Abrir no container" },
+    ...choices.map((c) => ({ icon: c.icon, label: c.name, action: () => reopenInContainer(ids, c.id) })),
+    ...(contained ? [{ icon: "log-out", label: "Tirar do container", action: () => reopenInContainer(ids, "") }] : []),
   ];
+}
+
+function spaceEntries(ids) {
+  const current = activeSpace(spaces, windowId).id;
+  const others = spaces.spaces.filter((s) => s.id !== current);
+  if (!others.length) return [];
+  return ["divider", { heading: "Mover para o espaço" }, ...others.map((space) => ({ icon: space.icon, label: space.name, action: () => moveTabsToSpace(ids, space.id) }))];
 }
 
 function splitEntries(item) {
@@ -107,37 +147,117 @@ function splitEntries(item) {
   }];
 }
 
-function tabMenu(item, x, y) {
-  const current = activeSpace(spaces, windowId).id;
-  const others = spaces.spaces.filter((s) => s.id !== current);
+async function tabsMenu(ids, x, y) {
+  const tabs = (await Promise.all(ids.map((id) => chrome.tabs.get(id).catch(() => null)))).filter(Boolean);
+  const items = tabs.map((t) => ({ id: t.id, container: containers.of(t.id) }));
   showMenu([
-    item.pinned
-      ? { icon: "pin-off", label: "Desafixar", action: () => chrome.tabs.update(item.id, { pinned: false }) }
-      : { icon: "pin", label: "Fixar", action: () => chrome.tabs.update(item.id, { pinned: true }) },
+    { heading: `${tabs.length} abas selecionadas` },
+    { icon: "pin", label: "Fixar", action: async () => { tabList.clearSelection(); for (const t of tabs) await pins.pinTab(t); } },
+    {
+      icon: "external-link",
+      label: "Destacar em janela",
+      action: async () => {
+        tabList.clearSelection();
+        const win = await chrome.windows.create({ tabId: tabs[0].id });
+        if (tabs.length > 1) await chrome.tabs.move(tabs.slice(1).map((t) => t.id), { windowId: win.id, index: -1 });
+      },
+    },
+    { icon: "copy", label: "Duplicar", action: () => { tabList.clearSelection(); for (const t of tabs) chrome.tabs.duplicate(t.id); } },
+    { icon: "link", label: "Copiar links", action: () => navigator.clipboard.writeText(tabs.map((t) => t.url).join("\n")) },
+    { icon: "rotate-cw", label: "Recarregar", action: () => { for (const t of tabs) chrome.tabs.reload(t.id); } },
+    { icon: "moon", label: "Dormir", action: () => { tabList.clearSelection(); for (const t of tabs) if (!t.active && !t.discarded) chrome.tabs.discard(t.id).catch(() => {}); } },
+    ...containerEntries(items),
+    ...spaceEntries(ids),
+    "divider",
+    { icon: "x", label: `Fechar ${tabs.length} abas`, danger: true, action: () => closeTabs(ids) },
+  ], x, y);
+}
+
+function tabMenu(item, x, y, selection) {
+  if (selection?.length > 1) return tabsMenu(selection, x, y);
+  showMenu([
+    { icon: "pin", label: "Fixar", action: async () => pins.pinTab(await chrome.tabs.get(item.id)) },
     { icon: "external-link", label: "Destacar em janela", action: () => chrome.windows.create({ tabId: item.id }) },
     ...splitEntries(item),
+    { icon: "pencil", label: "Renomear", action: () => tabList.rename(item.id) },
     { icon: "copy", label: "Duplicar", action: () => chrome.tabs.duplicate(item.id) },
     { icon: "link", label: "Copiar link", action: () => navigator.clipboard.writeText(item.url) },
     { icon: "rotate-cw", label: "Recarregar", action: () => chrome.tabs.reload(item.id) },
+    ...(item.active || item.asleep ? [] : [{ icon: "moon", label: "Dormir", action: () => chrome.tabs.discard(item.id).catch(() => {}) }]),
     ...(item.audio === "muted" ? [{ icon: "volume-2", label: "Ativar som", action: () => chrome.tabs.update(item.id, { muted: false }) }] : []),
     ...(item.audio === "playing" ? [{ icon: "volume-x", label: "Silenciar", action: () => chrome.tabs.update(item.id, { muted: true }) }] : []),
-    ...containerEntries(item),
-    ...(others.length ? ["divider", ...others.map((space) => ({
-      icon: space.icon,
-      label: `Mover para o espaço ${space.name}`,
-      action: async () => {
-        await moveTabToSpace(item.id, space.id);
-        if (item.active) {
-          const rest = visibleTabs(spaces, await chrome.tabs.query({ windowId }), windowId);
-          if (rest.length) await chrome.tabs.update(rest[0].id, { active: true });
-          else await chrome.tabs.create({ windowId });
-        }
-        render();
-      },
-    }))] : []),
+    ...containerEntries([item]),
+    ...spaceEntries([item.id]),
     "divider",
+    { icon: "copy-x", label: "Fechar as outras", action: () => closeAround(item.id, (i, at) => i !== at) },
+    { icon: "arrow-down-to-line", label: "Fechar as de baixo", action: () => closeAround(item.id, (i, at) => i > at) },
     { icon: "x", label: "Fechar", danger: true, action: () => chrome.tabs.remove(item.id) },
   ], x, y);
+}
+
+async function closeTabs(ids) {
+  if (!ids.length) return;
+  tabList.clearSelection();
+  await chrome.tabs.remove(ids);
+  toast(ids.length === 1 ? "1 aba fechada" : `${ids.length} abas fechadas`, { label: "Desfazer", run: () => restoreClosed(ids.length) });
+}
+
+async function closeAround(tabId, pick) {
+  const kept = pins.liveIds();
+  const today = visibleTabs(spaces, await chrome.tabs.query({ windowId }), windowId)
+    .filter((t) => !kept.has(t.id) && !t.pinned)
+    .sort((a, b) => a.index - b.index);
+  const at = today.findIndex((t) => t.id === tabId);
+  if (at < 0) return;
+  await closeTabs(today.filter((_, i) => pick(i, at)).map((t) => t.id));
+}
+
+async function moveTabsToSpace(ids, spaceId) {
+  for (const id of ids) spaces = assignTab(spaces, id, spaceId);
+  await saveSpaces();
+  tabList.clearSelection();
+  const active = await activeTab();
+  if (active && ids.includes(active.id)) {
+    const rest = visibleTabs(spaces, await chrome.tabs.query({ windowId }), windowId);
+    if (rest.length) await chrome.tabs.update(rest[0].id, { active: true });
+    else await chrome.tabs.create({ windowId });
+  }
+  render();
+}
+
+async function restoreClosed(count) {
+  for (let i = 0; i < count; i++) await chrome.sessions.restore().catch(() => {});
+}
+
+let bookmarkTitles = new Map();
+
+async function loadBookmarkTitles() {
+  const titles = new Map();
+  const walk = (nodes) => {
+    for (const node of nodes) {
+      if (node.url && node.title && !titles.has(node.url)) titles.set(node.url, node.title);
+      if (node.children) walk(node.children);
+    }
+  };
+  walk(await chrome.bookmarks.getTree());
+  bookmarkTitles = titles;
+  render();
+}
+
+for (const ev of ["onCreated", "onChanged", "onRemoved", "onMoved", "onImportEnded"]) chrome.bookmarks[ev]?.addListener(loadBookmarkTitles);
+loadBookmarkTitles();
+
+async function renameTab(id, title) {
+  const tab = await chrome.tabs.get(id).catch(() => null);
+  if (!tab) return;
+  const marks = spaces.tabTitle[id] ? [] : await chrome.bookmarks.search({ url: tab.url }).catch(() => []);
+  if (marks.length) {
+    for (const mark of marks) await chrome.bookmarks.update(mark.id, { title: title.trim() || tab.title || tab.url });
+  } else {
+    spaces = setTitle(spaces, id, title);
+    await saveSpaces();
+  }
+  render();
 }
 
 const tabList = createTabList({
@@ -145,46 +265,43 @@ const tabList = createTabList({
   indicator: document.getElementById("active-indicator"),
   onActivate: (id) => chrome.tabs.update(id, { active: true }),
   onClose: (id) => chrome.tabs.remove(id),
+  onMute: (id, muted) => chrome.tabs.update(id, { muted }),
+  onRename: renameTab,
   onContextMenu: tabMenu,
+  dropZone: {
+    over: (x, y) => pins.contains(x, y),
+    drop: async (id) => pins.pinTab(await chrome.tabs.get(id)),
+  },
   onMove: async (id, target) => {
     const { index } = await chrome.tabs.get(target.id);
     await chrome.tabs.move(id, { index });
   },
 });
 
-function favicon(url) {
-  const img = document.createElement("img");
-  img.src = url || "";
-  img.alt = "";
-  img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("globe") }));
-  return img;
-}
-
-function pin(item) {
-  const tile = document.createElement("div");
-  tile.className = "pin k-state" + (item.active ? " pin--active" : "") + (item.asleep ? " pin--asleep" : "");
-  tile.title = item.container ? `${item.container.name} · ${item.title}` : item.title;
-  if (item.container) {
-    tile.classList.add("pin--contained");
-    tile.style.setProperty("--container-color", item.container.color);
-  }
-  if (item.loading) {
-    const loader = document.createElement("k-loading-indicator");
-    loader.setAttribute("size", "22");
-    tile.append(loader);
-  } else {
-    tile.append(favicon(item.favIconUrl));
-  }
-  tile.onclick = () => { pop(tile); chrome.tabs.update(item.id, { active: true }); };
-  tile.oncontextmenu = (e) => { e.preventDefault(); tabMenu(item, e.clientX, e.clientY); };
-  return tile;
-}
-
 function showAddress() {
   if (document.activeElement === address) return;
   address.value = displayUrl(activeUrl, settings.showFullUrl);
-  document.getElementById("address-icon").textContent = glyph(activeUrl.startsWith("https://") ? "lock" : "globe");
+  document.querySelector("#address-icon .k-icon").textContent = glyph(activeUrl.startsWith("https://") ? "lock" : "globe");
 }
+
+const zoomChip = document.getElementById("zoom");
+
+async function showZoom() {
+  if (activeTabId === null) return;
+  const tabId = activeTabId;
+  const [zoom, { defaultZoomFactor = 1 }] = await Promise.all([
+    chrome.tabs.getZoom(tabId),
+    chrome.tabs.getZoomSettings(tabId),
+  ]).catch(() => [1, {}]);
+  if (tabId !== activeTabId) return;
+  zoomChip.hidden = Math.abs(zoom - defaultZoomFactor) < 0.001;
+  zoomChip.textContent = `${Math.round(zoom * 100)}%`;
+}
+
+zoomChip.addEventListener("click", () => chrome.tabs.setZoom(activeTabId, 0).catch(() => {}));
+chrome.tabs.onZoomChange.addListener(({ tabId }) => {
+  if (tabId === activeTabId) showZoom();
+});
 
 function applySpaceColor() {
   const space = activeSpace(spaces, windowId);
@@ -196,8 +313,8 @@ function applySpaceColor() {
 
 function renderSpaces() {
   const current = activeSpace(spaces, windowId);
-  spaceTitle.querySelector(".k-icon").textContent = glyph(current.icon);
-  spaceTitle.querySelector(".name").textContent = current.name;
+  spaceTitle.querySelector(".k-icon").textContent = glyph(incognito ? "venetian-mask" : current.icon);
+  spaceTitle.querySelector(".name").textContent = incognito ? `${current.name} · anônima` : current.name;
   const buttons = spaces.spaces.map((space) => {
     const button = document.createElement("button");
     button.className = "space k-state" + (space.id === current.id ? " space--active" : "");
@@ -218,19 +335,31 @@ function renderSpaces() {
   applySpaceColor();
 }
 
-async function render() {
-  const tabs = await chrome.tabs.query({ windowId });
+let renderQueued = null;
+
+function render() {
+  renderQueued ??= new Promise((resolve) => setTimeout(async () => {
+    renderQueued = null;
+    await paint();
+    resolve();
+  }, 16));
+  return renderQueued;
+}
+
+async function paint() {
+  const all = await chrome.tabs.query({});
+  const tabs = all.filter((t) => t.windowId === windowId);
   await containers.load();
-  const visible = visibleTabs(spaces, tabs, windowId);
+  const kept = pins.liveIds();
+  const visible = visibleTabs(spaces, tabs, windowId).filter((t) => !kept.has(t.id));
   const active = tabs.find((t) => t.active);
-  const items = toItems(visible, active?.id).map((i) => ({ ...i, container: containers.of(i.id) }));
-  const pins = items.filter((i) => i.pinned);
-  pinned.hidden = pins.length === 0;
-  pinned.replaceChildren(...pins.map(pin));
-  paintIcons(pinned);
+  const items = toItems(visible, active?.id, (t) => spaces.tabTitle[t.id] || bookmarkTitles.get(t.url) || "").map((i) => ({ ...i, container: containers.of(i.id) }));
+  pins.render(new Map(all.map((t) => [t.id, t])), active?.id);
   tabList.render(items.filter((i) => !i.pinned));
   activeUrl = active?.url || active?.pendingUrl || "";
+  activeTabId = active?.id ?? null;
   showAddress();
+  showZoom();
   renderSpaces();
   extensions.refresh();
 }
@@ -285,6 +414,20 @@ function openSpaceForm(space = null) {
     b.onclick = () => { for (const x of colors.children) x.setAttribute("aria-pressed", String(x === b)); pop(b); };
     return b;
   }));
+  const containerBox = spaceForm.querySelector(".space-containers");
+  const choices = containerBox.querySelector(".containers-choices");
+  containerBox.hidden = !containers.available;
+  choices.replaceChildren(...[{ id: "", name: "Nenhum", icon: "circle-off" }, ...containers.list()].map((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "container-choice k-state k-type-label";
+    b.dataset.value = c.id;
+    b.setAttribute("aria-pressed", String(c.id === (space?.container ?? "")));
+    if (c.color) b.style.setProperty("--container-color", c.color);
+    b.append(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(c.icon) }), c.name);
+    b.onclick = () => { for (const x of choices.children) x.setAttribute("aria-pressed", String(x === b)); pop(b); };
+    return b;
+  }));
   paintIcons(spaceForm);
   spaceForm.hidden = false;
   spaceForm.querySelector("input[name=name]").focus();
@@ -296,15 +439,17 @@ spaceForm.addEventListener("submit", async (e) => {
   const name = spaceForm.querySelector("input[name=name]").value;
   const icon = spaceForm.querySelector(".icons [aria-pressed=true]")?.dataset.value;
   const color = spaceForm.querySelector(".colors [aria-pressed=true]")?.dataset.value || null;
+  const container = spaceForm.querySelector(".containers-choices [aria-pressed=true]")?.dataset.value ?? "";
   try {
     const editing = spaceForm.dataset.editing;
     if (editing) {
       spaces = renameSpace(spaces, editing, name);
-      spaces = updateSpace(spaces, editing, { icon, color });
+      spaces = updateSpace(spaces, editing, { icon, color, container });
       await saveSpaces();
       render();
     } else {
       spaces = createSpace(spaces, { name, icon, color });
+      spaces = updateSpace(spaces, spaces.spaces.at(-1).id, { container });
       await saveSpaces();
       await switchSpace(spaces.spaces.at(-1).id, 1);
     }
@@ -336,15 +481,23 @@ address.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
   const nav = toNavigation(address.value);
   const tab = await activeTab();
+  const resolved = nav.kind === "search" && rangaPrivate ? await call("resolveInput", windowId, nav.text).catch(() => null) : null;
   if (nav.kind === "url") chrome.tabs.update(tab.id, { url: nav.url });
+  else if (resolved) chrome.tabs.update(tab.id, { url: resolved.url });
   else chrome.search.query({ text: nav.text, tabId: tab.id });
   address.blur();
 });
 
+document.getElementById("address-icon").onclick = () => {
+  if (rangaPrivate) call("showPageInfo", windowId).catch(() => {});
+};
 document.getElementById("back").onclick = async () => chrome.tabs.goBack((await activeTab()).id);
 document.getElementById("forward").onclick = async () => chrome.tabs.goForward((await activeTab()).id);
 document.getElementById("reload").onclick = async () => chrome.tabs.reload((await activeTab()).id);
-document.getElementById("new-tab").onclick = () => chrome.tabs.create({ windowId });
+document.getElementById("new-tab").onclick = () => {
+  if (rangaPrivate) call("executeCommand", windowId, "newTab").catch(() => chrome.tabs.create({ windowId }));
+  else chrome.tabs.create({ windowId });
+};
 document.getElementById("new-tab").oncontextmenu = (e) => {
   e.preventDefault();
   if (!containers.available) return;
@@ -370,10 +523,13 @@ async function archiveTabs(tabs, reason) {
   await chrome.tabs.remove(tabs.map((t) => t.id));
 }
 
-document.getElementById("clear-today").onclick = async () => {
-  const tabs = visibleTabs(spaces, await chrome.tabs.query({ windowId, pinned: false, active: false }), windowId);
+async function clearToday() {
+  const kept = pins.liveIds();
+  const tabs = visibleTabs(spaces, await chrome.tabs.query({ windowId, pinned: false, active: false }), windowId).filter((t) => !kept.has(t.id));
   if (tabs.length) archiveTabs(tabs, "clear");
-};
+}
+
+document.getElementById("clear-today").onclick = clearToday;
 
 const archivePanel = setupArchive({ popover: document.getElementById("archive-popover"), reopen });
 
@@ -397,16 +553,25 @@ document.getElementById("menu-button").onclick = async (e) => {
   if (menu.hidden || !rangaPrivate) return;
   const enabled = await call("getEnabledCommands", windowId).catch(() => []);
   menu.querySelector("[data-action=ranga-install-pwa]").hidden = !enabled.includes("installPwa");
+  menu.querySelector("[data-action=ranga-profiles]").hidden = !enabled.includes("profiles");
 };
 document.addEventListener("click", () => { menu.hidden = true; spaceMenu.hidden = true; });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { menu.hidden = true; spaceMenu.hidden = true; spaceForm.hidden = true; } });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") tabList.clearSelection();
+  else if (e.key === "Delete" && tabList.selection().length > 1 && !e.target.closest?.("input, textarea")) closeTabs(tabList.selection());
+});
 for (const item of menu.querySelectorAll("[data-action]")) {
   item.onclick = () => {
     menu.hidden = true;
     const action = item.dataset.action;
     if (action === "ranga-settings") chrome.runtime.openOptionsPage();
     else if (action === "ranga-archive") archivePanel.open();
+    else if (action === "ranga-toggle-sidebar") toggleSidebar();
     else if (action === "ranga-install-pwa") call("executeCommand", windowId, "installPwa").catch(() => {});
+    else if (action === "ranga-new-window") chrome.windows.create({});
+    else if (action === "ranga-new-incognito") chrome.windows.create({ incognito: true });
+    else if (action === "ranga-profiles") call("executeCommand", windowId, "profiles").catch(() => {});
     else chrome.tabs.create({ url: action, windowId });
   };
 }
@@ -440,16 +605,23 @@ document.addEventListener("wheel", (e) => {
 }, { passive: true });
 
 chrome.tabs.onCreated.addListener(async (tab) => {
-  if (tab.windowId === windowId && !spaces.tabSpace[tab.id]) await moveTabToSpace(tab.id, activeSpace(spaces, windowId).id);
+  if (ready && tab.windowId === windowId && !spaces.tabSpace[tab.id]) await moveTabToSpace(tab.id, activeSpace(spaces, windowId).id);
   render();
 });
 chrome.tabs.onRemoved.addListener(async (tabId, info) => {
+  if (!ready) return;
   spaces = forgetTab(spaces, tabId);
   if (info.windowId === windowId && !info.isWindowClosing) await saveSpaces();
   render();
 });
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (tab.windowId === windowId && info.url) queueSnapshot();
+});
+chrome.tabs.onMoved.addListener((tabId, info) => {
+  if (info.windowId === windowId) queueSnapshot();
+});
 chrome.tabs.onActivated.addListener(async ({ tabId, windowId: w }) => {
-  if (w === windowId) {
+  if (ready && w === windowId) {
     const space = spaceOfTab(spaces, tabId, windowId);
     if (space !== activeSpace(spaces, windowId).id) {
       spaces = setActive(spaces, windowId, space);
@@ -458,13 +630,105 @@ chrome.tabs.onActivated.addListener(async ({ tabId, windowId: w }) => {
   }
   render();
 });
-for (const ev of ["onUpdated", "onMoved", "onAttached", "onDetached"]) chrome.tabs[ev].addListener(render);
+for (const ev of ["onUpdated", "onMoved", "onAttached", "onDetached"]) chrome.tabs[ev].addListener(() => render());
 
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "space-step" && msg.windowId === windowId) {
-    const direction = msg.direction;
-    switchSpace(neighborSpace(spaces, activeSpace(spaces, windowId).id, direction), direction);
+async function restoreCrashedSession() {
+  if (!rangaPrivate || !(await call("getCrashedSession", windowId).catch(() => false))) return;
+  call("resolveCrashedSession", windowId, true).catch(() => {});
+}
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "session-crashed") restoreCrashedSession();
+});
+
+async function setSidebarMode(mode) {
+  if (!rangaPrivate) return;
+  await call("setSidebarMode", windowId, mode).catch(() => {});
+}
+
+function paintSidebarMode(mode) {
+  sidebarMode = mode;
+  document.body.classList.toggle("floating", mode === "floating");
+  document.body.classList.toggle("collapsed", mode === "collapsed");
+  const label = menu.querySelector(".toggle-sidebar-label");
+  label.textContent = mode === "docked" ? "Recolher barra lateral" : "Fixar barra lateral";
+  label.previousElementSibling.textContent = glyph(mode === "docked" ? "panel-left-close" : "panel-left-open");
+}
+
+async function toggleSidebar() {
+  const collapse = sidebarMode === "docked";
+  await chrome.storage.local.set({ sidebarCollapsed: collapse });
+  await setSidebarMode(collapse ? "collapsed" : "docked");
+}
+
+chrome.settingsPrivate?.getPref("side_panel.is_right_aligned").then((pref) => { rightAligned = Boolean(pref?.value); }).catch(() => {});
+chrome.settingsPrivate?.onPrefsChanged.addListener((prefs) => {
+  const pref = prefs.find((p) => p.key === "side_panel.is_right_aligned");
+  if (pref) rightAligned = Boolean(pref.value);
+});
+chrome.rangaPrivate?.onSidebarModeChanged?.addListener((mode, w) => {
+  if (w === windowId) paintSidebarMode(mode);
+});
+document.documentElement.addEventListener("mouseleave", (e) => {
+  if (sidebarMode !== "floating" || (rightAligned ? e.clientX >= innerWidth - 8 : e.clientX <= 8)) return;
+  clearTimeout(leaveTimer);
+  leaveTimer = setTimeout(() => { if (sidebarMode === "floating") setSidebarMode("collapsed"); }, 350);
+});
+document.documentElement.addEventListener("mouseenter", () => {
+  clearTimeout(leaveTimer);
+  if (sidebarMode === "collapsed") setSidebarMode("floating");
+});
+
+async function syncFullscreen() {
+  const win = await chrome.windows.get(windowId).catch(() => null);
+  if (!win) return;
+  const full = win.state === "fullscreen";
+  if (full && sidebarMode === "docked") {
+    fullscreenCollapsed = true;
+    await setSidebarMode("collapsed");
+  } else if (!full && fullscreenCollapsed) {
+    fullscreenCollapsed = false;
+    const { sidebarCollapsed } = await chrome.storage.local.get("sidebarCollapsed");
+    await setSidebarMode(sidebarCollapsed ? "collapsed" : "docked");
   }
+}
+
+chrome.windows.onBoundsChanged.addListener((win) => { if (win.id === windowId) syncFullscreen(); });
+
+async function splitWithPrevious() {
+  const tabs = await chrome.tabs.query({ windowId });
+  const current = tabs.find((t) => t.active);
+  if (!current || !chrome.tabs.createSplit) return;
+  if (current.splitViewId > 0) {
+    await chrome.tabs.unsplit(current.splitViewId);
+    return;
+  }
+  const visible = new Set(visibleTabs(spaces, tabs, windowId).map((t) => t.id));
+  const [previous] = tabs
+    .filter((t) => t.id !== current.id && visible.has(t.id) && t.pinned === current.pinned && !(t.splitViewId > 0))
+    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+  if (!previous) return;
+  await chrome.tabs.move(previous.id, { index: previous.index < current.index ? current.index : current.index + 1 });
+  await chrome.tabs.createSplit([current.id, previous.id]).catch(() => toast("Não deu pra dividir essas abas"));
+}
+
+const SHORTCUT_ACTIONS = {
+  newTab: () => call("executeCommand", windowId, "newTab"),
+  openLocation: () => call("executeCommand", windowId, "openLocation"),
+  copyUrl: async () => chrome.runtime.sendMessage({ type: "copy-link", format: "copyUrl", tabId: (await activeTab())?.id }),
+  copyMarkdown: async () => chrome.runtime.sendMessage({ type: "copy-link", format: "copyMarkdown", tabId: (await activeTab())?.id }),
+  pinTab: async () => pins.toggleTab(await activeTab()),
+  splitView: splitWithPrevious,
+  toggleSidebar,
+  spaceNext: () => switchSpace(neighborSpace(spaces, activeSpace(spaces, windowId).id, 1), 1),
+  spacePrevious: () => switchSpace(neighborSpace(spaces, activeSpace(spaces, windowId).id, -1), -1),
+  clearToday,
+  archive: () => archivePanel.open(),
+  settings: () => chrome.runtime.openOptionsPage(),
+};
+
+chrome.rangaPrivate?.onShortcut?.addListener((command, w) => {
+  if (w === windowId) SHORTCUT_ACTIONS[command]?.()?.catch?.(() => {});
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -496,27 +760,70 @@ function applySettings() {
 
 const themePort = chrome.runtime.connectNative("ranga.theme");
 themePort.onMessage.addListener((msg) => {
+  if (msg.type === "build") {
+    const card = document.getElementById("update");
+    if (msg.updateReady && card.hidden) {
+      card.hidden = false;
+      pop(card);
+    }
+    return;
+  }
   if (msg.type !== "theme") return;
   themeCss = msg.css;
   if (settings.followCielTheme) themeStyle.textContent = themeCss;
 });
+const askBuild = () => themePort.postMessage({ type: "build" });
+askBuild();
+setInterval(askBuild, 10 * 60 * 1000);
+window.addEventListener("focus", askBuild);
+document.getElementById("update-restart").onclick = () => call("executeCommand", windowId, "restart").catch(() => {});
 
 if (!(await chrome.alarms.get("ranga-lifecycle"))) chrome.alarms.create("ranga-lifecycle", { periodInMinutes: 1 });
 paintIcons();
-windowId = (await chrome.windows.getCurrent()).id;
+const currentWindow = await chrome.windows.getCurrent();
+windowId = currentWindow.id;
+incognito = currentWindow.incognito;
+document.body.classList.toggle("incognito", incognito);
 settings = loadSettings((await chrome.storage.local.get("settings")).settings);
 const stored = await chrome.storage.local.get(["spaces", "spaceSnapshot"]);
-if (stored.spaces?.spaces?.length) spaces = { ...initialState(), ...stored.spaces, tabSpace: stored.spaces.tabSpace ?? {} };
+if (stored.spaces?.spaces?.length) spaces = { ...initialState(), ...stored.spaces, tabSpace: stored.spaces.tabSpace ?? {}, tabTitle: stored.spaces.tabTitle ?? {} };
 const windowTabs = await chrome.tabs.query({ windowId });
-if (!windowTabs.some((t) => spaces.tabSpace[t.id])) spaces = restore({ ...spaces, tabSpace: {} }, windowTabs, stored.spaceSnapshot);
+const liveTabs = new Set((await chrome.tabs.query({})).map((t) => String(t.id)));
+const liveWindows = new Set((await chrome.windows.getAll()).map((w) => String(w.id)));
+spaces = {
+  ...spaces,
+  tabSpace: Object.fromEntries(Object.entries(spaces.tabSpace).filter(([id]) => liveTabs.has(id))),
+  tabTitle: Object.fromEntries(Object.entries(spaces.tabTitle).filter(([id]) => liveTabs.has(id))),
+  active: Object.fromEntries(Object.entries(spaces.active).filter(([id]) => liveWindows.has(id))),
+};
+if (!windowTabs.some((t) => spaces.tabSpace[t.id])) {
+  const shots = Array.isArray(stored.spaceSnapshot) ? stored.spaceSnapshot : Object.fromEntries(Object.entries(stored.spaceSnapshot ?? {}).filter(([id]) => !liveWindows.has(id)));
+  const picked = pickSnapshot(shots, windowTabs);
+  spaces = restore(spaces, windowTabs, picked?.shot);
+  if (!(windowId in spaces.active)) spaces = setActive(spaces, windowId, reopenedSpace(spaces, windowTabs, picked?.shot));
+  if (picked?.key && picked.key !== String(windowId)) {
+    await chrome.storage.local.set({ spaceSnapshot: forgetSnapshot((await chrome.storage.local.get("spaceSnapshot")).spaceSnapshot, picked.key) });
+  }
+}
 for (const tab of windowTabs) {
   if (!spaces.tabSpace[tab.id]) spaces = assignTab(spaces, tab.id, activeSpace(spaces, windowId).id);
 }
 for (const { from, to } of await containers.heal(windowTabs)) {
   spaces = assignTab(spaces, to, spaceOfTab(spaces, from, windowId));
 }
+await pins.load(await chrome.tabs.query({ windowId }));
+for (const tab of await chrome.tabs.query({ windowId, pinned: true })) {
+  await chrome.tabs.update(tab.id, { pinned: false });
+  await pins.pinTab(tab, { space: spaceOfTab(spaces, tab.id, windowId) });
+}
+ready = true;
+for (const tab of await chrome.tabs.query({ windowId })) {
+  if (!spaces.tabSpace[tab.id]) spaces = assignTab(spaces, tab.id, activeSpace(spaces, windowId).id);
+}
 await saveSpaces();
 for (const tab of windowTabs) {
   if (/^chrome:\/\/newtab\/?$/.test(tab.url || "") && tab.title !== "Nova aba") chrome.tabs.update(tab.id, { url: "chrome://newtab/" });
 }
 applySettings();
+restoreCrashedSession();
+if ((await chrome.storage.local.get("sidebarCollapsed")).sidebarCollapsed) setSidebarMode("collapsed");

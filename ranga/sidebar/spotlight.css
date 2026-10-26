@@ -2,6 +2,7 @@ html, body { height: 100%; margin: 0; background: transparent; overflow: hidden;
 .scrim {
   position: fixed;
   inset: 0;
+  border-radius: 12px;
   background: rgb(0 0 0 / 0.32);
   animation: scrim-in var(--k-motion-spring-effects-default-duration) var(--k-motion-spring-effects-default);
 }
@@ -65,6 +66,4 @@ html, body { height: 100%; margin: 0; background: transparent; overflow: hidden;
 }
 .query::selection { background: color-mix(in srgb, var(--k-color-primary) 45%, transparent); color: inherit; }
 
-body.page { background: var(--k-color-surface); }
-body.page .scrim { display: none; }
-body.page .card { top: 28vh; box-shadow: none; background: var(--k-color-surface-container); }
+body.closed > * { visibility: hidden; }

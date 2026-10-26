@@ -19,6 +19,13 @@ test("arquiva quem passou das horas, nunca fixadas nem a ativa", () => {
   assert.ok(!result.sleep.includes(1));
 });
 
+test("abas da seção Fixadas não são arquivadas, só dormem", () => {
+  const tabs = [tab(1, 13 * 60), tab(2, 13 * 60)];
+  const result = plan(tabs, now, { sleepAfterMinutes: 30, archiveAfterHours: 12 }, new Set([2]));
+  assert.deepEqual(result.archive, [1]);
+  assert.deepEqual(result.sleep, [2]);
+});
+
 test("zero desliga cada etapa", () => {
   const tabs = [tab(1, 13 * 60)];
   assert.deepEqual(plan(tabs, now, { sleepAfterMinutes: 0, archiveAfterHours: 0 }), { sleep: [], archive: [] });

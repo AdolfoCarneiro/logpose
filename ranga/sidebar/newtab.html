@@ -6,21 +6,15 @@
   <title>Nova aba</title>
   <link rel="stylesheet" href="kurobe/kurobe.css">
   <link rel="stylesheet" href="kurobe/components.css">
-  <link rel="stylesheet" href="spotlight.css">
+  <link rel="stylesheet" href="newtab.css">
   <style id="ranga-theme"></style>
 </head>
-<body class="k-type-body page">
-  <div id="scrim" class="scrim"></div>
-  <section id="card" class="card" role="search" aria-label="Nova aba">
-    <label class="field">
-      <span id="field-icon" class="k-icon"></span>
-      <input id="query" class="query k-type-title" type="text" autocomplete="off" spellcheck="false" placeholder="Buscar ou digitar endereço">
-    </label>
-    <div class="results-wrap">
-      <div id="selection" class="selection"></div>
-      <ul id="results" class="results k-list"></ul>
-    </div>
-  </section>
-  <script type="module" src="spotlight.js"></script>
+<body class="k-type-body">
+  <button id="search" class="hint k-state k-type-label" type="button">
+    <span class="k-icon" data-icon="search"></span>
+    <span>Buscar ou digitar endereço</span>
+    <span id="keys" class="keys"></span>
+  </button>
+  <script type="module" src="newtab.js"></script>
 </body>
 </html>

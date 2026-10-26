@@ -119,13 +119,18 @@ export function setupDownloads({ button, popover, windowId }) {
     return win?.id === windowId();
   }
 
+  async function announce(item) {
+    if (popover.hidden && (await focused())) toast(`Baixando ${fileName(item)}`);
+  }
+
   chrome.downloads.onCreated.addListener(async (item) => {
     await load();
     pop(button);
-    if (popover.hidden && (await focused())) toast(`Baixando ${fileName(item)}`);
+    if (item.filename) announce(item);
   });
   chrome.downloads.onChanged.addListener(async (delta) => {
     await load();
+    if (delta.filename && !delta.filename.previous && delta.state?.current !== "complete") announce({ filename: delta.filename.current });
     if (delta.state?.current !== "complete" || !(await focused())) return;
     const [item] = await chrome.downloads.search({ id: delta.id });
     pop(button);

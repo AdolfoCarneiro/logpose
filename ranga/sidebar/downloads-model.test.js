@@ -12,6 +12,9 @@ test("tamanhos em unidades decimais, com vírgula", () => {
 test("nome do arquivo vem do caminho", () => {
   assert.equal(fileName({ filename: "/home/u/Downloads/foto.png" }), "foto.png");
   assert.equal(fileName({ filename: "", url: "https://x.dev/a/relatorio.pdf" }), "relatorio.pdf");
+  assert.equal(fileName({ filename: "", url: "https://x.dev/cgi?u=https%3A%2F%2Fy.dev%2Fa.png" }), "cgi");
+  assert.equal(fileName({ filename: "", url: "https://x.dev/minha%20foto.png" }), "minha foto.png");
+  assert.equal(fileName({ filename: "", url: "data:image/png;base64,AAAA" }), "download");
 });
 
 test("progresso e situação", () => {

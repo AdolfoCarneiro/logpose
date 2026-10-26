@@ -1,5 +1,5 @@
 html, body { height: 100%; margin: 0; background: transparent; overflow: hidden; font-family: var(--k-type-family); color: var(--k-color-on-surface); }
-.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.28); animation: fade-in var(--k-motion-spring-effects-default-duration) var(--k-motion-spring-effects-default); }
+.scrim { position: fixed; inset: 0; border-radius: 12px; background: rgb(0 0 0 / 0.28); animation: fade-in var(--k-motion-spring-effects-default-duration) var(--k-motion-spring-effects-default); }
 @keyframes fade-in { from { opacity: 0; } }
 .card {
   position: fixed;
@@ -44,3 +44,4 @@ html, body { height: 100%; margin: 0; background: transparent; overflow: hidden;
 .tile--selected { background: var(--k-color-primary-container); border-radius: 32px; transform: scale(1.06); }
 .tile--selected .title { color: var(--k-color-on-primary-container); }
 .caption { max-width: 560px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--k-color-on-surface); }
+body.closed > * { visibility: hidden; }

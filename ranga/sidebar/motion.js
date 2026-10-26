@@ -48,3 +48,7 @@ export async function exit(el) {
 export function pop(el) {
   animate(el, [{ transform: "scale(0.86)" }, { transform: "none" }], "spatial-fast");
 }
+
+export function painted() {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}

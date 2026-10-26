@@ -22,6 +22,7 @@ async function finish() {
   const consent = document.getElementById("services").checked;
   if (chrome.settingsPrivate) {
     await chrome.settingsPrivate.setPref("helium.services.user_consented", consent).catch(() => {});
+    await chrome.settingsPrivate.setPref("helium.services.schema_version", 1).catch(() => {});
     await chrome.settingsPrivate.setPref("helium.completed_onboarding", true).catch(() => {});
   }
   const tab = await chrome.tabs.getCurrent();

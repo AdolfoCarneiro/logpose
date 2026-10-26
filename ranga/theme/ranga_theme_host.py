@@ -43,7 +43,25 @@ def changes(path, interval):
             time.sleep(interval)
 
 
+LOCK = threading.Lock()
+
+
+def send(obj):
+    with LOCK:
+        sys.stdout.buffer.write(encode(obj))
+        sys.stdout.buffer.flush()
+
+
+def update_ready():
+    running = os.path.dirname(os.path.realpath(f"/proc/{os.getppid()}/exe"))
+    current = os.path.join(os.path.dirname(running), "current")
+    return os.path.islink(current) and os.path.realpath(current) != running
+
+
 def handle(message, colors, theme):
+    if message.get("type") == "build":
+        send({"type": "build", "updateReady": update_ready()})
+        return
     if message.get("type") != "set-opacity":
         return
     value = max(0, min(100, int(message.get("value", ranga_theme.DEFAULT_OPACITY))))
@@ -65,10 +83,8 @@ def listen():
 
 def main():
     threading.Thread(target=listen, daemon=True).start()
-    out = sys.stdout.buffer
     for css in changes(THEME, 0.2):
-        out.write(encode({"type": "theme", "css": css}))
-        out.flush()
+        send({"type": "theme", "css": css})
 
 
 if __name__ == "__main__":

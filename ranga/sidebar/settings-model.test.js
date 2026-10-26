@@ -64,3 +64,15 @@ test("páginas internas aparecem como ranga://", () => {
   assert.equal(displayUrl("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/newtab.html", false), "");
   assert.equal(displayUrl("chrome-extension://outra/popup.html", false), "chrome-extension://outra");
 });
+
+test("Peek nas fixadas: ligado por padrão, só aceita booleano", () => {
+  assert.equal(loadSettings(undefined).peekPinnedLinks, true);
+  assert.equal(loadSettings({ peekPinnedLinks: false }).peekPinnedLinks, false);
+  assert.equal(loadSettings({ peekPinnedLinks: "não" }).peekPinnedLinks, true);
+});
+
+test("janela pequena pra links de outros apps: ligada por padrão, só aceita booleano", () => {
+  assert.equal(loadSettings(undefined).littleWindowLinks, true);
+  assert.equal(loadSettings({ littleWindowLinks: false }).littleWindowLinks, false);
+  assert.equal(loadSettings({ littleWindowLinks: 1 }).littleWindowLinks, true);
+});

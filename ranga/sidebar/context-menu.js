@@ -14,6 +14,13 @@ export function showMenu(entries, x, y) {
       hr.setAttribute("role", "separator");
       return hr;
     }
+    if (entry.heading) {
+      const title = document.createElement("li");
+      title.className = "k-menu__heading k-type-caption";
+      title.setAttribute("role", "presentation");
+      title.textContent = entry.heading;
+      return title;
+    }
     const li = document.createElement("li");
     li.className = "k-menu__item k-state k-type-label" + (entry.danger ? " k-menu__item--danger" : "");
     li.setAttribute("role", "menuitem");

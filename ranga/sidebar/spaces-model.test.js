@@ -105,7 +105,52 @@ test("foto guarda URL e espaço de cada aba", () => {
   s = assignTab(s, 1, "trabalho");
   s = setActive(s, 10, "pessoal");
   const shot = snapshot(s, [{ id: 1, url: "https://gitlab.com/" }, { id: 2, url: "https://github.com/" }], 10);
-  assert.deepEqual(shot, [{ url: "https://gitlab.com/", space: "trabalho" }, { url: "https://github.com/", space: "pessoal" }]);
+  assert.deepEqual(shot, { active: "pessoal", tabs: [{ url: "https://gitlab.com/", space: "trabalho" }, { url: "https://github.com/", space: "pessoal" }] });
+});
+
+test("nome próprio da aba: guarda, some com a aba e volta pela foto", async () => {
+  const { setTitle } = await import("./spaces-model.js");
+  let s = setTitle(initialState(), 3, "  Board  ");
+  assert.equal(s.tabTitle[3], "Board");
+  assert.equal(snapshot(s, [{ id: 3, url: "https://gitlab.com/" }], 1).tabs[0].title, "Board");
+  assert.equal(setTitle(s, 3, " ").tabTitle[3], undefined);
+  assert.equal(forgetTab(s, 3).tabTitle[3], undefined);
+  const back = restore(initialState(), [{ id: 9, url: "https://gitlab.com/" }], { tabs: [{ url: "https://gitlab.com/", space: "pessoal", title: "Board" }] });
+  assert.equal(back.tabTitle[9], "Board");
+});
+
+test("restaurar sem URL igual casa as que sobraram pela posição", () => {
+  const shot = { tabs: [{ url: "https://a.dev/", space: "pessoal" }, { url: "https://gitlab.com/mr/1", space: "uown" }, { url: "https://b.dev/", space: "uown" }] };
+  const s = restore(initialState(), [
+    { id: 1, url: "https://a.dev/" },
+    { id: 2, url: "https://gitlab.com/mr/2" },
+    { id: 3, url: "https://b.dev/" },
+  ], shot);
+  assert.deepEqual(s.tabSpace, { 1: "pessoal", 2: "uown", 3: "uown" });
+});
+
+test("fotos por janela: guarda as 6 mais recentes e escolhe a que mais casa", async () => {
+  const { storeSnapshot, pickSnapshot, forgetSnapshot } = await import("./spaces-model.js");
+  let stored = storeSnapshot([{ url: "https://velho.dev/", space: "pessoal" }], 1, { active: "uown", tabs: [{ url: "https://a.dev/", space: "uown" }] }, 10);
+  stored = storeSnapshot(stored, 2, { active: "pessoal", tabs: [{ url: "https://b.dev/", space: "pessoal" }, { url: "https://c.dev/", space: "pessoal" }] }, 20);
+  assert.deepEqual(Object.keys(stored).sort(), ["1", "2"]);
+  assert.equal(pickSnapshot(stored, [{ url: "https://a.dev/" }]).key, "1");
+  assert.equal(pickSnapshot(stored, [{ url: "https://c.dev/" }, { url: "https://b.dev/" }]).key, "2");
+  assert.equal(pickSnapshot(stored, [{ url: "https://z.dev/" }]), null);
+  assert.equal(pickSnapshot([{ url: "https://a.dev/", space: "uown" }], [{ url: "https://a.dev/" }]).shot.tabs[0].space, "uown");
+  for (let w = 3; w <= 9; w++) stored = storeSnapshot(stored, w, { tabs: [] }, w * 10);
+  assert.equal(Object.keys(stored).length, 6);
+  assert.deepEqual(Object.keys(stored).sort(), ["4", "5", "6", "7", "8", "9"]);
+  assert.deepEqual(Object.keys(forgetSnapshot(stored, "9")).sort(), ["4", "5", "6", "7", "8"]);
+});
+
+test("ao reabrir, o espaço é o da aba ativa; sem ela, o último usado", async () => {
+  const { reopenedSpace } = await import("./spaces-model.js");
+  let s = createSpace(initialState(), { name: "UOWN", icon: "briefcase", color: null });
+  s = assignTab(s, 5, "uown");
+  assert.equal(reopenedSpace(s, [{ id: 4 }, { id: 5, active: true }], { active: "pessoal" }), "uown");
+  assert.equal(reopenedSpace(s, [{ id: 4, active: true }], { active: "uown" }), "uown");
+  assert.equal(reopenedSpace(s, [], { active: "sumiu" }), "pessoal");
 });
 
 test("restaurar casa abas novas pela URL, uma vez cada", () => {
@@ -121,5 +166,12 @@ test("restaurar casa abas novas pela URL, uma vez cada", () => {
   ], shot);
   assert.equal(s.tabSpace[7], "trabalho");
   assert.equal(s.tabSpace[8], "pessoal");
-  assert.equal(s.tabSpace[9], undefined);
+  assert.equal(s.tabSpace[9], "trabalho");
+});
+
+test("container do espaço ativo, vazio quando não tem", async () => {
+  const { containerOf } = await import("./spaces-model.js");
+  const state = { ...initialState(), spaces: [{ id: "pessoal", name: "Pessoal" }, { id: "job", name: "Job", container: "trabalho" }], active: { 1: "job", 2: "pessoal" } };
+  assert.equal(containerOf(state, 1), "trabalho");
+  assert.equal(containerOf(state, 2), "");
 });

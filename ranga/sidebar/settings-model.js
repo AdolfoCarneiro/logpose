@@ -5,6 +5,8 @@ export const DEFAULTS = Object.freeze({
   materialOpacity: 85,
   sleepAfterMinutes: 30,
   archiveAfterHours: 12,
+  peekPinnedLinks: true,
+  littleWindowLinks: true,
 });
 
 const CHOICES = {

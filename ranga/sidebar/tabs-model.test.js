@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toItems, toNavigation, splitEdges } from "./tabs-model.js";
+import { toItems, toNavigation, splitEdges, faviconOf } from "./tabs-model.js";
 
 test("fixadas primeiro, depois por index", () => {
   const tabs = [
@@ -12,6 +12,8 @@ test("fixadas primeiro, depois por index", () => {
 });
 
 test("título vazio cai pra URL", () => {
+  const [named] = toItems([{ id: 1, index: 0, title: "Página", url: "https://x.dev/a" }], 1, (t) => (t.id === 1 ? "Meu nome" : ""));
+  assert.equal(named.title, "Meu nome");
   const [item] = toItems([{ id: 1, index: 0, title: "", url: "https://x.dev/a", pinned: false }], 1);
   assert.equal(item.title, "https://x.dev/a");
 });
@@ -68,6 +70,8 @@ test("aba tocando som ou silenciada é marcada", () => {
 test("navegação: ranga:// vira a página interna", () => {
   assert.deepEqual(toNavigation("ranga://extensions"), { kind: "url", url: "chrome://extensions" });
   assert.deepEqual(toNavigation("ranga://settings/privacy"), { kind: "url", url: "chrome://settings/privacy" });
+  assert.deepEqual(toNavigation("ranga://settings"), { kind: "url", url: "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html" });
+  assert.deepEqual(toNavigation("chrome://settings/"), { kind: "url", url: "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html" });
   assert.deepEqual(toNavigation("ranga://configurações"), { kind: "url", url: "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html" });
 });
 
@@ -85,4 +89,13 @@ test("abas em tela dividida ficam juntas", () => {
   ], 2);
   assert.deepEqual(items.map((i) => i.split), [null, 7, 7, null]);
   assert.deepEqual(splitEdges(items), ["", "first", "last", ""]);
+});
+
+test("página de extensão sem favicon usa o ícone da extensão", () => {
+  const icon = faviconOf({ url: "chrome-extension://abc/dashboard.html", favIconUrl: "chrome-extension://abc/img/icon.svg" });
+  assert.match(icon, /\/_favicon\/\?pageUrl=chrome-extension%3A%2F%2Fabc%2Fdashboard\.html&size=32$/);
+  assert.equal(faviconOf({ url: "https://a.com/", favIconUrl: "https://a.com/f.ico" }), "https://a.com/f.ico");
+  assert.equal(faviconOf({ url: "https://a.com/" }), "");
+  const own = "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html";
+  assert.equal(faviconOf({ url: own, favIconUrl: "x.svg" }), "x.svg");
 });

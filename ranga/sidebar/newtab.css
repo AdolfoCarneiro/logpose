@@ -1,0 +1,32 @@
+html, body { height: 100%; margin: 0; }
+body {
+  display: grid;
+  place-items: center;
+  background: var(--k-color-surface);
+  color: var(--k-color-on-surface-variant);
+  font-family: var(--k-type-family);
+}
+.hint {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--k-space-sm);
+  height: 48px;
+  padding: 0 var(--k-space-lg);
+  border-radius: var(--k-shape-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity var(--k-motion-duration-short) var(--k-motion-easing-standard);
+}
+.hint:hover { opacity: 1; background: var(--k-color-surface-container); }
+.hint .k-icon { font-size: 18px; color: var(--k-color-primary); }
+.keys { display: inline-flex; gap: var(--k-space-xxs); }
+.keys kbd {
+  padding: 2px var(--k-space-xs);
+  border-radius: var(--k-shape-small);
+  background: var(--k-color-surface-container-highest);
+  font-family: inherit;
+}
