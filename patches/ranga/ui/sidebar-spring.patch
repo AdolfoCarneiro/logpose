@@ -1,0 +1,233 @@
+Barra lateral com mola: recolher, fixar e o toque na borda animam a barra com uma mola (com passada e volta) que empurra a página em vez de flutuar por cima dela (RangaSidebarReveal). O MultiContentsView deixa de recuar 3 px à direita e embaixo, pra margem do cartão da página ficar igual nos quatro lados.
+
+--- a/chrome/browser/ui/views/frame/ranga_sidebar_mode.h
++++ b/chrome/browser/ui/views/frame/ranga_sidebar_mode.h
+@@ -16,6 +16,8 @@
+ 
+ RangaSidebarMode RangaGetSidebarMode(const BrowserWindowInterface* browser);
+ 
++double RangaSidebarReveal(const BrowserWindowInterface* browser);
++
+ void RangaSetSidebarMode(BrowserWindowInterface* browser,
+                          RangaSidebarMode mode);
+ 
+--- a/chrome/browser/ui/views/frame/ranga_sidebar_mode.cc
++++ b/chrome/browser/ui/views/frame/ranga_sidebar_mode.cc
+@@ -4,13 +4,18 @@
+ 
+ #include "chrome/browser/ui/views/frame/ranga_sidebar_mode.h"
+ 
++#include <algorithm>
++#include <cmath>
+ #include <memory>
+ #include <string>
+ #include <utility>
+ 
+ #include "base/containers/flat_map.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/functional/bind.h"
+ #include "base/no_destructor.h"
++#include "base/time/time.h"
++#include "base/timer/timer.h"
+ #include "base/values.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ranga/ranga_sidebar.h"
+@@ -47,6 +52,67 @@
+   }
+ }
+ 
++class RevealSpring {
++ public:
++  RevealSpring(BrowserWindowInterface* browser, double value)
++      : browser_(browser), value_(value), target_(value) {}
++  RevealSpring(const RevealSpring&) = delete;
++  RevealSpring& operator=(const RevealSpring&) = delete;
++
++  double value() const { return value_; }
++
++  void SetTarget(double target) {
++    target_ = target;
++    if (timer_.IsRunning()) {
++      return;
++    }
++    last_ = base::TimeTicks::Now();
++    timer_.Start(FROM_HERE, base::Milliseconds(16),
++                 base::BindRepeating(&RevealSpring::Tick,
++                                     base::Unretained(this)));
++  }
++
++ private:
++  static constexpr double kStiffness = 320;
++  static constexpr double kDamping = 19;
++  static constexpr double kStep = 0.002;
++
++  void Tick() {
++    const base::TimeTicks now = base::TimeTicks::Now();
++    double left = std::min((now - last_).InSecondsF(), 0.05);
++    last_ = now;
++    while (left > 0) {
++      const double step = std::min(left, kStep);
++      velocity_ +=
++          (-kStiffness * (value_ - target_) - kDamping * velocity_) * step;
++      value_ += velocity_ * step;
++      left -= step;
++    }
++    if (std::abs(value_ - target_) < 0.001 && std::abs(velocity_) < 0.01) {
++      value_ = target_;
++      velocity_ = 0;
++      timer_.Stop();
++    }
++    if (BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser_)) {
++      view->InvalidateLayout();
++    }
++  }
++
++  const raw_ptr<BrowserWindowInterface> browser_;
++  double value_;
++  double target_;
++  double velocity_ = 0;
++  base::TimeTicks last_;
++  base::RepeatingTimer timer_;
++};
++
++base::flat_map<SessionID::id_type, std::unique_ptr<RevealSpring>>& Springs() {
++  static base::NoDestructor<
++      base::flat_map<SessionID::id_type, std::unique_ptr<RevealSpring>>>
++      springs;
++  return *springs;
++}
++
+ // A collapsed sidebar keeps only a thin strip inside the window, and window
+ // managers with gaps leave the screen edge outside of it: a pointer pushed to
+ // the edge crosses the strip between two events. Reaching the window's edge
+@@ -104,6 +170,7 @@
+ }
+ 
+ void EdgeWatcher::OnWindowDestroying(aura::Window* window) {
++  Springs().erase(id_);
+   Watchers().erase(id_);
+ }
+ 
+@@ -136,16 +203,31 @@
+   return it == Modes().end() ? RangaSidebarMode::kDocked : it->second;
+ }
+ 
++double RangaSidebarReveal(const BrowserWindowInterface* browser) {
++  auto it = Springs().find(browser->GetSessionID().id());
++  if (it != Springs().end()) {
++    return it->second->value();
++  }
++  return RangaGetSidebarMode(browser) == RangaSidebarMode::kCollapsed ? 0 : 1;
++}
++
+ void RangaSetSidebarMode(BrowserWindowInterface* browser,
+                          RangaSidebarMode mode) {
+   if (RangaGetSidebarMode(browser) == mode) {
+     return;
+   }
+-  Modes()[browser->GetSessionID().id()] = mode;
++  const SessionID::id_type id = browser->GetSessionID().id();
++  const bool first = !Modes().contains(id);
++  const double from = RangaSidebarReveal(browser);
++  const double target = mode == RangaSidebarMode::kCollapsed ? 0 : 1;
++  Modes()[id] = mode;
+   if (BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser)) {
+-    if (mode == RangaSidebarMode::kCollapsed) {
+-      WatchEdge(browser, view);
++    WatchEdge(browser, view);
++    std::unique_ptr<RevealSpring>& spring = Springs()[id];
++    if (!spring) {
++      spring = std::make_unique<RevealSpring>(browser, first ? target : from);
+     }
++    spring->SetTarget(target);
+     view->InvalidateLayout();
+   }
+   Profile* profile = browser->GetProfile()->GetOriginalProfile();
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1229,17 +1229,27 @@
+ 
+     // Not all of the width may be visible on the screen.
+     const int target_width = horizontal_layout.side_panel_width;
+-    const RangaSidebarMode ranga_mode =
+-        base::CommandLine::ForCurrentProcess()->HasSwitch(
+-            "ranga-native-chrome")
+-            ? RangaSidebarMode::kDocked
+-            : RangaGetSidebarMode(
++    const bool ranga_native = base::CommandLine::ForCurrentProcess()->HasSwitch(
++        "ranga-native-chrome");
++    const double ranga_reveal =
++        ranga_native
++            ? 1.0
++            : RangaSidebarReveal(
+                   views::AsViewClass<BrowserView>(views().browser_view.get())
+                       ->browser());
+     const int visible_width =
+-        ranga_mode == RangaSidebarMode::kCollapsed
+-            ? kRangaSidebarEdgeWidth
+-            : base::ClampFloor(target_width * side_panel_reveal_amount);
++        ranga_native || side_panel_reveal_amount < 1.0
++            ? base::ClampFloor(target_width * side_panel_reveal_amount)
++            : std::clamp(kRangaSidebarEdgeWidth +
++                             base::ClampRound((target_width -
++                                               kRangaSidebarEdgeWidth) *
++                                              ranga_reveal),
++                         0, target_width);
++    const int pushed_width =
++        ranga_native || side_panel_reveal_amount < 1.0
++            ? visible_width
++            : std::max(0, 8 + base::ClampRound((target_width - 8) *
++                                               ranga_reveal));
+ 
+     // Add `container_inset_padding` to the top of the side panel to separate it
+     // from the horizontal tab strip. SidePanel draws the top on top of the top
+@@ -1271,12 +1281,10 @@
+                       side_panel_animation_content_bounds);
+     }
+ 
+-    if (ranga_mode == RangaSidebarMode::kDocked) {
+-      params.InsetHorizontal(visible_width, side_panel_leading);
+-      if (side_panel_reveal_amount == 1.0) {
+-        InsetHorizontal(unclipped_contents_region, visible_width,
+-                        side_panel_leading);
+-      }
++    params.InsetHorizontal(pushed_width, side_panel_leading);
++    if (side_panel_reveal_amount == 1.0) {
++      InsetHorizontal(unclipped_contents_region, pushed_width,
++                      side_panel_leading);
+     }
+   }
+ 
+@@ -1445,10 +1453,7 @@
+           "ranga-native-chrome") &&
+       !is_fullscreen(layout_data_->window_state)) {
+     const bool panel_shown =
+-        views().side_panel && views().side_panel->GetVisible() &&
+-        RangaGetSidebarMode(
+-            views::AsViewClass<BrowserView>(views().browser_view.get())
+-                ->browser()) == RangaSidebarMode::kDocked;
++        views().side_panel && views().side_panel->GetVisible();
+     const bool panel_right =
+         panel_shown && views().side_panel->IsRightAligned();
+     ranga_contents_bounds.Inset(gfx::Insets::TLBR(
+--- a/chrome/browser/ui/views/frame/multi_contents_view.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
+@@ -9,6 +9,7 @@
+ #include <utility>
+ 
+ #include "base/check_deref.h"
++#include "base/command_line.h"
+ #include "base/notreached.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/actor/ui/actor_overlay_web_view.h"
+@@ -581,7 +582,9 @@
+ 
+   if (IsInSplitView()) {
+     available_space.Inset(split_view_insets_);
+-  } else if (should_use_rounded_frame) {
++  } else if (should_use_rounded_frame &&
++             base::CommandLine::ForCurrentProcess()->HasSwitch(
++                 "ranga-native-chrome")) {
+     gfx::Insets single_insets(kSplitViewContentInset);
+     single_insets.set_top(attached_chrome.TopInset());
+     single_insets.set_left(contents_separators_.leading_side_chrome_attached

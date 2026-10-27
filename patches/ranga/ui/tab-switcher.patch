@@ -48,7 +48,7 @@ Ctrl+Tab / Ctrl+Shift+Tab abrem o seletor de abas recentes do Ranga (switcher.ht
 +
 +void RangaSpotlightView::Preload() {
 +  content::WebContents* contents = GetWebContents();
-+  if (contents->GetController().GetEntryCount() > 0) {
++  if (!contents->GetController().IsInitialNavigation()) {
 +    return;
 +  }
 +  contents->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);

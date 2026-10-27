@@ -49,3 +49,8 @@ ranga/ui/load-progress.patch
 ranga/ui/settings-close.patch
 ranga/ui/shortcuts-yield-to-text.patch
 ranga/ui/restart-command.patch
+ranga/ui/sidebar-spring.patch
+ranga/ui/media-controls.patch
+ranga/ui/incognito-overlays.patch
+ranga/ui/overlay-preload.patch
+ranga/ui/extensions-web-store.patch

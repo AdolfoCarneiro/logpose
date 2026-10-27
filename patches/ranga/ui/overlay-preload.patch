@@ -1,0 +1,13 @@
+Spotlight e busca na página pré-carregados quando a janela abre, como a troca de abas: o primeiro Ctrl+T de uma janela nova piscava um quadro branco enquanto a página do painel carregava.
+
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -2390,6 +2390,8 @@
+       InvalidateLayout();
+     } else {
+       RangaOverlayFor(this, "switcher.html")->Preload();
++      RangaOverlayFor(this, "spotlight.html")->Preload();
++      RangaOverlayFor(this, "find.html")->Preload();
+       RangaPreparePeek(this);
+     }
+     RangaRegisterShortcuts(this);

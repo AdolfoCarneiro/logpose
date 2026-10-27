@@ -1,0 +1,46 @@
+Página de extensões: volta o link "Descubra mais extensões e temas na Chrome Web Store" no fim do menu lateral, que o ungoogled-chromium tirou. O aviso do modo de desenvolvedor continua de fora.
+
+--- a/chrome/browser/resources/extensions/sidebar.html.ts
++++ b/chrome/browser/resources/extensions/sidebar.html.ts
+@@ -45,6 +45,16 @@
+     <cr-ripple></cr-ripple>
+   </a>
+ </cr-menu-selector>
++<div class="separator"></div>
++<div class="cr-nav-menu-item" id="moreExtensions">
++  <cr-icon id="web-store-icon" icon="extensions-icons:web_store-custom">
++  </cr-icon>
++  <span id="discover-more-text" class="cr-secondary-text"
++      @click="${this.onMoreExtensionsClick_}"
++      .innerHTML="${this.computeDiscoverMoreText_()}">
++  </span>
++  <cr-ripple></cr-ripple>
++</div>
+ <!--_html_template_end_-->`;
+   // clang-format on
+ }
+--- a/chrome/browser/resources/extensions/sidebar.ts
++++ b/chrome/browser/resources/extensions/sidebar.ts
+@@ -23,6 +23,7 @@
+     sectionsExtensions: HTMLElement,
+     sectionsShortcuts: HTMLElement,
+     sectionsSitePermissions: HTMLElement,
++    moreExtensions: HTMLElement,
+   };
+ }
+ 
+@@ -110,6 +111,14 @@
+     this.fire('close-drawer');
+   }
+ 
++  protected computeDiscoverMoreText_(): TrustedHTML {
++    return this.i18nAdvanced('sidebarDiscoverMore', {
++      tags: ['a'],
++      attrs: ['target'],
++      substitutions: [loadTimeData.getString('getMoreExtensionsUrl')],
++    });
++  }
++
+   protected onMoreExtensionsClick_(e: Event) {
+     if ((e.target as HTMLElement).tagName === 'A') {
+       chrome.metricsPrivate.recordUserAction('Options_GetMoreExtensions');
