@@ -53,7 +53,7 @@ def latest():
 def behind(current, build):
     if not current:
         return True
-    base = current.removesuffix("-dirty")
+    base = current.split("-dirty")[0]
     if base == build:
         return False
     try:

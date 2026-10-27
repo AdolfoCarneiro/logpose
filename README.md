@@ -56,11 +56,11 @@ Ctrl+T e Ctrl+L abrem uma busca única: abas abertas, histórico, favoritos, com
 </td>
 <td width="50%" valign="top">
 
-**Gaveta flutuante**
+**Barra que recolhe com mola**
 
-Ctrl+Shift+S recolhe a barra e a página ocupa a janela. Encostar o mouse na borda traz a barra como um cartão solto por cima da página.
+Ctrl+Shift+S recolhe a barra e a página ocupa a janela. Encostar o mouse na borda traz a barra de volta com efeito de mola, empurrando a página.
 
-<img src="ranga/docs/img/floating.webp" alt="Barra lateral como cartão flutuante sobre a página">
+<img src="ranga/docs/img/collapsed.webp" alt="Página ocupando a janela inteira com a barra lateral recolhida">
 
 </td>
 </tr>
@@ -93,7 +93,9 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 ## Também
 
 - **Privacidade do Helium**: sem serviços do Google, uBlock Origin embutido, ruído contra fingerprinting, Global Privacy Control e só HTTPS.
-- **Containers**: cookies e logins separados por container. Duas contas do mesmo site lado a lado.
+- **Containers**: cookies e logins separados por container, com um grupo de abas salvo e recolhível na barra. Duas contas do mesmo site lado a lado.
+- **Mini player**: o que toca em outra aba aparece no pé da barra, com tocar/pausar, próxima e picture-in-picture.
+- **Nova aba** com saudação, tempo, atalhos, tarefas e notícias.
 - **Tema do sistema**: segue as cores do Ciel (o shell do meu desktop) e a transparência do material, no claro e no escuro.
 - **Janela pequena**: links vindos de outros apps abrem numa janela compacta; "Abrir no Ranga" leva pra janela principal.
 - **Volta de onde parou**: abas, espaços e nomes de aba voltam ao reabrir, até depois de uma falha.

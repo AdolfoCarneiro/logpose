@@ -8,7 +8,7 @@ out="$root/build/src/out/${1:-Release}"
 chromium="$(. "$root/build/src/chrome/VERSION" && echo "$MAJOR.$MINOR.$BUILD.$PATCH")"
 version="$(cat "$root/ranga/VERSION")-$chromium"
 build="$(git -C "$root" rev-parse --short=10 HEAD)"
-[ -z "$(git -C "$root" status --porcelain)" ] || build="$build-dirty"
+[ -z "$(git -C "$root" status --porcelain)" ] || build="$build-dirty.$(date +%m%d%H%M)"
 name="ranga-$version-x86_64"
 dir="$root/build/release/$name"
 

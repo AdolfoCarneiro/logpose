@@ -34,7 +34,8 @@ gh release view "$tag" -R "$repo" >/dev/null 2>&1 && { echo "release $tag já ex
   || fail "o build falhou"
 (cd "$root/ranga/sidebar" && node --test >/dev/null) || fail "os testes da barra falharam"
 package="$("$root/ranga/bin/ranga-package" | tail -1)"
-[ "$(tar -I zstd -xOf "$package" --wildcards '*/BUILD' | head -1)" = "$short" ] || fail "o pacote não é do commit $short"
+name="$(basename "$package" .tar.zst)"
+[ "$(tar -I zstd -xOf "$package" "$name/BUILD")" = "$short" ] || fail "o pacote não é do commit $short"
 (cd "$(dirname "$package")" && sha256sum "$(basename "$package")" > "$package.sha256")
 
 previous="$(gh release view -R "$repo" --json tagName -q .tagName 2>/dev/null || true)"
