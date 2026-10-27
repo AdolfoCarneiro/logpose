@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ranga — barra lateral",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjqMNSPTO1DOCiSruYXZLLVI7anTUnswkevnXpGlJBMO+kDSzKBShi5O1vNKT9irSEuIbNF9ZeQJ/huffFQ7GObg+jTaDpoEcnlALzoG40tAu1aPFbAYvAgZVByCu+gG6Ob6EnnI6mgj964pc+7H7Umoi/tybow3jyKIGiESZZgJVjXI9vlrZ/6Ngdvjyz6wpu/ExkjupuW7nKWeKaGA0oJiw9kjV88qTrz3/0KMbEOM5b992L1xWY5CIzziGpvZdgMcFVmSeds2y9eycuV8IAvfbeB80fj1PcaKZwB6F8mWFkQNnitIhOulAnY2WhlGcG1z52juy6b1xyqJ/RIUq1wIDAQAB",
   "permissions": [
     "tabs",
@@ -22,7 +22,12 @@
     "settingsPrivate",
     "downloads",
     "downloads.open",
-    "downloads.ui"
+    "downloads.ui",
+    "topSites"
+  ],
+  "host_permissions": [
+    "https://news.google.com/*",
+    "https://api.open-meteo.com/*"
   ],
   "side_panel": {
     "default_path": "sidebar.html"
@@ -45,6 +50,9 @@
     "open_in_tab": true
   },
   "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
     "128": "icon-128.png"
   },
   "chrome_url_overrides": {

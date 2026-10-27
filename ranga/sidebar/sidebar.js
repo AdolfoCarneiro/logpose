@@ -9,14 +9,16 @@ import { glyph } from "./kurobe/icons.mjs";
 import { createTabList } from "./tab-list.js";
 import { showMenu } from "./context-menu.js";
 import { setupFavorites } from "./favorites.js";
-import { animate, pop } from "./motion.js";
+import { animate, pop, kick, spin } from "./motion.js";
 import { toast } from "./toast.js";
 import { setupArchive } from "./archive.js";
 import { archiveEntry, pushArchive } from "./lifecycle-model.js";
 import { setupExtensions } from "./extensions.js";
 import { setupContainers } from "./containers.js";
+import { setupContainerGroups } from "./container-groups.js";
 import { setupDownloads } from "./downloads.js";
 import { setupPins } from "./pins.js";
+import { setupPlayer } from "./player.js";
 import { available as rangaPrivate, call } from "./ranga-private.js";
 
 const SPACE_ICONS = ["house", "briefcase", "code", "book-open", "music", "gamepad-2", "heart", "star", "palette"];
@@ -52,9 +54,21 @@ const pins = setupPins({
   windowId: () => windowId,
   spaceId: () => activeSpace(spaces, windowId).id,
   assign: (tabId) => moveTabToSpace(tabId, activeSpace(spaces, windowId).id),
-  container: () => (containers.available ? containerOf(spaces, windowId) : ""),
+  container: () => (containers.available && !incognito ? containerOf(spaces, windowId) : ""),
   changed: () => render(),
 });
+const groups = setupContainerGroups({
+  section: document.getElementById("groups"),
+  list: document.getElementById("groups-list"),
+  windowId: () => windowId,
+  assign: (tabId) => moveTabToSpace(tabId, activeSpace(spaces, windowId).id),
+  containerOf: (tabId) => containers.of(tabId)?.id ?? "",
+  changed: () => render(),
+});
+
+function keptIds() {
+  return new Set([...pins.liveIds(), ...groups.liveIds()]);
+}
 
 function paintIcons(root = document) {
   for (const el of root.querySelectorAll("[data-icon]")) {
@@ -86,6 +100,7 @@ async function saveSpaces() {
   const tabs = await saveSnapshot();
   await containers.save(tabs);
   await pins.save();
+  await groups.persist();
 }
 
 async function moveTabToSpace(tabId, spaceId) {
@@ -104,19 +119,22 @@ async function reopenInContainer(ids, container) {
     const space = spaceOfTab(spaces, tabId, windowId);
     const id = await containers.reopen(await chrome.tabs.get(tabId), container);
     await moveTabToSpace(id, space);
+    if (container) await groups.adopt(id, container);
   }
   render();
 }
 
 function containerEntries(items) {
-  if (!containers.available) return [];
+  if (!containers.available || incognito) return [];
   const ids = items.map((i) => i.id);
   const current = items.length === 1 ? items[0].container?.id ?? "" : null;
   const choices = containers.list().filter((c) => c.id !== current);
   const contained = items.some((i) => i.container);
   if (!choices.length && !contained) return [];
+  const saveable = items.length === 1 && items[0].container ? [{ icon: "folder-plus", label: `Guardar no grupo ${items[0].container.name}`, action: () => groups.adopt(items[0].id, items[0].container.id) }] : [];
   return [
     "divider",
+    ...saveable,
     { heading: "Abrir no container" },
     ...choices.map((c) => ({ icon: c.icon, label: c.name, action: () => reopenInContainer(ids, c.id) })),
     ...(contained ? [{ icon: "log-out", label: "Tirar do container", action: () => reopenInContainer(ids, "") }] : []),
@@ -203,7 +221,7 @@ async function closeTabs(ids) {
 }
 
 async function closeAround(tabId, pick) {
-  const kept = pins.liveIds();
+  const kept = keptIds();
   const today = visibleTabs(spaces, await chrome.tabs.query({ windowId }), windowId)
     .filter((t) => !kept.has(t.id) && !t.pinned)
     .sort((a, b) => a.index - b.index);
@@ -350,11 +368,13 @@ async function paint() {
   const all = await chrome.tabs.query({});
   const tabs = all.filter((t) => t.windowId === windowId);
   await containers.load();
-  const kept = pins.liveIds();
+  const kept = keptIds();
   const visible = visibleTabs(spaces, tabs, windowId).filter((t) => !kept.has(t.id));
   const active = tabs.find((t) => t.active);
   const items = toItems(visible, active?.id, (t) => spaces.tabTitle[t.id] || bookmarkTitles.get(t.url) || "").map((i) => ({ ...i, container: containers.of(i.id) }));
   pins.render(new Map(all.map((t) => [t.id, t])), active?.id);
+  if (incognito) document.getElementById("groups").hidden = true;
+  else groups.render(new Map(all.map((t) => [t.id, t])), active?.id);
   tabList.render(items.filter((i) => !i.pinned));
   activeUrl = active?.url || active?.pendingUrl || "";
   activeTabId = active?.id ?? null;
@@ -491,16 +511,17 @@ address.addEventListener("keydown", async (e) => {
 document.getElementById("address-icon").onclick = () => {
   if (rangaPrivate) call("showPageInfo", windowId).catch(() => {});
 };
-document.getElementById("back").onclick = async () => chrome.tabs.goBack((await activeTab()).id);
-document.getElementById("forward").onclick = async () => chrome.tabs.goForward((await activeTab()).id);
-document.getElementById("reload").onclick = async () => chrome.tabs.reload((await activeTab()).id);
+const iconOf = (id) => document.querySelector(`#${id} .k-icon`);
+document.getElementById("back").onclick = async () => { kick(iconOf("back"), "translateX(-7px)"); chrome.tabs.goBack((await activeTab()).id); };
+document.getElementById("forward").onclick = async () => { kick(iconOf("forward"), "translateX(7px)"); chrome.tabs.goForward((await activeTab()).id); };
+document.getElementById("reload").onclick = async () => { spin(iconOf("reload")); chrome.tabs.reload((await activeTab()).id); };
 document.getElementById("new-tab").onclick = () => {
   if (rangaPrivate) call("executeCommand", windowId, "newTab").catch(() => chrome.tabs.create({ windowId }));
   else chrome.tabs.create({ windowId });
 };
 document.getElementById("new-tab").oncontextmenu = (e) => {
   e.preventDefault();
-  if (!containers.available) return;
+  if (!containers.available || incognito) return;
   showMenu(containers.list().map((c) => ({
     icon: c.icon,
     label: `Nova aba no container ${c.name}`,
@@ -524,7 +545,7 @@ async function archiveTabs(tabs, reason) {
 }
 
 async function clearToday() {
-  const kept = pins.liveIds();
+  const kept = keptIds();
   const tabs = visibleTabs(spaces, await chrome.tabs.query({ windowId, pinned: false, active: false }), windowId).filter((t) => !kept.has(t.id));
   if (tabs.length) archiveTabs(tabs, "clear");
 }
@@ -549,6 +570,7 @@ function announceArchived(info) {
 
 document.getElementById("menu-button").onclick = async (e) => {
   e.stopPropagation();
+  if (menu.hidden) kick(iconOf("menu-button"), "rotate(90deg)");
   menu.hidden = !menu.hidden;
   if (menu.hidden || !rangaPrivate) return;
   const enabled = await call("getEnabledCommands", windowId).catch(() => []);
@@ -581,6 +603,12 @@ const extensions = setupExtensions({
   button: document.getElementById("extensions-button"),
   popover: document.getElementById("extensions-popover"),
   windowId: () => windowId,
+});
+
+const player = setupPlayer({
+  root: document.getElementById("player"),
+  windowId: () => windowId,
+  enabled: () => settings.miniPlayer,
 });
 
 setupDownloads({
@@ -648,7 +676,6 @@ async function setSidebarMode(mode) {
 
 function paintSidebarMode(mode) {
   sidebarMode = mode;
-  document.body.classList.toggle("floating", mode === "floating");
   document.body.classList.toggle("collapsed", mode === "collapsed");
   const label = menu.querySelector(".toggle-sidebar-label");
   label.textContent = mode === "docked" ? "Recolher barra lateral" : "Fixar barra lateral";
@@ -736,6 +763,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.settings) {
     settings = loadSettings(changes.settings.newValue);
     applySettings();
+    player.refresh();
   }
   if (changes.lastArchived?.newValue) announceArchived(changes.lastArchived.newValue);
   if (changes.containers) render();
@@ -812,6 +840,8 @@ for (const { from, to } of await containers.heal(windowTabs)) {
   spaces = assignTab(spaces, to, spaceOfTab(spaces, from, windowId));
 }
 await pins.load(await chrome.tabs.query({ windowId }));
+await containers.load();
+await groups.load(await chrome.tabs.query({ windowId }));
 for (const tab of await chrome.tabs.query({ windowId, pinned: true })) {
   await chrome.tabs.update(tab.id, { pinned: false });
   await pins.pinTab(tab, { space: spaceOfTab(spaces, tab.id, windowId) });

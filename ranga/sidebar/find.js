@@ -48,6 +48,7 @@ async function close() {
 }
 
 async function open() {
+  if (location.hash.startsWith("#idle")) return;
   windowId = (await chrome.windows.getLastFocused()).id;
   const mode = location.hash.slice(1).split("-")[0];
   if (!text.value) {

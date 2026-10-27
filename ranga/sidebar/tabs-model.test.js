@@ -97,5 +97,12 @@ test("página de extensão sem favicon usa o ícone da extensão", () => {
   assert.equal(faviconOf({ url: "https://a.com/", favIconUrl: "https://a.com/f.ico" }), "https://a.com/f.ico");
   assert.equal(faviconOf({ url: "https://a.com/" }), "");
   const own = "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/settings.html";
-  assert.equal(faviconOf({ url: own, favIconUrl: "x.svg" }), "x.svg");
+  assert.equal(faviconOf({ url: own, favIconUrl: "x.svg" }), "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/icon-128.png");
+});
+
+test("páginas internas usam o ícone do Ranga", () => {
+  const icon = "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/icon-128.png";
+  assert.equal(faviconOf({ url: "chrome://history/", favIconUrl: "chrome://favicon/x" }), icon);
+  assert.equal(faviconOf({ url: "ranga://settings" }), icon);
+  assert.equal(faviconOf({ url: "about:blank", favIconUrl: "" }), "");
 });

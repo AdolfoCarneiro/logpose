@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   loadContainers, createContainer, updateContainer, deleteContainer, membership, containerSnapshot, lostTabs, slug, DEFAULT_CONTAINERS,
+  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages,
 } from "./containers-model.js";
 
 test("sem nada salvo vêm Trabalho e Pessoal; lista salva vazia continua vazia", () => {
@@ -49,4 +50,30 @@ test("depois de reiniciar, reconhece pela ordem quem estava no container, mesmo 
     { tabId: 8, url: "https://mail.google.com/", index: 1, active: false, pinned: true, container: "trabalho" },
   ]);
   assert.deepEqual(lostTabs(shot, tabs, new Map([[8, "trabalho"]]), DEFAULT_CONTAINERS), []);
+});
+
+test("o container guarda páginas como as fixadas", () => {
+  let list = [{ id: "trabalho", name: "Trabalho", color: "#fff", icon: "briefcase" }, { id: "pessoal", name: "Pessoal", color: "#000", icon: "user" }];
+  list = addPage(list, "trabalho", { id: "p1", url: "https://mail.com/", title: "Mail" });
+  list = addPage(list, "trabalho", { id: "p2", url: "https://jira.com/", title: "" }, 0);
+  assert.deepEqual(pagesOf(list[0]).map((p) => p.id), ["p2", "p1"]);
+  assert.equal(pagesOf(list[0])[0].title, "https://jira.com/");
+  assert.equal(findPage(list, "p1").container.id, "trabalho");
+  list = updatePage(list, "p1", { url: "https://mail.com/inbox", id: "x" });
+  assert.deepEqual(findPage(list, "p1").page, { id: "p1", url: "https://mail.com/inbox", title: "Mail" });
+  assert.deepEqual([...pageIds(list)].sort(), ["p1", "p2"]);
+  list = removePage(list, "p2");
+  assert.equal(findPage(list, "p2"), null);
+  list = toggleGroup(list, "trabalho");
+  assert.equal(list[0].collapsed, true);
+  assert.equal(list[1].collapsed, undefined);
+  assert.deepEqual(pagesOf(list[1]), []);
+});
+
+test("ao reabrir, a página volta pra aba do mesmo container, não pra uma igual fora dele", () => {
+  const list = [{ id: "trabalho", name: "Trabalho", color: "#fff", icon: "briefcase", pages: [{ id: "p1", url: "https://w.org/", title: "W" }] }];
+  const tabs = [{ id: 1, url: "https://w.org/" }, { id: 2, url: "https://w.org/" }];
+  const inside = new Map([[2, "trabalho"]]);
+  assert.deepEqual(restorePages(tabs, [{ pin: "p1", url: "https://w.org/" }, { pin: "gone", url: "x" }], list, (id) => inside.get(id) ?? ""), { 2: "p1" });
+  assert.deepEqual(restorePages(tabs, undefined, list, () => ""), {});
 });

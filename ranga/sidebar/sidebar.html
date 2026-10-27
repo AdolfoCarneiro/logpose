@@ -50,6 +50,8 @@
       <span class="k-icon chevron" data-icon="chevron-right"></span>
     </button>
 
+    <section id="groups" class="groups" aria-label="Containers" hidden><ul id="groups-list" class="groups-list"></ul></section>
+
     <div class="today-header">
       <span class="k-type-section">Hoje</span>
       <button id="clear-today" class="clear k-state k-type-label" title="Fechar as abas de hoje deste espaço, menos a atual"><span class="k-icon" data-icon="arrow-down"></span>Limpar</button>
@@ -63,6 +65,25 @@
       <ul id="tabs" class="k-list"></ul>
     </div>
   </div>
+
+  <section id="player" class="player" aria-label="Mídia tocando" hidden>
+    <div class="player__head">
+      <button class="player__source k-state" type="button" title="Ir para a aba">
+        <span class="player__art"><img alt=""><span class="k-icon" data-icon="music"></span></span>
+        <span class="player__text"><span class="player__title k-type-label"></span><span class="player__subtitle k-type-caption"></span></span>
+      </button>
+      <button class="player__pip k-icon-button k-icon-button--small k-state" type="button" title="Picture-in-picture" data-icon="picture-in-picture-2"></button>
+      <button class="player__mute k-icon-button k-icon-button--small k-state" type="button" title="Silenciar" data-icon="volume-2"></button>
+    </div>
+    <div class="player__progress" role="presentation"><div class="player__bar"></div></div>
+    <div class="player__controls">
+      <span class="player__time k-type-caption"></span>
+      <button class="player__prev k-icon-button k-state" type="button" title="Anterior" data-icon="skip-back"></button>
+      <button class="player__play k-state" type="button" title="Tocar" data-icon="play"></button>
+      <button class="player__next k-icon-button k-state" type="button" title="Próxima" data-icon="skip-forward"></button>
+      <span class="player__duration k-type-caption"></span>
+    </div>
+  </section>
 
   <div id="update" class="update-card" hidden>
     <span class="k-icon" data-icon="sparkles"></span>

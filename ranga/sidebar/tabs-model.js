@@ -1,10 +1,12 @@
 import { rangaUrl } from "./settings-model.js";
 
 const RANGA_ORIGIN = "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/";
+const RANGA_ICON = `${RANGA_ORIGIN}icon-128.png`;
 
 export function faviconOf(tab) {
   const url = tab.url || tab.pendingUrl || "";
-  if (!url.startsWith("chrome-extension://") || url.startsWith(RANGA_ORIGIN)) return tab.favIconUrl || "";
+  if (/^(chrome|ranga):/.test(url) || url.startsWith(RANGA_ORIGIN)) return RANGA_ICON;
+  if (!url.startsWith("chrome-extension://")) return tab.favIconUrl || "";
   return `${RANGA_ORIGIN}_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`;
 }
 

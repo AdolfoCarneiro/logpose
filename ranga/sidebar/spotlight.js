@@ -80,10 +80,11 @@ function row(item, index) {
 
 async function refresh() {
   const text = query.value;
+  const incognito = Boolean(target?.incognito);
   const [tabs, history, bookmarks, resolved] = await Promise.all([
-    chrome.tabs.query({}),
-    text.trim() ? chrome.history.search({ text, maxResults: 25, startTime: 0 }) : [],
-    text.trim() ? chrome.bookmarks.search(text) : [],
+    chrome.tabs.query(incognito ? { windowId: target.windowId } : {}),
+    text.trim() && !incognito ? chrome.history.search({ text, maxResults: 25, startTime: 0 }) : [],
+    text.trim() && !incognito ? chrome.bookmarks.search(text) : [],
     mayHaveKeyword(text) ? resolve(text) : null,
   ]);
   const others = tabs.filter((t) => t.id !== target?.id && !/^chrome:\/\/newtab\/?$/.test(t.url || ""));
@@ -102,7 +103,7 @@ function resolve(text) {
 async function createTab(url) {
   const windowId = target?.windowId;
   const { spaces } = await chrome.storage.local.get("spaces");
-  const container = rangaPrivate && spaces?.spaces ? containerOf({ active: {}, ...spaces }, windowId) : "";
+  const container = rangaPrivate && spaces?.spaces && !target?.incognito ? containerOf({ active: {}, ...spaces }, windowId) : "";
   if (container) return call("createTab", { windowId, container, url, active: true });
   return (await chrome.tabs.create({ url, windowId })).id;
 }
@@ -139,10 +140,12 @@ function blank(url) {
 
 function showMode() {
   document.getElementById("field-icon").textContent = glyph(mode === "new" ? "plus" : "search");
-  query.placeholder = mode === "new" ? "Nova aba: buscar ou digitar endereço" : "Buscar ou digitar endereço";
+  const prefix = target?.incognito ? "Anônima: " : mode === "new" ? "Nova aba: " : "";
+  query.placeholder = prefix ? `${prefix}buscar ou digitar endereço` : "Buscar ou digitar endereço";
 }
 
 async function open() {
+  if (location.hash.startsWith("#idle")) return;
   document.title = "Ranga";
   document.body.classList.remove("closed");
   mode = location.hash.startsWith("#current") ? "current" : "new";

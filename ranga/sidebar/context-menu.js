@@ -36,7 +36,7 @@ export function showMenu(entries, x, y) {
   }));
   menu.style.visibility = "hidden";
   menu.hidden = false;
-  const { width, height } = menu.getBoundingClientRect();
+  const { offsetWidth: width, offsetHeight: height } = menu;
   const left = Math.max(8, Math.min(x, innerWidth - width - 8));
   const top = Math.max(8, Math.min(y, innerHeight - height - 8));
   menu.style.left = `${left}px`;

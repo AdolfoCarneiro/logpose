@@ -58,7 +58,7 @@
           </div>
         </div>
         <label class="setting">
-          <span class="text"><span class="k-type-panel">Barra de progresso</span><span class="k-type-caption hint">Linha no topo da página enquanto ela carrega.</span></span>
+          <span class="text"><span class="k-type-panel">Cobrinha de carregamento</span><span class="k-type-caption hint">Traço que contorna a página enquanto ela carrega.</span></span>
           <input class="k-switch" type="checkbox" data-pref="helium.browser.show_progress_bar">
         </label>
       </section>
@@ -76,6 +76,14 @@
             <button class="k-segmented__option k-type-label" data-value="true">Direita</button>
           </div>
         </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Mini player</span><span class="k-type-caption hint">Quando outra aba toca áudio ou vídeo, um cartão no pé da barra mostra o que toca, com tocar/pausar, anterior/próxima, picture-in-picture e mudo.</span></span>
+          <input class="k-switch" type="checkbox" data-key="miniPlayer">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Picture-in-picture automático</span><span class="k-type-caption hint">Ao trocar de aba com um vídeo tocando, ele segue numa janelinha flutuante; ao voltar pra aba, a janelinha fecha.</span></span>
+          <input class="k-switch" type="checkbox" data-key="autoPip">
+        </label>
       </section>
 
       <section class="card" id="abas" data-title="Abas" data-nav-icon="layers">
@@ -126,6 +134,14 @@
             <button class="k-segmented__option k-type-label" data-value="5">Nova aba</button>
           </div>
         </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Notícias na nova aba</span><span class="k-type-caption hint">Manchetes do Google Notícias em português, atualizadas a cada 30 minutos.</span></span>
+          <input class="k-switch" type="checkbox" data-key="newtabNews">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Tempo e tarefas na nova aba</span><span class="k-type-caption hint">Previsão por hora da cidade escolhida no Ciel (Open-Meteo) e uma lista de tarefas guardada no Ranga.</span></span>
+          <input class="k-switch" type="checkbox" data-key="newtabCards">
+        </label>
         <button class="setting setting--link" type="button" data-open="chrome://settings/searchEngines">
           <span class="text"><span class="k-type-panel">Mecanismos e atalhos de busca</span><span class="k-type-caption hint">Adicionar mecanismos e palavras-chave de site.</span></span>
           <span class="k-icon" data-icon="external-link"></span>

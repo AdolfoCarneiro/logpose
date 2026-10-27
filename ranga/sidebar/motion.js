@@ -49,6 +49,23 @@ export function pop(el) {
   animate(el, [{ transform: "scale(0.86)" }, { transform: "none" }], "spatial-fast");
 }
 
+export async function kick(el, transform) {
+  if (!el || reducedMotion()) return;
+  const out = el.animate([{ transform: "none" }, { transform }], { duration: 90, easing: "cubic-bezier(0.3, 0, 0.8, 0.15)", fill: "forwards" });
+  await out.finished.catch(() => {});
+  animate(el, [{ transform }, { transform: "none" }], "spatial-fast");
+  out.cancel();
+}
+
+export function spin(el) {
+  if (!el || reducedMotion()) return;
+  el.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }], { duration: 650, easing: spring("spatial-fast").easing });
+}
+
+export function squash(el) {
+  animate(el, [{ transform: "scale(0.72) rotate(-10deg)" }, { transform: "none" }], "spatial-fast");
+}
+
 export function painted() {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }

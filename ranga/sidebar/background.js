@@ -3,6 +3,7 @@ import { loadSettings } from "./settings-model.js";
 import { cleanUrl, markdownLink } from "./link-model.js";
 import { toMap } from "./shortcuts-model.js";
 import { peekTabs } from "./peek-model.js";
+import { shouldAutoPip } from "./player-model.js";
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 chrome.downloads.setUiOptions({ enabled: false }).catch(() => {});
@@ -13,8 +14,8 @@ async function runLifecycle() {
   const settings = loadSettings(stored.settings);
   const tabs = await chrome.tabs.query({});
   const now = Date.now();
-  const { pinLive = {} } = await chrome.storage.session.get("pinLive");
-  const { sleep, archive } = plan(tabs, now, settings, new Set(Object.keys(pinLive).map(Number)));
+  const { pinLive = {}, containerLive = {} } = await chrome.storage.session.get(["pinLive", "containerLive"]);
+  const { sleep, archive } = plan(tabs, now, settings, new Set([...Object.keys(pinLive), ...Object.keys(containerLive)].map(Number)));
   for (const id of sleep) chrome.tabs.discard(id).catch(() => {});
   if (!archive.length) return;
   const byId = new Map(tabs.map((t) => [t.id, t]));
@@ -72,6 +73,30 @@ async function applyLinks() {
   chrome.rangaPrivate.setOpenLinksInLittle(settings.littleWindowLinks, () => void chrome.runtime.lastError);
 }
 
+function rangaCall(name, ...args) {
+  return new Promise((resolve) => chrome.rangaPrivate[name](...args, (result) => {
+    void chrome.runtime.lastError;
+    resolve(result);
+  }));
+}
+
+async function autoPip({ tabId, windowId }) {
+  const { activeTabs = {}, autoPipTab = null } = await chrome.storage.session.get(["activeTabs", "autoPipTab"]);
+  const left = activeTabs[windowId];
+  await chrome.storage.session.set({ activeTabs: { ...activeTabs, [windowId]: tabId } });
+  if (!chrome.rangaPrivate?.getMediaSessions) return;
+  if (!loadSettings((await chrome.storage.local.get("settings")).settings).autoPip) return;
+  if (autoPipTab === tabId) {
+    await chrome.storage.session.set({ autoPipTab: null });
+    rangaCall("mediaAction", tabId, "exitPip");
+    return;
+  }
+  if (left == null || left === tabId) return;
+  if (!shouldAutoPip((await rangaCall("getMediaSessions", windowId)) ?? [], left)) return;
+  await chrome.storage.session.set({ autoPipTab: left });
+  rangaCall("mediaAction", left, "pip");
+}
+
 async function acceptServicesSchema() {
   if (!chrome.settingsPrivate) return;
   const consent = await chrome.settingsPrivate.getPref("helium.services.user_consented").catch(() => null);
@@ -96,6 +121,8 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === "copy-link" && msg.tabId) copyLink(msg.tabId, msg.format);
   if (msg?.type === "links") applyLinks();
 });
+
+chrome.tabs.onActivated.addListener(autoPip);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "ranga-lifecycle") runLifecycle();

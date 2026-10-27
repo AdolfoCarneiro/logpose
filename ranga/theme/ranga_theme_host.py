@@ -13,6 +13,7 @@ import ranga_theme
 STATE = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "ranga")
 THEME = os.path.join(STATE, "theme.css")
 COLORS = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "ciel", "theme", "colors.toml")
+WEATHER = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "ciel", "settings", "weather.json")
 
 
 def encode(obj):
@@ -58,9 +59,21 @@ def update_ready():
     return os.path.islink(current) and os.path.realpath(current) != running
 
 
+def location():
+    try:
+        with open(WEATHER, encoding="utf-8") as f:
+            data = json.load(f)
+        return {"name": str(data.get("name") or ""), "latitude": float(data["latitude"]), "longitude": float(data["longitude"])}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def handle(message, colors, theme):
     if message.get("type") == "build":
         send({"type": "build", "updateReady": update_ready()})
+        return
+    if message.get("type") == "location":
+        send({"type": "location", "location": location()})
         return
     if message.get("type") != "set-opacity":
         return

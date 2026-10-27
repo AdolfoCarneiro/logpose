@@ -1,7 +1,7 @@
 import { glyph } from "./kurobe/icons.mjs";
 import { others, pinnedIds, pinnedActions, togglePin } from "./extensions-model.js";
 import { available, call } from "./ranga-private.js";
-import { pop } from "./motion.js";
+import { pop, kick, squash } from "./motion.js";
 
 function anchorOf(el) {
   const rect = el.getBoundingClientRect();
@@ -31,7 +31,7 @@ export function setupExtensions({ bar, button, popover, windowId }) {
       b.className = "extension k-icon-button k-state";
       b.title = action.name;
       b.append(iconImage(action));
-      b.onclick = (e) => { e.stopPropagation(); pop(b); run(action, b); };
+      b.onclick = (e) => { e.stopPropagation(); squash(b.firstChild); run(action, b); };
       b.oncontextmenu = (e) => { e.preventDefault(); togglePinned(action.id); };
       return b;
     }));
@@ -90,6 +90,7 @@ export function setupExtensions({ bar, button, popover, windowId }) {
   button.onclick = (e) => {
     e.stopPropagation();
     if (!popover.hidden) return close();
+    kick(button.querySelector(".k-icon"), "rotate(-18deg) scale(1.1)");
     paintList();
     popover.hidden = false;
     button.setAttribute("aria-expanded", "true");

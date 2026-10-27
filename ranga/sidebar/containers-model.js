@@ -63,3 +63,56 @@ export function lostTabs(shot, tabs, members, known) {
   }
   return lost;
 }
+
+export function pagesOf(container) {
+  return Array.isArray(container?.pages) ? container.pages : [];
+}
+
+export function addPage(list, containerId, page, index = null) {
+  return list.map((c) => {
+    if (c.id !== containerId) return c;
+    const pages = pagesOf(c).filter((p) => p.id !== page.id);
+    const at = index == null ? pages.length : Math.max(0, Math.min(pages.length, index));
+    return { ...c, pages: [...pages.slice(0, at), { id: page.id, url: page.url, title: page.title || page.url }, ...pages.slice(at)] };
+  });
+}
+
+export function removePage(list, pageId) {
+  return list.map((c) => (pagesOf(c).some((p) => p.id === pageId) ? { ...c, pages: pagesOf(c).filter((p) => p.id !== pageId) } : c));
+}
+
+export function updatePage(list, pageId, patch) {
+  return list.map((c) => (pagesOf(c).some((p) => p.id === pageId)
+    ? { ...c, pages: pagesOf(c).map((p) => (p.id === pageId ? { ...p, ...patch, id: p.id } : p)) }
+    : c));
+}
+
+export function findPage(list, pageId) {
+  for (const container of list) {
+    const page = pagesOf(container).find((p) => p.id === pageId);
+    if (page) return { container, page };
+  }
+  return null;
+}
+
+export function toggleGroup(list, containerId) {
+  return list.map((c) => (c.id === containerId ? { ...c, collapsed: !c.collapsed } : c));
+}
+
+export function pageIds(list) {
+  return new Set(list.flatMap((c) => pagesOf(c).map((p) => p.id)));
+}
+
+export function restorePages(tabs, shot, list, containerOfTab) {
+  const live = {};
+  const used = new Set();
+  for (const entry of shot ?? []) {
+    const found = findPage(list, entry.pin);
+    if (!found) continue;
+    const tab = tabs.find((t) => !used.has(t.id) && (t.url || t.pendingUrl || "") === entry.url && containerOfTab(t.id) === found.container.id);
+    if (!tab) continue;
+    used.add(tab.id);
+    live[tab.id] = entry.pin;
+  }
+  return live;
+}

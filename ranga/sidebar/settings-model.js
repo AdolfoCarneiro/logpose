@@ -7,6 +7,10 @@ export const DEFAULTS = Object.freeze({
   archiveAfterHours: 12,
   peekPinnedLinks: true,
   littleWindowLinks: true,
+  miniPlayer: true,
+  autoPip: true,
+  newtabNews: true,
+  newtabCards: true,
 });
 
 const CHOICES = {
