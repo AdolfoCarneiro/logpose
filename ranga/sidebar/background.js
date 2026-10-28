@@ -36,13 +36,7 @@ async function copyCurrentUrl() {
   const [tab] = await chrome.tabs.query({ active: true, windowId: window.id });
   if (!tab?.url) return;
   await copyToClipboard(tab.url);
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl: "icon-128.png",
-    title: "Link copiado",
-    message: tab.url,
-    silent: true,
-  });
+  rangaCall("executeCommand", window.id, "linkCopied");
 }
 
 async function copyLink(tabId, format) {
@@ -50,13 +44,7 @@ async function copyLink(tabId, format) {
   if (!tab?.url) return;
   const text = format === "copyMarkdown" ? markdownLink(tab.title, tab.url) : format === "copyCleanLink" ? cleanUrl(tab.url) : tab.url;
   await copyToClipboard(text);
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl: "icon-128.png",
-    title: format === "copyMarkdown" ? "Markdown copiado" : "Link copiado",
-    message: text,
-    silent: true,
-  });
+  rangaCall("executeCommand", tab.windowId, "linkCopied");
 }
 
 async function applyShortcuts() {

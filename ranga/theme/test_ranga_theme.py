@@ -205,3 +205,18 @@ class HostMessages(unittest.TestCase):
         ranga_theme_host.handle({"type": "set-opacity", "value": 300}, colors, theme)
         with open(os.path.join(d, "state", "material-opacity")) as f:
             self.assertEqual(f.read(), "100\n")
+
+
+class RangaWindowsTest(unittest.TestCase):
+    def test_only_visible_ranga_windows_newest_first(self):
+        monitors = [{"activeWorkspace": {"id": 1}, "specialWorkspace": {"id": 0}}]
+        clients = [
+            {"class": "ranga", "title": "Gmail - Ranga", "at": [10, 20], "size": [800, 600], "focusHistoryID": 1, "workspace": {"id": 1}},
+            {"class": "ranga", "title": "WhatsApp - Ranga", "at": [820, 20], "size": [800, 600], "focusHistoryID": 0, "workspace": {"id": 1}},
+            {"class": "ranga", "title": "Outro - Ranga", "at": [0, 0], "size": [10, 10], "focusHistoryID": 2, "workspace": {"id": 3}},
+            {"class": "kitty", "title": "zsh", "at": [0, 0], "size": [10, 10], "focusHistoryID": 3, "workspace": {"id": 1}},
+        ]
+        found = ranga_theme_host.ranga_windows({"x": 900, "y": 300}, clients, monitors)
+        self.assertEqual((found["x"], found["y"]), (900, 300))
+        self.assertEqual([w["title"] for w in found["windows"]], ["WhatsApp - Ranga", "Gmail - Ranga"])
+        self.assertEqual(found["windows"][1], {"title": "Gmail - Ranga", "x": 10, "y": 20, "width": 800, "height": 600, "focus": 1})

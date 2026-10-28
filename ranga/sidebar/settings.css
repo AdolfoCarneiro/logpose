@@ -56,6 +56,13 @@ h1 { margin: 0; }
 .container-new .k-text-field { flex: 1; }
 .setting[hidden], .hint[hidden] { display: none; }
 .shortcut-row, .shortcuts-footer { cursor: default; }
+.aliases-head, .alias-row { cursor: default; }
+.alias-row { justify-content: flex-start; gap: var(--k-space-sm); }
+.alias-row .alias-key { width: 72px; flex: none; }
+.alias-row .alias-name { width: 150px; flex: none; }
+.alias-row .alias-url { flex: 1; min-width: 0; }
+.alias-row .alias-scope { flex: 1; color: var(--k-color-on-surface-variant); }
+.alias-row .k-text-field[aria-invalid="true"] { outline: 2px solid var(--k-color-error); }
 .shortcut-actions { display: flex; align-items: center; gap: var(--k-space-xs); }
 .shortcut-keys {
   appearance: none;

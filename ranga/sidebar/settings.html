@@ -127,6 +127,17 @@
           <span class="text"><span class="k-type-panel">Sugestões enquanto digita</span><span class="k-type-caption hint">Pede sugestões ao mecanismo de busca. O que você digita vai pra ele.</span></span>
           <input class="k-switch" type="checkbox" data-pref="search.suggest_enabled">
         </label>
+        <div class="setting aliases-head">
+          <span class="text"><span class="k-type-panel">Aliases do spotlight</span><span class="k-type-caption hint">No spotlight, o alias e um espaço mudam o que ele procura: “a board” só nas abas abertas, “f repos” nos favoritos, “yt lofi” no YouTube. Num site, %s marca onde entram os termos.</span></span>
+          <button id="aliases-reset" class="k-button k-button--text k-type-button" type="button">Restaurar padrão</button>
+        </div>
+        <div id="alias-settings"></div>
+        <form id="alias-new" class="setting alias-row">
+          <input name="alias" class="k-text-field k-type-label alias-key" placeholder="alias" maxlength="8" autocomplete="off">
+          <input name="name" class="k-text-field k-type-label alias-name" placeholder="Nome do site" maxlength="32" autocomplete="off">
+          <input name="url" class="k-text-field k-type-label alias-url" placeholder="https://site.com/busca?q=%s" autocomplete="off">
+          <button class="k-button k-button--tonal k-type-button" type="submit">Adicionar</button>
+        </form>
         <div class="setting">
           <span class="text"><span class="k-type-panel">Ao abrir</span><span class="k-type-caption hint">O que o Ranga mostra quando você abre o navegador.</span></span>
           <div class="k-segmented" data-pref="session.restore_on_startup" data-type="number">
@@ -324,12 +335,12 @@
         </div>
       </section>
 
-      <section class="card" id="containers" data-title="Containers" data-nav-icon="boxes" hidden>
-        <h2 class="k-type-section">Containers</h2>
-        <p class="k-type-caption hint">Cada container tem cookies, logins e dados de sites próprios: duas contas do mesmo site lado a lado. Abra uma aba num container pelo menu de contexto da aba ou de “Nova aba”. Clique no ícone ou na cor para trocar.</p>
+      <section class="card" id="containers" data-title="Grupos" data-nav-icon="boxes" hidden>
+        <h2 class="k-type-section">Grupos</h2>
+        <p class="k-type-caption hint">Páginas salvas que ficam recolhíveis na barra lateral. Guarde uma aba pelo menu de contexto dela; as páginas abrem na sessão do espaço atual. Logins separados ficam por espaço: cada um tem a sua sessão, e o primeiro usa a principal. Clique no ícone ou na cor para trocar.</p>
         <div id="container-settings"></div>
         <form id="container-new" class="setting container-new">
-          <input name="name" class="k-text-field k-type-label" placeholder="Novo container" maxlength="32" autocomplete="off">
+          <input name="name" class="k-text-field k-type-label" placeholder="Novo grupo" maxlength="32" autocomplete="off">
           <button class="k-button k-button--tonal k-type-button" type="submit">Criar</button>
         </form>
       </section>

@@ -10,11 +10,12 @@ function faviconFor(url) {
   return src.toString();
 }
 
-export function setupFavorites({ button, popover, activeTab, windowId }) {
+export function setupFavorites({ button, popover, activeTab, windowId, openTab }) {
   const title = popover.querySelector(".favorites-title");
   const back = popover.querySelector(".favorites-back");
   const list = popover.querySelector(".favorites-list");
   const save = popover.querySelector(".favorites-save");
+  const manage = popover.querySelector(".favorites-manage");
   const trail = [];
 
   async function folder() {
@@ -23,6 +24,30 @@ export function setupFavorites({ button, popover, activeTab, windowId }) {
       return node;
     }
     return favoritesRoot(await chrome.bookmarks.getTree());
+  }
+
+  function rename(li, entry) {
+    const label = li.querySelector(".k-list-item__label");
+    if (!label) return;
+    const input = Object.assign(document.createElement("input"), { className: "k-text-field k-type-label tab__rename", value: entry.title, maxLength: 120 });
+    let done = false;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      input.replaceWith(label);
+      const title = input.value.trim();
+      if (keep && title && title !== entry.title) chrome.bookmarks.update(entry.id, { title });
+    };
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") finish(true);
+      else if (e.key === "Escape") finish(false);
+    };
+    input.onblur = () => finish(true);
+    input.onclick = (e) => e.stopPropagation();
+    label.replaceWith(input);
+    input.focus();
+    input.select();
   }
 
   function row(entry) {
@@ -42,6 +67,7 @@ export function setupFavorites({ button, popover, activeTab, windowId }) {
     label.className = "k-list-item__label";
     label.textContent = entry.title;
     li.append(leading, label);
+    label.ondblclick = (e) => { e.stopPropagation(); rename(li, entry); };
     if (entry.kind === "folder") {
       const count = document.createElement("span");
       count.className = "favorites-count k-type-caption";
@@ -49,6 +75,15 @@ export function setupFavorites({ button, popover, activeTab, windowId }) {
       const chevron = Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("chevron-right") });
       li.append(count, chevron);
       li.onclick = (e) => { e.stopPropagation(); trail.push(entry.id); paint(1); };
+      li.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showMenu([
+          { icon: "pencil", label: "Renomear", action: () => rename(li, entry) },
+          "divider",
+          { icon: "trash-2", label: "Apagar a pasta", danger: true, action: async () => { await chrome.bookmarks.removeTree(entry.id); paint(0); } },
+        ], e.clientX, e.clientY);
+      };
     } else {
       li.title = entry.url;
       li.onclick = async (e) => {
@@ -57,12 +92,13 @@ export function setupFavorites({ button, popover, activeTab, windowId }) {
         chrome.tabs.update(tab.id, { url: entry.url });
         close();
       };
-      li.onauxclick = (e) => { if (e.button === 1) chrome.tabs.create({ url: entry.url, windowId: windowId(), active: false }); };
+      li.onauxclick = (e) => { if (e.button === 1) openTab(entry.url, false); };
       li.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
         showMenu([
-          { icon: "app-window", label: "Abrir em nova aba", action: () => chrome.tabs.create({ url: entry.url, windowId: windowId() }) },
+          { icon: "pencil", label: "Renomear", action: () => rename(li, entry) },
+          { icon: "app-window", label: "Abrir em nova aba", action: () => openTab(entry.url, true) },
           { icon: "copy", label: "Copiar link", action: () => navigator.clipboard.writeText(entry.url) },
           "divider",
           { icon: "trash-2", label: "Remover dos favoritos", danger: true, action: async () => { await chrome.bookmarks.remove(entry.id); paint(0); } },
@@ -107,6 +143,11 @@ export function setupFavorites({ button, popover, activeTab, windowId }) {
     const node = await folder();
     if (tab?.url) await chrome.bookmarks.create({ parentId: node.id, title: tab.title || tab.url, url: tab.url });
     paint(0);
+  };
+  manage.onclick = (e) => {
+    e.stopPropagation();
+    chrome.tabs.create({ url: trail.length ? `chrome://bookmarks/?id=${trail.at(-1)}` : "chrome://bookmarks", windowId: windowId() });
+    close();
   };
   popover.addEventListener("click", (e) => e.stopPropagation());
   document.addEventListener("click", close);

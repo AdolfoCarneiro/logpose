@@ -69,28 +69,89 @@ function searchTitle(text, resolved) {
   return `Buscar “${text}”`;
 }
 
-export function suggestions(query, { tabs = [], bookmarks = [], history = [], commands = [], resolved = null }, limit = 8) {
+export const TOP = 5;
+const SECTIONS = [["tab", "Abas", 4], ["bookmark", "Favoritos", 3], ["history", "Histórico", 4]];
+const SCOPE_KIND = { tabs: "tab", bookmarks: "bookmark", history: "history" };
+
+function entries(q, { tabs = [], bookmarks = [], history = [] }) {
+  const pool = [
+    ...tabs.filter((t) => !q || matches(t, q)).map((t) => ({ kind: "tab", title: tabTitle(t), url: t.url, tabId: t.id, windowId: t.windowId, score: score(t, q, 6) })),
+    ...bookmarks.filter((b) => b.url && (!q || matches(b, q))).map((b) => ({ kind: "bookmark", title: b.title || b.url, url: b.url, score: score(b, q, 4) })),
+    ...history.filter((h) => !q || matches(h, q)).map((h) => ({ kind: "history", title: h.title || h.url, url: h.url, score: score(h, q, 2) })),
+  ];
+  const sorted = q ? pool.sort((a, b) => b.score - a.score) : pool;
+  const seen = new Set();
+  const found = [];
+  for (const entry of sorted) {
+    if (seen.has(entry.url)) continue;
+    seen.add(entry.url);
+    const { score: _, ...clean } = entry;
+    found.push(clean);
+  }
+  return found;
+}
+
+function sectioned(found) {
+  return SECTIONS.flatMap(([kind, title, max]) => {
+    const rows = found.filter((e) => e.kind === kind).slice(0, max);
+    return rows.length ? [{ kind: "header", title }, ...rows] : [];
+  });
+}
+
+function hostOf(url) {
+  try {
+    const parsed = new URL(url);
+    return /^https?:$/.test(parsed.protocol) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function completeHost(query, { tabs = [], bookmarks = [], history = [] }) {
+  const q = query.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
+  if (q.length < 2 || /[\s/]/.test(q)) return null;
+  const hosts = new Map();
+  const add = (url, weight) => {
+    const parsed = hostOf(url);
+    const host = parsed?.hostname.replace(/^www\./, "");
+    if (!host?.startsWith(q)) return;
+    const known = hosts.get(parsed.hostname) ?? { host, origin: parsed.origin, weight: 0 };
+    known.weight += weight;
+    hosts.set(parsed.hostname, known);
+  };
+  for (const h of history) add(h.url, 1 + Math.min(h.visitCount ?? 0, 50) + 5 * (h.typedCount ?? 0));
+  for (const b of bookmarks) add(b.url, 10);
+  for (const t of tabs) add(t.url, 10);
+  const [best] = [...hosts.values()].sort((a, b) => b.weight - a.weight || a.host.length - b.host.length);
+  return best ? { kind: "url", title: best.host, url: `${best.origin}/` } : null;
+}
+
+function suggestedRow(text) {
+  const nav = toNavigation(text);
+  if (nav.kind !== "url" || !hostOf(nav.url)) return { kind: "suggestion", title: text, text };
+  return { kind: "url", title: text.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, ""), url: nav.url };
+}
+
+export function suggestions(query, { tabs = [], bookmarks = [], history = [], commands = [], resolved = null, suggested = [], hint = null }) {
   const text = query.trim();
   const q = text.toLowerCase();
-  if (!q) return tabs.slice(0, limit).map((t) => ({ kind: "tab", title: tabTitle(t), url: t.url, tabId: t.id, windowId: t.windowId }));
+  if (!q) return sectioned(entries("", { tabs: tabs.slice(0, 8) }));
   const nav = toNavigation(text);
   const first = nav.kind === "url"
     ? { kind: "url", title: nav.url, url: nav.url }
     : { kind: "search", title: searchTitle(text, resolved), text };
-  const pool = [
-    ...tabs.filter((t) => matches(t, q)).map((t) => ({ kind: "tab", title: tabTitle(t), url: t.url, tabId: t.id, windowId: t.windowId, score: score(t, q, 6) })),
-    ...bookmarks.filter((b) => b.url && matches(b, q)).map((b) => ({ kind: "bookmark", title: b.title || b.url, url: b.url, score: score(b, q, 4) })),
-    ...history.filter((h) => matches(h, q)).map((h) => ({ kind: "history", title: h.title || h.url, url: h.url, score: score(h, q, 2) })),
-  ].sort((a, b) => b.score - a.score);
-  const seen = new Set();
-  const rest = [];
-  for (const entry of pool) {
-    if (seen.has(entry.url)) continue;
-    seen.add(entry.url);
-    const { score: _, ...clean } = entry;
-    rest.push(clean);
-  }
-  const found = nav.kind === "url" ? [] : matchCommands(text, commands).slice(0, 3);
-  const head = found[0]?.strong ? [found[0], first, ...found.slice(1)] : [first, ...found];
-  return [...head.map(({ strong: _, ...c }) => c), ...rest].slice(0, limit);
+  const found = nav.kind === "url" ? [] : matchCommands(text, commands).slice(0, 3).map(({ strong, ...c }) => ({ ...c, strong }));
+  const strong = found[0]?.strong ? [found.shift()] : [];
+  const completion = nav.kind === "url" ? null : completeHost(text, { tabs, bookmarks, history });
+  const same = (row) => completion && row.kind === "url" && hostOf(row.url)?.hostname.replace(/^www\./, "") === completion.title;
+  const more = nav.kind === "url" ? [] : suggested.filter((s) => fold(s) !== fold(text)).map(suggestedRow).filter((row) => !same(row));
+  const top = [...(completion ? [completion] : []), ...strong, first, ...(hint ? [hint] : []), ...found, ...more].slice(0, TOP).map(({ strong: _, ...c }) => c);
+  return [...top, ...sectioned(entries(q, { tabs, bookmarks, history }))];
+}
+
+export function scoped(scope, query, sources, max = 12) {
+  const kind = SCOPE_KIND[scope];
+  const q = query.trim().toLowerCase();
+  const rows = entries(q, { [scope]: sources[scope] ?? [] }).filter((e) => e.kind === kind).slice(0, max);
+  return rows;
 }

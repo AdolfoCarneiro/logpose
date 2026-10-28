@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mayHaveKeyword, suggestions } from "./spotlight-model.js";
+import { mayHaveKeyword, suggestions, scoped, completeHost, TOP } from "./spotlight-model.js";
 
 const sources = {
   tabs: [{ id: 1, windowId: 9, title: "GitHub - ranga", url: "https://github.com/taigakilla/ranga" }],
@@ -19,11 +19,57 @@ test("domínio vira navegação na primeira linha", () => {
   assert.equal(first.url, "https://gitlab.com");
 });
 
-test("aba aberta vem antes de favorito e histórico, sem repetir URL", () => {
-  const list = suggestions("ranga", sources);
-  const kinds = list.slice(1).map((s) => s.kind);
-  assert.equal(kinds[0], "tab");
-  assert.equal(list.filter((s) => s.url === "https://github.com/taigakilla/ranga").length, 1);
+test("abas, favoritos e histórico vêm em seções com título, sem repetir URL", () => {
+  const list = suggestions("git", sources);
+  assert.deepEqual(list.map((s) => (s.kind === "header" ? s.title : s.kind)), ["url", "search", "Abas", "tab", "Favoritos", "bookmark", "Histórico", "history"]);
+  assert.equal(suggestions("ranga", sources).filter((s) => s.url === "https://github.com/taigakilla/ranga").length, 1);
+});
+
+test("sugestões do buscador vêm logo depois da busca, e o topo tem no máximo 5", () => {
+  const list = suggestions("ranga", { ...sources, suggested: ["ranga", "ranga browser", "ranga github", "ranga linux", "ranga download", "ranga wolf"] });
+  const top = list.slice(0, list.findIndex((s) => s.kind === "header"));
+  assert.equal(top.length, TOP);
+  assert.deepEqual(top.map((s) => s.kind), ["search", "suggestion", "suggestion", "suggestion", "suggestion"]);
+  assert.equal(top[1].text, "ranga browser");
+  assert.ok(!suggestions("gitlab.com", { suggested: ["gitlab"] }).some((s) => s.kind === "suggestion"));
+});
+
+test("começo de um site já visitado completa o endereço na primeira linha", () => {
+  const history = [
+    { title: "Outlook", url: "https://outlook.live.com/mail/0/inbox", visitCount: 12, typedCount: 1 },
+    { title: "Outlook", url: "https://outlook.live.com/mail/0/sent", visitCount: 3 },
+    { title: "Outlook blog", url: "https://www.outlookindia.com/news", visitCount: 1 },
+  ];
+  const [first, second] = suggestions("outl", { history });
+  assert.deepEqual(first, { kind: "url", title: "outlook.live.com", url: "https://outlook.live.com/" });
+  assert.equal(second.kind, "search");
+  assert.equal(completeHost("outlook mail", { history }), null);
+  assert.equal(completeHost("o", { history }), null);
+  assert.equal(completeHost("news", { history }), null);
+  assert.equal(completeHost("outlooki", { history }).url, "https://www.outlookindia.com/");
+});
+
+test("sugestão do buscador que é endereço vira navegação, sem repetir o site completado", () => {
+  const top = suggestions("outlook", { suggested: ["outlook", "outlook.com", "https://outlook.live.com/", "outlook login"] });
+  assert.deepEqual(top.map((s) => [s.kind, s.title]), [
+    ["search", "Buscar “outlook”"],
+    ["url", "outlook.com"],
+    ["url", "outlook.live.com"],
+    ["suggestion", "outlook login"],
+  ]);
+  const history = [{ url: "https://outlook.live.com/mail/", visitCount: 4 }];
+  assert.equal(suggestions("outlook", { history, suggested: ["https://outlook.live.com/"] }).filter((s) => s.url === "https://outlook.live.com/").length, 1);
+});
+
+test("dica de alias vem logo depois da busca", () => {
+  const hint = { kind: "alias", title: "YouTube", alias: "yt" };
+  assert.deepEqual(suggestions("yt", { hint, suggested: ["ytmp3"] }).slice(0, 3).map((s) => s.kind), ["search", "alias", "suggestion"]);
+});
+
+test("alias de escopo lista só aquela fonte, e sem texto mostra tudo dela", () => {
+  assert.deepEqual(scoped("bookmarks", "repo", sources).map((s) => s.title), ["Ranga repo"]);
+  assert.deepEqual(scoped("tabs", "", sources).map((s) => s.kind), ["tab"]);
+  assert.deepEqual(scoped("history", "hacker", sources).map((s) => s.url), ["https://news.ycombinator.com/"]);
 });
 
 test("busca casa título e URL sem diferenciar maiúsculas", () => {
@@ -33,12 +79,12 @@ test("busca casa título e URL sem diferenciar maiúsculas", () => {
 
 test("vazio mostra as abas abertas", () => {
   const list = suggestions("", sources);
-  assert.deepEqual(list.map((s) => s.kind), ["tab"]);
+  assert.deepEqual(list.map((s) => s.kind), ["header", "tab"]);
 });
 
 test("limite de resultados", () => {
   const many = { tabs: [], bookmarks: [], history: Array.from({ length: 30 }, (_, i) => ({ title: `git ${i}`, url: `https://g${i}.dev/`, visitCount: i })) };
-  assert.equal(suggestions("git", many, 8).length, 8);
+  assert.equal(suggestions("git", many).filter((s) => s.kind === "history").length, 4);
 });
 
 test("comando habilitado aparece pelo título ou por palavra-chave, sem acento", () => {

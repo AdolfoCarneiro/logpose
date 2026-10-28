@@ -1,0 +1,63 @@
+html, body { height: 100%; margin: 0; background: transparent; overflow: hidden; font-family: var(--k-type-family); color: var(--k-color-on-surface); pointer-events: none; }
+body { background: rgb(0 0 0 / 0.32); transition: background var(--k-motion-duration-short) var(--k-motion-easing-standard); }
+.zone {
+  position: fixed;
+  inset: var(--top) var(--right) var(--bottom) var(--left);
+  display: grid;
+  place-items: center;
+  border-radius: var(--k-shape-extra-large);
+  border: 2px solid var(--k-color-primary);
+  background: color-mix(in srgb, var(--k-color-primary-container) 90%, transparent);
+  box-shadow: 0 18px 48px -16px rgb(0 0 0 / 0.6);
+  transition:
+    inset var(--k-motion-spring-spatial-default-duration) var(--k-motion-spring-spatial-default),
+    border-radius var(--k-motion-spring-spatial-default-duration) var(--k-motion-spring-spatial-default),
+    background var(--k-motion-duration-short) var(--k-motion-easing-standard);
+}
+.label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--k-space-sm);
+  max-width: calc(100% - 24px);
+  animation: label-in var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast);
+}
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--k-space-sm);
+  white-space: nowrap;
+  padding: var(--k-space-md) var(--k-space-xl);
+  border-radius: var(--k-shape-full);
+  background: var(--k-color-primary);
+  color: var(--k-color-on-primary);
+  font-size: 15px;
+  font-variation-settings: "wght" 600;
+  box-shadow: 0 6px 18px -6px rgb(0 0 0 / 0.5);
+}
+.action .k-icon { font-size: 22px; }
+.pair { display: flex; align-items: center; gap: var(--k-space-xs); max-width: 100%; }
+.pair:empty { display: none; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--k-space-xs);
+  min-width: 0;
+  max-width: 240px;
+  font-size: 13px;
+  padding: var(--k-space-xs) var(--k-space-md) var(--k-space-xs) var(--k-space-sm);
+  border-radius: var(--k-shape-full);
+  background: var(--k-color-surface-container-high);
+  color: var(--k-color-on-surface);
+}
+.chip img, .chip .k-icon { width: 18px; height: 18px; font-size: 18px; flex: none; }
+.chip__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.join { color: var(--k-color-on-primary-container); font-size: 18px; }
+@keyframes label-in { from { opacity: 0; transform: scale(0.85); } }
+body[data-zone="left"] .zone { --top: 12px; --right: calc(50% + 6px); --bottom: 12px; --left: 12px; }
+body[data-zone="right"] .zone { --top: 12px; --right: 12px; --bottom: 12px; --left: calc(50% + 6px); }
+body[data-zone="top"] .zone { --top: 12px; --right: 12px; --bottom: calc(50% + 6px); --left: 12px; }
+body[data-zone="bottom"] .zone { --top: calc(50% + 6px); --right: 12px; --bottom: 12px; --left: 12px; }
+body:is([data-zone="window"], [data-zone="join"]) .zone { --top: clamp(12px, 30%, calc(50% - 60px)); --right: clamp(12px, 25%, calc(50% - 150px)); --bottom: clamp(12px, 30%, calc(50% - 60px)); --left: clamp(12px, 25%, calc(50% - 150px)); border-style: dashed; background: color-mix(in srgb, var(--k-color-primary-container) 94%, transparent); }
+body.closed > * { visibility: hidden; }
+body.closed { background: transparent; }

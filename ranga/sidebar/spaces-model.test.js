@@ -97,7 +97,7 @@ test("atualizar ícone e cor sem mudar o id", () => {
   let s = createSpace(initialState(), { name: "Trabalho", icon: "briefcase", color: null });
   const id = s.spaces[1].id;
   s = updateSpace(s, id, { icon: "code", color: "#7cc2a8", id: "outro" });
-  assert.deepEqual(s.spaces[1], { id, name: "Trabalho", icon: "code", color: "#7cc2a8" });
+  assert.deepEqual(s.spaces[1], { id, name: "Trabalho", icon: "code", color: "#7cc2a8", session: id });
 });
 
 test("foto guarda URL e espaço de cada aba", () => {
@@ -169,9 +169,17 @@ test("restaurar casa abas novas pela URL, uma vez cada", () => {
   assert.equal(s.tabSpace[9], "trabalho");
 });
 
-test("container do espaço ativo, vazio quando não tem", async () => {
-  const { containerOf } = await import("./spaces-model.js");
-  const state = { ...initialState(), spaces: [{ id: "pessoal", name: "Pessoal" }, { id: "job", name: "Job", container: "trabalho" }], active: { 1: "job", 2: "pessoal" } };
-  assert.equal(containerOf(state, 1), "trabalho");
-  assert.equal(containerOf(state, 2), "");
+test("cada espaço tem sessão própria; o primeiro usa a principal e o container antigo vira a sessão", async () => {
+  const { withSessions, sessionOf, sessionOfSpace } = await import("./spaces-model.js");
+  const old = { ...initialState(), spaces: [{ id: "pessoal", name: "Pessoal", container: "pessoal" }, { id: "job", name: "Job", container: "trabalho" }, { id: "estudos", name: "Estudos" }], active: { 1: "job", 2: "pessoal" } };
+  const state = withSessions(old);
+  assert.deepEqual(state.spaces.map((s) => s.session), ["", "trabalho", "estudos"]);
+  assert.equal(state.spaces.some((s) => "container" in s), false);
+  assert.equal(sessionOf(state, 1), "trabalho");
+  assert.equal(sessionOf(state, 2), "");
+  assert.equal(sessionOfSpace(state, "estudos"), "estudos");
+  const next = createSpace(state, { name: "Casa", icon: "house", color: null });
+  assert.equal(next.spaces.at(-1).session, "casa");
+  assert.equal(withSessions(next).spaces.at(-1).session, "casa");
+  assert.equal(initialState().spaces[0].session, "");
 });

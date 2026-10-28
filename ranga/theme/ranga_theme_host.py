@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import socket
 import struct
 import sys
 import threading
@@ -68,7 +69,42 @@ def location():
         return None
 
 
+def hyprland(command):
+    signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not signature or not runtime:
+        return None
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.3)
+        sock.connect(os.path.join(runtime, "hypr", signature, ".socket.sock"))
+        sock.sendall(f"j/{command}".encode())
+        chunks = []
+        while chunk := sock.recv(65536):
+            chunks.append(chunk)
+    return json.loads(b"".join(chunks))
+
+
+def ranga_windows(cursor, clients, monitors):
+    visible = {m["activeWorkspace"]["id"] for m in monitors} | {m["specialWorkspace"]["id"] for m in monitors if m.get("specialWorkspace", {}).get("id")}
+    windows = [
+        {"title": c["title"], "x": c["at"][0], "y": c["at"][1], "width": c["size"][0], "height": c["size"][1], "focus": c["focusHistoryID"]}
+        for c in clients
+        if c.get("class") == "ranga" and c.get("mapped", True) and not c.get("hidden") and c["workspace"]["id"] in visible
+    ]
+    return {"x": cursor["x"], "y": cursor["y"], "windows": sorted(windows, key=lambda w: w["focus"])}
+
+
+def pointer():
+    try:
+        return ranga_windows(hyprland("cursorpos"), hyprland("clients"), hyprland("monitors"))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def handle(message, colors, theme):
+    if message.get("type") == "pointer":
+        send({"type": "pointer", "id": message.get("id"), "pointer": pointer()})
+        return
     if message.get("type") == "build":
         send({"type": "build", "updateReady": update_ready()})
         return

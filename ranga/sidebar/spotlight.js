@@ -1,15 +1,19 @@
-import { mayHaveKeyword, suggestions } from "./spotlight-model.js";
+import { mayHaveKeyword, suggestions, scoped } from "./spotlight-model.js";
 import { displayUrl } from "./settings-model.js";
+import { loadAliases, parseAlias, findAlias, aliasName, aliasUrl } from "./aliases-model.js";
+import { toNavigation } from "./tabs-model.js";
 import { glyph } from "./kurobe/icons.mjs";
 import { animate, painted } from "./motion.js";
 import { available as rangaPrivate, call } from "./ranga-private.js";
-import { containerOf } from "./spaces-model.js";
+import { sessionOf, withSessions } from "./spaces-model.js";
 
 const LOCAL_COMMANDS = ["copyCleanLink", "copyMarkdown"];
-const KIND = { tab: "Aba", bookmark: "Favorito", history: "Histórico", command: "Comando" };
+const KIND = { command: "Comando", alias: "Atalho" };
+const SCOPE_ICON = { tabs: "app-window", bookmarks: "star", history: "history" };
 const query = document.getElementById("query");
 const results = document.getElementById("results");
 const selection = document.getElementById("selection");
+const chip = document.getElementById("alias-chip");
 const themeStyle = document.getElementById("ranga-theme");
 let mode = "new";
 let items = [];
@@ -17,6 +21,9 @@ let selected = 0;
 let target;
 let timer;
 let commands = [];
+let aliases = loadAliases(undefined);
+let alias = null;
+const suggestCache = new Map();
 
 function faviconFor(url) {
   const src = new URL(chrome.runtime.getURL("/_favicon/"));
@@ -29,6 +36,19 @@ async function close() {
   document.body.classList.add("closed");
   await painted();
   document.title = `ranga-spotlight:close:${Date.now()}`;
+}
+
+function selectable(index) {
+  return items[index] && items[index].kind !== "header";
+}
+
+function step(direction) {
+  for (let i = selected + direction; i >= 0 && i < items.length; i += direction) {
+    if (selectable(i)) {
+      selected = i;
+      return;
+    }
+  }
 }
 
 function moveSelection() {
@@ -44,24 +64,31 @@ function moveSelection() {
   row.scrollIntoView({ block: "nearest" });
 }
 
+function iconOf(item) {
+  if (item.icon) return item.icon;
+  if (item.kind === "alias") return item.scope ? SCOPE_ICON[item.scope] : "search";
+  return item.kind === "search" || item.kind === "suggestion" || item.kind === "site" ? "search" : "globe";
+}
+
 function row(item, index) {
+  if (item.kind === "header") return Object.assign(document.createElement("li"), { className: "section k-type-caption", textContent: item.title });
   const li = document.createElement("li");
   li.className = "k-list-item k-state k-type-label result";
   const leading = document.createElement("span");
   leading.className = "k-list-item__leading";
-  if (item.url && item.kind !== "url") {
+  if (item.url && item.kind !== "site") {
     const img = document.createElement("img");
     img.alt = "";
     img.src = faviconFor(item.url);
     leading.append(img);
   } else {
-    leading.innerHTML = `<span class="k-icon">${glyph(item.icon ?? (item.kind === "search" ? "search" : "globe"))}</span>`;
+    leading.innerHTML = `<span class="k-icon">${glyph(iconOf(item))}</span>`;
   }
   const label = document.createElement("span");
   label.className = "k-list-item__label";
   label.textContent = item.title;
   li.append(leading, label);
-  if (item.url && item.kind !== "url") {
+  if (item.url && item.kind !== "url" && item.kind !== "site") {
     const url = document.createElement("span");
     url.className = "url k-type-caption";
     url.textContent = displayUrl(item.url, true).replace(/^https?:\/\/(www\.)?/, "");
@@ -73,26 +100,73 @@ function row(item, index) {
     kind.textContent = KIND[item.kind];
     li.append(kind);
   }
-  li.onmousemove = () => { if (selected !== index) { selected = index; moveSelection(); } };
+  li.onmousemove = (e) => {
+    if (selected === index || (e.movementX === 0 && e.movementY === 0)) return;
+    selected = index;
+    moveSelection();
+  };
   li.onclick = () => run(item);
   return li;
 }
 
+function showAlias() {
+  chip.hidden = !alias;
+  chip.textContent = alias ? aliasName(alias) : "";
+  query.parentElement.style.setProperty("--chip-width", alias ? `${chip.offsetWidth + 8}px` : "0px");
+  showMode();
+}
+
+function setAlias(next) {
+  alias = next;
+  showAlias();
+  if (alias) animate(chip, [{ transform: "scale(0.8)", opacity: 0 }, { transform: "none", opacity: 1 }], "spatial-fast");
+}
+
+async function sources(text, incognito) {
+  const scope = alias?.scope;
+  const wants = (name) => !incognito && (scope ? scope === name : Boolean(text.trim()));
+  const [tabs, history, bookmarks] = await Promise.all([
+    !scope || scope === "tabs" ? chrome.tabs.query(incognito ? { windowId: target.windowId } : {}) : [],
+    wants("history") ? chrome.history.search({ text, maxResults: scope ? 40 : 25, startTime: 0 }) : [],
+    wants("bookmarks") ? (text.trim() ? chrome.bookmarks.search(text) : chrome.bookmarks.getRecent(20)) : [],
+  ]);
+  return { tabs: tabs.filter((t) => t.id !== target?.id && !/^chrome:\/\/newtab\/?$/.test(t.url || "")), history, bookmarks };
+}
+
+function suggestionsFor(text) {
+  const clean = text.trim();
+  if (!rangaPrivate || !target || target.incognito || !clean || toNavigation(clean).kind === "url") return null;
+  if (!suggestCache.has(clean)) suggestCache.set(clean, call("getSearchSuggestions", target.windowId, clean).catch(() => []));
+  return suggestCache.get(clean);
+}
+
+function hintFor(text) {
+  const found = !alias && findAlias(aliases, text.trim());
+  return found ? { kind: "alias", alias: found.alias, scope: found.scope, title: found.scope ? `Buscar em ${aliasName(found)}` : `Buscar no ${aliasName(found)}` } : null;
+}
+
+function paint(next, keep) {
+  const key = keep && items[selected] ? JSON.stringify(items[selected]) : null;
+  items = next;
+  selected = key ? Math.max(0, items.findIndex((i) => JSON.stringify(i) === key)) : 0;
+  if (!selectable(selected)) step(1);
+  results.replaceChildren(...items.map(row));
+  if (!keep) for (const li of results.children) animate(li, [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], "effects-default");
+  moveSelection();
+}
+
 async function refresh() {
   const text = query.value;
-  const incognito = Boolean(target?.incognito);
-  const [tabs, history, bookmarks, resolved] = await Promise.all([
-    chrome.tabs.query(incognito ? { windowId: target.windowId } : {}),
-    text.trim() && !incognito ? chrome.history.search({ text, maxResults: 25, startTime: 0 }) : [],
-    text.trim() && !incognito ? chrome.bookmarks.search(text) : [],
-    mayHaveKeyword(text) ? resolve(text) : null,
-  ]);
-  const others = tabs.filter((t) => t.id !== target?.id && !/^chrome:\/\/newtab\/?$/.test(t.url || ""));
-  items = suggestions(text, { tabs: others, history, bookmarks, commands, resolved });
-  selected = 0;
-  results.replaceChildren(...items.map(row));
-  for (const li of results.children) animate(li, [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], "effects-default");
-  moveSelection();
+  const data = await sources(text, Boolean(target?.incognito));
+  if (query.value !== text) return;
+  if (alias?.scope) return paint(scoped(alias.scope, text, data));
+  if (alias) return paint(text.trim() ? [{ kind: "site", title: `Buscar no ${alias.name}: “${text.trim()}”`, url: aliasUrl(alias, text) }] : []);
+  const resolved = mayHaveKeyword(text) ? await resolve(text) : null;
+  const base = { ...data, commands, resolved, hint: hintFor(text) };
+  paint(suggestions(text, base));
+  const pending = suggestionsFor(text);
+  const suggested = pending ? await pending : [];
+  if (suggested.length && query.value === text && !alias) paint(suggestions(text, { ...base, suggested }), true);
 }
 
 function resolve(text) {
@@ -103,12 +177,13 @@ function resolve(text) {
 async function createTab(url) {
   const windowId = target?.windowId;
   const { spaces } = await chrome.storage.local.get("spaces");
-  const container = rangaPrivate && spaces?.spaces && !target?.incognito ? containerOf({ active: {}, ...spaces }, windowId) : "";
+  const container = rangaPrivate && spaces?.spaces && !target?.incognito ? sessionOf(withSessions({ active: {}, ...spaces }), windowId) : "";
   if (container) return call("createTab", { windowId, container, url, active: true });
   return (await chrome.tabs.create({ url, windowId })).id;
 }
 
-async function run(item) {
+async function run(chosen) {
+  let item = chosen;
   if (!item) return;
   const newTab = mode === "new";
   if (item.kind === "command") {
@@ -117,6 +192,14 @@ async function run(item) {
     else await call("executeCommand", target?.windowId, item.command).catch(() => {});
     return;
   }
+  if (item.kind === "alias") {
+    setAlias(findAlias(aliases, item.alias));
+    query.value = "";
+    refresh();
+    return;
+  }
+  if (item.kind === "suggestion") return run({ kind: "search", text: item.text });
+  if (item.kind === "site") item = { kind: "url", url: item.url };
   if (item.kind === "tab") {
     await chrome.tabs.update(item.tabId, { active: true });
     await chrome.windows.update(item.windowId, { focused: true });
@@ -140,6 +223,10 @@ function blank(url) {
 
 function showMode() {
   document.getElementById("field-icon").textContent = glyph(mode === "new" ? "plus" : "search");
+  if (alias) {
+    query.placeholder = alias.scope ? `Buscar em ${aliasName(alias)}` : `Buscar no ${alias.name}`;
+    return;
+  }
   const prefix = target?.incognito ? "Anônima: " : mode === "new" ? "Nova aba: " : "";
   query.placeholder = prefix ? `${prefix}buscar ou digitar endereço` : "Buscar ou digitar endereço";
 }
@@ -154,8 +241,11 @@ async function open() {
   const empty = blank(target?.url);
   if (empty) mode = "current";
   commands = rangaPrivate && target ? await call("getEnabledCommands", target.windowId).catch(() => []) : [];
+  aliases = loadAliases((await chrome.storage.local.get("spotlightAliases")).spotlightAliases);
+  suggestCache.clear();
+  alias = null;
   if (/^https?:/.test(target?.url ?? "")) commands = [...commands, ...LOCAL_COMMANDS];
-  showMode();
+  showAlias();
   query.value = mode === "current" && !empty ? displayUrl(target?.url ?? "", true) : "";
   query.focus();
   query.select();
@@ -168,12 +258,18 @@ async function open() {
 }
 
 query.addEventListener("input", () => {
+  const parsed = alias ? null : parseAlias(query.value, aliases);
+  if (parsed && !(target?.incognito && parsed.alias.scope && parsed.alias.scope !== "tabs")) {
+    setAlias(parsed.alias);
+    query.value = parsed.rest;
+  }
   clearTimeout(timer);
   timer = setTimeout(refresh, 50);
 });
 query.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown") { e.preventDefault(); selected = Math.min(items.length - 1, selected + 1); moveSelection(); }
-  else if (e.key === "ArrowUp") { e.preventDefault(); selected = Math.max(0, selected - 1); moveSelection(); }
+  if (e.key === "Backspace" && alias && query.selectionStart === 0 && query.selectionEnd === 0) { e.preventDefault(); setAlias(null); refresh(); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); step(1); moveSelection(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); step(-1); moveSelection(); }
   else if (e.key === "Enter") { e.preventDefault(); run(items[selected]); }
   else if (e.key === "Escape") { e.preventDefault(); close(); }
 });

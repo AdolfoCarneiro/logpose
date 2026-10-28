@@ -3,6 +3,7 @@ import { others, pinnedIds, togglePin } from "./extensions-model.js";
 import { available as rangaPrivate, call } from "./ranga-private.js";
 import { loadContainers, createContainer, updateContainer, deleteContainer, CONTAINER_COLORS, CONTAINER_ICONS } from "./containers-model.js";
 import { glyph } from "./kurobe/icons.mjs";
+import { loadAliases, validAlias, SCOPES } from "./aliases-model.js";
 import { typed, shown } from "./browser-prefs.js";
 import { current, assign, reset, toMap, label, fromEvent, SHORTCUTS } from "./shortcuts-model.js";
 
@@ -113,16 +114,10 @@ async function paintContainers() {
     text.append(icon, dot, name);
     const actions = document.createElement("span");
     actions.className = "container-actions";
-    const clear = Object.assign(document.createElement("button"), { className: "k-button k-button--text k-type-button", textContent: "Limpar dados" });
-    clear.onclick = async () => {
-      clear.disabled = true;
-      await call("clearContainer", c.id).catch(() => {});
-      clear.textContent = "Dados limpos";
-    };
-    const remove = Object.assign(document.createElement("button"), { className: "k-icon-button k-state", title: "Apagar container" });
+    const remove = Object.assign(document.createElement("button"), { className: "k-icon-button k-state", title: "Apagar grupo" });
     remove.innerHTML = `<span class="k-icon">${glyph("trash-2")}</span>`;
     remove.onclick = () => saveContainers(deleteContainer(list, c.id));
-    actions.append(clear, remove);
+    actions.append(remove);
     row.append(text, actions);
     return row;
   }));
@@ -139,6 +134,69 @@ document.getElementById("container-new").addEventListener("submit", async (e) =>
     input.focus();
   }
 });
+
+async function storedAliases() {
+  return loadAliases((await chrome.storage.local.get("spotlightAliases")).spotlightAliases);
+}
+
+async function saveAliases(list) {
+  await chrome.storage.local.set({ spotlightAliases: list });
+  paintAliases();
+}
+
+function aliasField(value, className, placeholder, onChange) {
+  const input = Object.assign(document.createElement("input"), { className: `k-text-field k-type-label ${className}`, value, placeholder, autocomplete: "off" });
+  input.addEventListener("change", () => {
+    const ok = onChange(input.value.trim());
+    input.setAttribute("aria-invalid", String(!ok));
+  });
+  return input;
+}
+
+async function paintAliases() {
+  const list = await storedAliases();
+  const update = (i, patch) => {
+    const next = list.map((a, j) => (j === i ? { ...a, ...patch } : a));
+    const unique = new Set(next.map((a) => a.alias.toLowerCase())).size === next.length;
+    if (!validAlias(next[i]) || !unique) return false;
+    saveAliases(next);
+    return true;
+  };
+  document.getElementById("alias-settings").replaceChildren(...list.map((a, i) => {
+    const row = document.createElement("div");
+    row.className = "setting alias-row";
+    const key = aliasField(a.alias, "alias-key", "alias", (alias) => update(i, { alias }));
+    key.maxLength = 8;
+    row.append(key);
+    if (a.scope) {
+      row.append(Object.assign(document.createElement("span"), { className: "alias-scope k-type-label", textContent: `Procura em ${SCOPES[a.scope]}` }));
+    } else {
+      row.append(aliasField(a.name, "alias-name", "Nome do site", (name) => update(i, { name })), aliasField(a.url, "alias-url", "https://site.com/busca?q=%s", (url) => update(i, { url })));
+    }
+    const remove = Object.assign(document.createElement("button"), { className: "k-icon-button k-state", type: "button", title: "Apagar alias" });
+    remove.innerHTML = `<span class="k-icon">${glyph("trash-2")}</span>`;
+    remove.onclick = () => saveAliases(list.filter((_, j) => j !== i));
+    row.append(remove);
+    return row;
+  }));
+}
+
+document.getElementById("alias-new").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target.elements;
+  const entry = { alias: form.alias.value.trim(), name: form.name.value.trim(), url: form.url.value.trim() };
+  const list = await storedAliases();
+  if (!validAlias(entry) || list.some((a) => a.alias.toLowerCase() === entry.alias.toLowerCase())) {
+    form.alias.focus();
+    return;
+  }
+  await saveAliases([...list, entry]);
+  e.target.reset();
+});
+document.getElementById("aliases-reset").onclick = async () => {
+  await chrome.storage.local.remove("spotlightAliases");
+  paintAliases();
+};
 
 async function paintBrowserPrefs() {
   if (!chrome.settingsPrivate) return;
@@ -191,6 +249,7 @@ chrome.settingsPrivate?.onPrefsChanged.addListener(paintBrowserPrefs);
 paint();
 paintExtensions();
 paintContainers();
+paintAliases();
 paintBrowserPrefs();
 
 let recording = null;

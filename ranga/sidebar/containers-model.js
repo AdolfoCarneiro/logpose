@@ -87,6 +87,11 @@ export function updatePage(list, pageId, patch) {
     : c));
 }
 
+export function pageTitle(page, { custom = "", bookmark = "", live = "" } = {}) {
+  const saved = page.title && page.title !== page.url ? page.title : "";
+  return custom || saved || bookmark || live || page.url;
+}
+
 export function findPage(list, pageId) {
   for (const container of list) {
     const page = pagesOf(container).find((p) => p.id === pageId);
@@ -103,13 +108,13 @@ export function pageIds(list) {
   return new Set(list.flatMap((c) => pagesOf(c).map((p) => p.id)));
 }
 
-export function restorePages(tabs, shot, list, containerOfTab) {
+export function restorePages(tabs, shot, list) {
   const live = {};
   const used = new Set();
   for (const entry of shot ?? []) {
     const found = findPage(list, entry.pin);
     if (!found) continue;
-    const tab = tabs.find((t) => !used.has(t.id) && (t.url || t.pendingUrl || "") === entry.url && containerOfTab(t.id) === found.container.id);
+    const tab = tabs.find((t) => !used.has(t.id) && (t.url || t.pendingUrl || "") === entry.url);
     if (!tab) continue;
     used.add(tab.id);
     live[tab.id] = entry.pin;

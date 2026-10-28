@@ -2,7 +2,7 @@ import { toItems, toNavigation } from "./tabs-model.js";
 import { loadSettings, displayUrl } from "./settings-model.js";
 import {
   initialState, createSpace, renameSpace, deleteSpace, assignTab, forgetTab,
-  visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore, spaceOfTab, containerOf,
+  visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore, spaceOfTab, sessionOf, sessionOfSpace, withSessions,
   storeSnapshot, pickSnapshot, forgetSnapshot, reopenedSpace, setTitle,
 } from "./spaces-model.js";
 import { glyph } from "./kurobe/icons.mjs";
@@ -16,12 +16,15 @@ import { archiveEntry, pushArchive } from "./lifecycle-model.js";
 import { setupExtensions } from "./extensions.js";
 import { setupContainers } from "./containers.js";
 import { setupContainerGroups } from "./container-groups.js";
+import { setupContainerEditor } from "./container-editor.js";
+import { dropTab, joinWindow } from "./split-drop.js";
+import { windowAt, chromeWindowFor, zonesFor } from "./drag-model.js";
+import { iconChoices } from "./icons-model.js";
 import { setupDownloads } from "./downloads.js";
 import { setupPins } from "./pins.js";
 import { setupPlayer } from "./player.js";
 import { available as rangaPrivate, call } from "./ranga-private.js";
 
-const SPACE_ICONS = ["house", "briefcase", "code", "book-open", "music", "gamepad-2", "heart", "star", "palette"];
 const SPACE_COLORS = [null, "#71b1ec", "#7cc2a8", "#d9c08a", "#d49a78", "#d8737a", "#b59ad4"];
 
 const address = document.getElementById("address");
@@ -35,6 +38,7 @@ const content = document.getElementById("space-content");
 let windowId;
 let settings = loadSettings();
 let spaces = initialState();
+let bookmarkTitles = new Map();
 let themeCss = "";
 let activeUrl = "";
 let activeTabId = null;
@@ -54,16 +58,22 @@ const pins = setupPins({
   windowId: () => windowId,
   spaceId: () => activeSpace(spaces, windowId).id,
   assign: (tabId) => moveTabToSpace(tabId, activeSpace(spaces, windowId).id),
-  container: () => (containers.available && !incognito ? containerOf(spaces, windowId) : ""),
+  container: () => currentSession(),
   changed: () => render(),
 });
+const containerEditor = setupContainerEditor({ popover: document.getElementById("containers-popover") });
 const groups = setupContainerGroups({
   section: document.getElementById("groups"),
   list: document.getElementById("groups-list"),
   windowId: () => windowId,
   assign: (tabId) => moveTabToSpace(tabId, activeSpace(spaces, windowId).id),
-  containerOf: (tabId) => containers.of(tabId)?.id ?? "",
+  session: () => currentSession(),
+  sessionOfTab: (tabId) => containers.sessionOfTab(tabId),
   changed: () => render(),
+  edit: (id) => containerEditor.open(id),
+  newTab: (id) => newTabInGroup(id),
+  customName: (tabId) => spaces.tabTitle[tabId] || "",
+  bookmarkName: (url) => bookmarkTitles.get(url) || "",
 });
 
 function keptIds() {
@@ -103,9 +113,23 @@ async function saveSpaces() {
   await groups.persist();
 }
 
+function currentSession() {
+  return containers.available && !incognito ? sessionOf(spaces, windowId) : "";
+}
+
 async function moveTabToSpace(tabId, spaceId) {
   spaces = assignTab(spaces, tabId, spaceId);
   await saveSpaces();
+}
+
+async function intoSession(tabId, spaceId) {
+  if (!containers.available || incognito) return tabId;
+  const session = sessionOfSpace(spaces, spaceId);
+  await containers.load();
+  if (containers.sessionOfTab(tabId) === session) return tabId;
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || !/^https?:/.test(tab.url || tab.pendingUrl || "")) return tabId;
+  return containers.reopen(tab, session);
 }
 
 async function activeTab() {
@@ -113,31 +137,17 @@ async function activeTab() {
   return tab;
 }
 
-async function reopenInContainer(ids, container) {
-  tabList.clearSelection();
-  for (const tabId of ids) {
-    const space = spaceOfTab(spaces, tabId, windowId);
-    const id = await containers.reopen(await chrome.tabs.get(tabId), container);
-    await moveTabToSpace(id, space);
-    if (container) await groups.adopt(id, container);
-  }
-  render();
-}
-
-function containerEntries(items) {
+function groupEntries(ids) {
   if (!containers.available || incognito) return [];
-  const ids = items.map((i) => i.id);
-  const current = items.length === 1 ? items[0].container?.id ?? "" : null;
-  const choices = containers.list().filter((c) => c.id !== current);
-  const contained = items.some((i) => i.container);
-  if (!choices.length && !contained) return [];
-  const saveable = items.length === 1 && items[0].container ? [{ icon: "folder-plus", label: `Guardar no grupo ${items[0].container.name}`, action: () => groups.adopt(items[0].id, items[0].container.id) }] : [];
+  const save = (groupId) => async () => {
+    tabList.clearSelection();
+    for (const id of ids) await groups.adopt(id, groupId);
+  };
   return [
     "divider",
-    ...saveable,
-    { heading: "Abrir no container" },
-    ...choices.map((c) => ({ icon: c.icon, label: c.name, action: () => reopenInContainer(ids, c.id) })),
-    ...(contained ? [{ icon: "log-out", label: "Tirar do container", action: () => reopenInContainer(ids, "") }] : []),
+    { heading: "Guardar no grupo" },
+    ...groups.list().map((g) => ({ icon: g.icon, label: g.name, action: save(g.id) })),
+    { icon: "plus", label: "Novo grupo", action: () => containerEditor.open() },
   ];
 }
 
@@ -167,7 +177,6 @@ function splitEntries(item) {
 
 async function tabsMenu(ids, x, y) {
   const tabs = (await Promise.all(ids.map((id) => chrome.tabs.get(id).catch(() => null)))).filter(Boolean);
-  const items = tabs.map((t) => ({ id: t.id, container: containers.of(t.id) }));
   showMenu([
     { heading: `${tabs.length} abas selecionadas` },
     { icon: "pin", label: "Fixar", action: async () => { tabList.clearSelection(); for (const t of tabs) await pins.pinTab(t); } },
@@ -184,7 +193,7 @@ async function tabsMenu(ids, x, y) {
     { icon: "link", label: "Copiar links", action: () => navigator.clipboard.writeText(tabs.map((t) => t.url).join("\n")) },
     { icon: "rotate-cw", label: "Recarregar", action: () => { for (const t of tabs) chrome.tabs.reload(t.id); } },
     { icon: "moon", label: "Dormir", action: () => { tabList.clearSelection(); for (const t of tabs) if (!t.active && !t.discarded) chrome.tabs.discard(t.id).catch(() => {}); } },
-    ...containerEntries(items),
+    ...groupEntries(ids),
     ...spaceEntries(ids),
     "divider",
     { icon: "x", label: `Fechar ${tabs.length} abas`, danger: true, action: () => closeTabs(ids) },
@@ -204,7 +213,7 @@ function tabMenu(item, x, y, selection) {
     ...(item.active || item.asleep ? [] : [{ icon: "moon", label: "Dormir", action: () => chrome.tabs.discard(item.id).catch(() => {}) }]),
     ...(item.audio === "muted" ? [{ icon: "volume-2", label: "Ativar som", action: () => chrome.tabs.update(item.id, { muted: false }) }] : []),
     ...(item.audio === "playing" ? [{ icon: "volume-x", label: "Silenciar", action: () => chrome.tabs.update(item.id, { muted: true }) }] : []),
-    ...containerEntries([item]),
+    ...groupEntries([item.id]),
     ...spaceEntries([item.id]),
     "divider",
     { icon: "copy-x", label: "Fechar as outras", action: () => closeAround(item.id, (i, at) => i !== at) },
@@ -231,11 +240,12 @@ async function closeAround(tabId, pick) {
 }
 
 async function moveTabsToSpace(ids, spaceId) {
-  for (const id of ids) spaces = assignTab(spaces, id, spaceId);
-  await saveSpaces();
   tabList.clearSelection();
+  const current = activeSpace(spaces, windowId).id;
+  for (const id of ids) spaces = assignTab(spaces, await intoSession(id, spaceId), spaceId);
+  await saveSpaces();
   const active = await activeTab();
-  if (active && ids.includes(active.id)) {
+  if (active && spaceOfTab(spaces, active.id, windowId) !== current) {
     const rest = visibleTabs(spaces, await chrome.tabs.query({ windowId }), windowId);
     if (rest.length) await chrome.tabs.update(rest[0].id, { active: true });
     else await chrome.tabs.create({ windowId });
@@ -247,7 +257,6 @@ async function restoreClosed(count) {
   for (let i = 0; i < count; i++) await chrome.sessions.restore().catch(() => {});
 }
 
-let bookmarkTitles = new Map();
 
 async function loadBookmarkTitles() {
   const titles = new Map();
@@ -278,6 +287,112 @@ async function renameTab(id, title) {
   render();
 }
 
+function setupPageDrop() {
+  let drag = null;
+  let frame = 0;
+  let asked = 0;
+  let listening = false;
+  const answers = new Map();
+
+  function pointer() {
+    if (!listening) {
+      listening = true;
+      themePort.onMessage.addListener((msg) => {
+        if (msg.type !== "pointer") return;
+        answers.get(msg.id)?.(msg.pointer);
+        answers.delete(msg.id);
+      });
+    }
+    const id = ++asked;
+    return new Promise((resolve) => {
+      answers.set(id, resolve);
+      themePort.postMessage({ type: "pointer", id });
+      setTimeout(() => { if (answers.delete(id)) resolve(null); }, 250);
+    });
+  }
+
+  async function start(id) {
+    const [dragged, all] = await Promise.all([
+      chrome.tabs.get(id).catch(() => null),
+      chrome.windows.getAll({ populate: true, windowTypes: ["normal"] }),
+    ]);
+    const windows = all.filter((w) => w.incognito === incognito).map((w) => {
+      const active = w.tabs.find((t) => t.active) ?? null;
+      return { id: w.id, title: active?.title ?? "", active };
+    });
+    return { id, dragged, windows, target: null, zone: "", zones: "" };
+  }
+
+  async function locate(x, y) {
+    const found = drag.windows.length > 1 ? await pointer() : null;
+    const over = found && windowAt(found, found.windows);
+    if (found && !over) return null;
+    const other = over && chromeWindowFor(over, drag.windows);
+    if (other && other.id !== windowId) return { window: other.id, x: found.x - over.x, y: found.y - over.y, partner: other.active };
+    return { window: windowId, x, y, partner: drag.windows.find((w) => w.id === windowId)?.active ?? null };
+  }
+
+  async function update(x, y) {
+    const spot = await locate(x, y);
+    if (!drag) return;
+    if (drag.target && drag.target !== spot?.window) call("endTabDrag", drag.target).catch(() => {});
+    if (!spot) {
+      drag.target = null;
+      drag.zone = "";
+      return;
+    }
+    const own = spot.window === windowId;
+    const zones = zonesFor({ dragged: drag.dragged, partner: spot.partner, own });
+    if (drag.target !== spot.window || drag.zones !== zones) {
+      const pairs = zones.includes("left") && spot.partner;
+      chrome.storage.session.set({ tabDrag: { tab: drag.id, partner: pairs ? spot.partner.id : null } });
+    }
+    drag.target = spot.window;
+    drag.zones = zones;
+    drag.partner = spot.partner;
+    drag.zone = await call("dragTab", spot.window, Math.round(spot.x), Math.round(spot.y), zones).catch(() => "");
+  }
+
+  function hide() {
+    if (drag?.target) call("endTabDrag", drag.target).catch(() => {});
+    call("endTabDrag", windowId).catch(() => {});
+    chrome.storage.session.remove("tabDrag");
+  }
+
+  return {
+    over(id, x, y) {
+      drag ||= { pending: start(id), point: null };
+      drag.point = [x, y];
+      frame ||= requestAnimationFrame(async () => {
+        if (drag?.pending) Object.assign(drag, await drag.pending, { pending: null });
+        frame = 0;
+        if (drag?.point) await update(...drag.point);
+      });
+    },
+    leave() {
+      if (!drag) return;
+      hide();
+      drag.point = null;
+      drag.target = null;
+      drag.zone = "";
+    },
+    async drop(id, at) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      if (!drag) return;
+      if (drag.pending) Object.assign(drag, await drag.pending, { pending: null });
+      const end = at ?? drag.point;
+      if (end) await update(...end);
+      const { zone, target, partner, dragged } = drag;
+      hide();
+      drag = null;
+      if (!zone || !target) return;
+      if (target === windowId) await dropTab(windowId, id, zone, dragged?.splitViewId > 0 ? dragged.splitViewId : null, partner?.id ?? null);
+      else await joinWindow(target, id, zone, partner?.id ?? null);
+    },
+  };
+}
+
 const tabList = createTabList({
   list: document.getElementById("tabs"),
   indicator: document.getElementById("active-indicator"),
@@ -290,6 +405,7 @@ const tabList = createTabList({
     over: (x, y) => pins.contains(x, y),
     drop: async (id) => pins.pinTab(await chrome.tabs.get(id)),
   },
+  pageDrop: rangaPrivate ? setupPageDrop() : null,
   onMove: async (id, target) => {
     const { index } = await chrome.tabs.get(target.id);
     await chrome.tabs.move(id, { index });
@@ -371,7 +487,7 @@ async function paint() {
   const kept = keptIds();
   const visible = visibleTabs(spaces, tabs, windowId).filter((t) => !kept.has(t.id));
   const active = tabs.find((t) => t.active);
-  const items = toItems(visible, active?.id, (t) => spaces.tabTitle[t.id] || bookmarkTitles.get(t.url) || "").map((i) => ({ ...i, container: containers.of(i.id) }));
+  const items = toItems(visible, active?.id, (t) => spaces.tabTitle[t.id] || bookmarkTitles.get(t.url) || "");
   pins.render(new Map(all.map((t) => [t.id, t])), active?.id);
   if (incognito) document.getElementById("groups").hidden = true;
   else groups.render(new Map(all.map((t) => [t.id, t])), active?.id);
@@ -412,13 +528,14 @@ function openSpaceForm(space = null) {
   spaceForm.dataset.editing = space?.id ?? "";
   spaceForm.querySelector("input[name=name]").value = space?.name ?? "";
   const icons = spaceForm.querySelector(".icons");
-  icons.replaceChildren(...SPACE_ICONS.map((name) => {
+  const current = space?.icon ?? "house";
+  icons.replaceChildren(...iconChoices(current).map((name) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "choice k-state";
     b.dataset.icon = name;
     b.dataset.value = name;
-    b.setAttribute("aria-pressed", String(name === (space?.icon ?? SPACE_ICONS[0])));
+    b.setAttribute("aria-pressed", String(name === current));
     b.onclick = () => { for (const x of icons.children) x.setAttribute("aria-pressed", String(x === b)); pop(b); };
     return b;
   }));
@@ -434,20 +551,19 @@ function openSpaceForm(space = null) {
     b.onclick = () => { for (const x of colors.children) x.setAttribute("aria-pressed", String(x === b)); pop(b); };
     return b;
   }));
-  const containerBox = spaceForm.querySelector(".space-containers");
-  const choices = containerBox.querySelector(".containers-choices");
-  containerBox.hidden = !containers.available;
-  choices.replaceChildren(...[{ id: "", name: "Nenhum", icon: "circle-off" }, ...containers.list()].map((c) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "container-choice k-state k-type-label";
-    b.dataset.value = c.id;
-    b.setAttribute("aria-pressed", String(c.id === (space?.container ?? "")));
-    if (c.color) b.style.setProperty("--container-color", c.color);
-    b.append(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(c.icon) }), c.name);
-    b.onclick = () => { for (const x of choices.children) x.setAttribute("aria-pressed", String(x === b)); pop(b); };
-    return b;
-  }));
+  const session = spaceForm.querySelector(".space-session");
+  const own = !space || Boolean(space.session);
+  session.hidden = !containers.available || incognito;
+  session.querySelector(".space-session__text").textContent = own ? "Sessão própria: logins e cookies separados dos outros espaços." : "Sessão principal do navegador.";
+  const clear = document.getElementById("space-clear");
+  clear.hidden = !space?.session;
+  clear.disabled = false;
+  clear.textContent = "Limpar dados";
+  clear.onclick = async () => {
+    clear.disabled = true;
+    await call("clearContainer", space.session).catch(() => {});
+    clear.textContent = "Dados limpos";
+  };
   paintIcons(spaceForm);
   spaceForm.hidden = false;
   spaceForm.querySelector("input[name=name]").focus();
@@ -459,17 +575,15 @@ spaceForm.addEventListener("submit", async (e) => {
   const name = spaceForm.querySelector("input[name=name]").value;
   const icon = spaceForm.querySelector(".icons [aria-pressed=true]")?.dataset.value;
   const color = spaceForm.querySelector(".colors [aria-pressed=true]")?.dataset.value || null;
-  const container = spaceForm.querySelector(".containers-choices [aria-pressed=true]")?.dataset.value ?? "";
   try {
     const editing = spaceForm.dataset.editing;
     if (editing) {
       spaces = renameSpace(spaces, editing, name);
-      spaces = updateSpace(spaces, editing, { icon, color, container });
+      spaces = updateSpace(spaces, editing, { icon, color });
       await saveSpaces();
       render();
     } else {
       spaces = createSpace(spaces, { name, icon, color });
-      spaces = updateSpace(spaces, spaces.spaces.at(-1).id, { container });
       await saveSpaces();
       await switchSpace(spaces.spaces.at(-1).id, 1);
     }
@@ -487,7 +601,10 @@ for (const item of spaceMenu.querySelectorAll("[data-space-action]")) {
     if (!space) return;
     if (item.dataset.spaceAction === "edit") openSpaceForm(space);
     if (item.dataset.spaceAction === "delete" && spaces.spaces.length > 1) {
+      const moving = Object.entries(spaces.tabSpace).filter(([, id]) => id === space.id).map(([id]) => Number(id));
       spaces = deleteSpace(spaces, space.id);
+      const fallback = spaces.spaces[0].id;
+      for (const id of moving) spaces = assignTab(spaces, await intoSession(id, fallback), fallback);
       await saveSpaces();
       render();
     }
@@ -519,19 +636,52 @@ document.getElementById("new-tab").onclick = () => {
   if (rangaPrivate) call("executeCommand", windowId, "newTab").catch(() => chrome.tabs.create({ windowId }));
   else chrome.tabs.create({ windowId });
 };
+
+let groupTab = null;
+
+async function blankTab(spaceId, active) {
+  const session = containers.available && !incognito ? sessionOfSpace(spaces, spaceId) : "";
+  return session ? containers.open({ container: session, active }) : (await chrome.tabs.create({ windowId, active })).id;
+}
+
+async function newTabInGroup(groupId) {
+  const id = await blankTab(activeSpace(spaces, windowId).id, true);
+  groupTab = { id, groupId };
+  if (rangaPrivate) call("executeCommand", windowId, "openLocation").catch(() => {});
+}
+
+async function newTabInSpace(spaceId) {
+  const from = spaces.spaces.findIndex((s) => s.id === activeSpace(spaces, windowId).id);
+  const to = spaces.spaces.findIndex((s) => s.id === spaceId);
+  const id = await blankTab(spaceId, false);
+  spaces = rememberTab(assignTab(spaces, id, spaceId), spaceId, id);
+  await switchSpace(spaceId, Math.sign(to - from));
+  if (rangaPrivate) call("executeCommand", windowId, "openLocation").catch(() => {});
+}
+
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (groupTab?.id !== tabId || !/^https?:/.test(info.url ?? "")) return;
+  const { groupId } = groupTab;
+  groupTab = null;
+  groups.adopt(tabId, groupId);
+});
+chrome.tabs.onRemoved.addListener((tabId) => { if (groupTab?.id === tabId) groupTab = null; });
+
 document.getElementById("new-tab").oncontextmenu = (e) => {
   e.preventDefault();
-  if (!containers.available || incognito) return;
-  showMenu(containers.list().map((c) => ({
-    icon: c.icon,
-    label: `Nova aba no container ${c.name}`,
-    action: () => containers.open({ container: c.id }),
-  })), e.clientX, e.clientY);
+  const others = spaces.spaces.filter((s) => s.id !== activeSpace(spaces, windowId).id);
+  if (!others.length || incognito) return;
+  showMenu([
+    { heading: "Nova aba no espaço" },
+    ...others.map((space) => ({ icon: space.icon, label: space.name, action: () => newTabInSpace(space.id) })),
+  ], e.clientX, e.clientY);
 };
 async function reopen(entries) {
   for (const entry of entries) {
-    const tab = await chrome.tabs.create({ url: entry.url, windowId, active: false });
-    await moveTabToSpace(tab.id, spaces.spaces.some((s) => s.id === entry.space) ? entry.space : activeSpace(spaces, windowId).id);
+    const space = spaces.spaces.some((s) => s.id === entry.space) ? entry.space : activeSpace(spaces, windowId).id;
+    const session = containers.available && !incognito ? sessionOfSpace(spaces, space) : "";
+    const id = session ? await containers.open({ url: entry.url, container: session, active: false }) : (await chrome.tabs.create({ url: entry.url, windowId, active: false })).id;
+    await moveTabToSpace(id, space);
   }
   render();
 }
@@ -622,6 +772,7 @@ setupFavorites({
   popover: document.getElementById("favorites-popover"),
   activeTab,
   windowId: () => windowId,
+  openTab: (url, active) => (currentSession() ? containers.open({ url, container: currentSession(), active }) : chrome.tabs.create({ url, windowId, active })),
 });
 
 document.addEventListener("wheel", (e) => {
@@ -814,7 +965,7 @@ incognito = currentWindow.incognito;
 document.body.classList.toggle("incognito", incognito);
 settings = loadSettings((await chrome.storage.local.get("settings")).settings);
 const stored = await chrome.storage.local.get(["spaces", "spaceSnapshot"]);
-if (stored.spaces?.spaces?.length) spaces = { ...initialState(), ...stored.spaces, tabSpace: stored.spaces.tabSpace ?? {}, tabTitle: stored.spaces.tabTitle ?? {} };
+if (stored.spaces?.spaces?.length) spaces = withSessions({ ...initialState(), ...stored.spaces, tabSpace: stored.spaces.tabSpace ?? {}, tabTitle: stored.spaces.tabTitle ?? {} });
 const windowTabs = await chrome.tabs.query({ windowId });
 const liveTabs = new Set((await chrome.tabs.query({})).map((t) => String(t.id)));
 const liveWindows = new Set((await chrome.windows.getAll()).map((w) => String(w.id)));

@@ -105,7 +105,10 @@
       <span class="favorites-title k-type-panel">Favoritos</span>
     </header>
     <ul class="favorites-list k-list"></ul>
-    <button class="favorites-save k-button k-button--tonal k-type-button"><span class="k-icon" data-icon="bookmark-plus"></span>Salvar página atual</button>
+    <div class="favorites-actions">
+      <button class="favorites-save k-button k-button--tonal k-type-button"><span class="k-icon" data-icon="bookmark-plus"></span>Salvar página</button>
+      <button class="favorites-manage k-button k-button--tonal k-type-button"><span class="k-icon" data-icon="library"></span>Gerenciar</button>
+    </div>
   </section>
 
   <section id="archive-popover" class="favorites-popover archive-popover" role="dialog" aria-label="Abas arquivadas" hidden>
@@ -118,6 +121,28 @@
     <header class="favorites-header"><span class="k-type-panel">Extensões</span></header>
     <ul class="extensions-list favorites-list k-list"></ul>
     <button class="extensions-manage k-button k-button--text k-type-button"><span class="k-icon" data-icon="settings"></span>Gerenciar extensões</button>
+  </section>
+
+  <section id="containers-popover" class="favorites-popover containers-popover" role="dialog" aria-label="Grupos" hidden>
+    <header class="favorites-header">
+      <button class="favorites-back k-icon-button k-icon-button--small k-state" title="Voltar" hidden><span class="k-icon" data-icon="chevron-left"></span></button>
+      <span class="containers-title k-type-panel">Grupos</span>
+    </header>
+    <div class="containers-list-view">
+      <ul class="containers-list favorites-list k-list"></ul>
+      <form class="containers-new">
+        <input name="name" class="k-text-field k-type-label" placeholder="Novo grupo" maxlength="32" autocomplete="off">
+        <button class="k-icon-button k-state" type="submit" title="Criar"><span class="k-icon" data-icon="plus"></span></button>
+      </form>
+    </div>
+    <form class="containers-edit" hidden>
+      <input name="name" class="k-text-field k-type-label" placeholder="Nome" maxlength="32" autocomplete="off">
+      <div class="icons"></div>
+      <div class="colors"></div>
+      <div class="actions">
+        <button type="button" class="containers-delete k-button k-button--text k-type-button">Apagar o grupo</button>
+      </div>
+    </form>
   </section>
 
   <section id="downloads-popover" class="favorites-popover downloads-popover" role="dialog" aria-label="Downloads" hidden>
@@ -146,9 +171,9 @@
     <input name="name" class="k-text-field k-type-label" placeholder="Nome" autocomplete="off" maxlength="32">
     <div class="icons"></div>
     <div class="colors"></div>
-    <div class="space-containers" hidden>
-      <span class="k-type-caption hint">Container das abas novas</span>
-      <div class="containers-choices"></div>
+    <div class="space-session" hidden>
+      <span class="space-session__text k-type-caption hint"></span>
+      <button id="space-clear" type="button" class="k-button k-button--text k-type-button">Limpar dados</button>
     </div>
     <div class="actions">
       <button id="space-cancel" type="button" class="k-button k-button--text k-type-button">Cancelar</button>

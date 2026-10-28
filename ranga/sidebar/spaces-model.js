@@ -1,6 +1,6 @@
 export function initialState() {
   return {
-    spaces: [{ id: "pessoal", name: "Pessoal", icon: "house", color: null }],
+    spaces: [{ id: "pessoal", name: "Pessoal", icon: "house", color: null, session: "" }],
     tabSpace: {},
     tabTitle: {},
     active: {},
@@ -18,7 +18,7 @@ export function createSpace(state, { name, icon, color }) {
   const base = slug(clean);
   let id = base;
   for (let n = 2; state.spaces.some((s) => s.id === id); n++) id = `${base}-${n}`;
-  return { ...state, spaces: [...state.spaces, { id, name: clean, icon: icon || "circle", color: color ?? null }] };
+  return { ...state, spaces: [...state.spaces, { id, name: clean, icon: icon || "circle", color: color ?? null, session: id }] };
 }
 
 export function renameSpace(state, id, name) {
@@ -161,6 +161,17 @@ export function reopenedSpace(state, tabs, shot) {
   return state.spaces.some((s) => s.id === id) ? id : state.spaces[0].id;
 }
 
-export function containerOf(state, windowId) {
-  return activeSpace(state, windowId).container ?? "";
+export function withSessions(state) {
+  return {
+    ...state,
+    spaces: state.spaces.map(({ container, ...space }, i) => (typeof space.session === "string" ? space : { ...space, session: i === 0 ? "" : container || space.id })),
+  };
+}
+
+export function sessionOfSpace(state, spaceId) {
+  return state.spaces.find((s) => s.id === spaceId)?.session ?? "";
+}
+
+export function sessionOf(state, windowId) {
+  return activeSpace(state, windowId).session ?? "";
 }

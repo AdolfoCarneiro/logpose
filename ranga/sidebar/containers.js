@@ -22,6 +22,10 @@ export function setupContainers({ windowId }) {
     return list.find((c) => c.id === id) ?? { id, name: id, color: "var(--k-color-outline)", icon: "box" };
   }
 
+  function sessionOfTab(tabId) {
+    return members.get(tabId) ?? "";
+  }
+
   function open({ url, container, index, active = true, pinned = false }) {
     const options = { windowId: windowId(), container, active, pinned };
     if (url) options.url = url;
@@ -59,5 +63,5 @@ export function setupContainers({ windowId }) {
     return created;
   }
 
-  return { available, load, of, list: () => list, open, reopen, save, heal };
+  return { available, load, of, sessionOfTab, list: () => list, open, reopen, save, heal };
 }

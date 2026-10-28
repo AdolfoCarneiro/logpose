@@ -31,12 +31,26 @@ html, body { height: 100%; margin: 0; background: transparent; overflow: hidden;
   height: 60px;
   border: 0;
   border-radius: var(--k-shape-large);
-  padding: 0 var(--k-space-lg) 0 56px;
+  padding: 0 var(--k-space-lg) 0 calc(56px + var(--chip-width, 0px));
   background: var(--k-color-surface-container-highest);
   color: var(--k-color-on-surface);
   outline: none;
 }
+.alias-chip {
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  z-index: 1;
+  translate: 0 -50%;
+  padding: 4px var(--k-space-sm);
+  border-radius: var(--k-shape-small);
+  background: var(--k-color-primary-container);
+  color: var(--k-color-on-primary-container);
+  white-space: nowrap;
+}
+.alias-chip[hidden] { display: none; }
 .results-wrap { position: relative; }
+.section { list-style: none; padding: var(--k-space-sm) var(--k-space-md) var(--k-space-xxs); color: var(--k-color-on-surface-variant); }
 .results { position: relative; z-index: 1; max-height: 52vh; overflow-y: auto; scrollbar-width: none; }
 .results:empty { display: none; }
 .selection {

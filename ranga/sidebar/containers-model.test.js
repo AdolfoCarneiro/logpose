@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   loadContainers, createContainer, updateContainer, deleteContainer, membership, containerSnapshot, lostTabs, slug, DEFAULT_CONTAINERS,
-  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages,
+  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle,
 } from "./containers-model.js";
 
 test("sem nada salvo vêm Trabalho e Pessoal; lista salva vazia continua vazia", () => {
@@ -70,10 +70,18 @@ test("o container guarda páginas como as fixadas", () => {
   assert.deepEqual(pagesOf(list[1]), []);
 });
 
-test("ao reabrir, a página volta pra aba do mesmo container, não pra uma igual fora dele", () => {
+test("ao reabrir, a página do grupo volta pra uma aba com a mesma URL", () => {
   const list = [{ id: "trabalho", name: "Trabalho", color: "#fff", icon: "briefcase", pages: [{ id: "p1", url: "https://w.org/", title: "W" }] }];
-  const tabs = [{ id: 1, url: "https://w.org/" }, { id: 2, url: "https://w.org/" }];
-  const inside = new Map([[2, "trabalho"]]);
-  assert.deepEqual(restorePages(tabs, [{ pin: "p1", url: "https://w.org/" }, { pin: "gone", url: "x" }], list, (id) => inside.get(id) ?? ""), { 2: "p1" });
-  assert.deepEqual(restorePages(tabs, undefined, list, () => ""), {});
+  const tabs = [{ id: 1, url: "https://x.org/" }, { id: 2, url: "https://w.org/" }];
+  assert.deepEqual(restorePages(tabs, [{ pin: "p1", url: "https://w.org/" }, { pin: "gone", url: "x" }], list), { 2: "p1" });
+  assert.deepEqual(restorePages(tabs, undefined, list), {});
+});
+
+test("a página do grupo mostra o nome dado, o salvo ou o do favorito antes da URL", () => {
+  const page = { id: "p1", url: "https://w.org/", title: "https://w.org/" };
+  assert.equal(pageTitle(page), "https://w.org/");
+  assert.equal(pageTitle(page, { live: "W" }), "W");
+  assert.equal(pageTitle(page, { bookmark: "Wiki", live: "W" }), "Wiki");
+  assert.equal(pageTitle({ ...page, title: "Minha wiki" }, { bookmark: "Wiki", live: "W" }), "Minha wiki");
+  assert.equal(pageTitle({ ...page, title: "Minha wiki" }, { custom: "Renomeada" }), "Renomeada");
 });

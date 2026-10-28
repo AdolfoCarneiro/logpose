@@ -11,7 +11,7 @@ function favicon(url) {
   return img;
 }
 
-export function createTabList({ list, indicator, onActivate, onClose, onMute, onRename, onContextMenu, onMove, dropZone }) {
+export function createTabList({ list, indicator, onActivate, onClose, onMute, onRename, onContextMenu, onMove, dropZone, pageDrop }) {
   const rows = new Map();
   const selected = new Set();
   let anchor = null;
@@ -83,7 +83,7 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
   function dragTo(e) {
     const dy = e.clientY - drag.startY;
     if (!drag.active) {
-      if (Math.abs(dy) < 5) return;
+      if (Math.hypot(e.clientX - drag.startX, dy) < 5) return;
       drag.active = true;
       drag.rows = [...list.children];
       drag.from = drag.rows.indexOf(drag.li);
@@ -95,7 +95,12 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
     }
     drag.li.style.transform = `translateY(${dy}px)`;
     drag.point = [e.clientX, e.clientY];
-    drag.out = dropZone?.over(e.clientX, e.clientY) ?? false;
+    const page = Boolean(pageDrop) && (e.clientX > innerWidth || e.clientX < 0);
+    if (page) pageDrop.over(Number(drag.li.dataset.id), e.clientX, e.clientY);
+    else if (drag.page) pageDrop.leave();
+    drag.page = page;
+    drag.li.classList.toggle("tab--lifted", page);
+    drag.out = !page && (dropZone?.over(e.clientX, e.clientY) ?? false);
     document.body.classList.toggle("dragging-tab--over", drag.out);
     drag.to = Math.max(0, Math.min(drag.rows.length - 1, drag.from + Math.round(dy / drag.step)));
     drag.rows.forEach((row, i) => {
@@ -105,13 +110,13 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
     });
   }
 
-  function drop() {
+  function drop(e) {
     const done = drag;
     drag = null;
     if (!done?.active) return;
     done.li.dataset.dragged = "1";
     for (const row of done.rows) row.style.transform = "";
-    done.li.classList.remove("tab--dragging");
+    done.li.classList.remove("tab--dragging", "tab--lifted");
     list.classList.remove("k-list--dragging");
     document.body.classList.remove("dragging-tab", "dragging-tab--over");
     if (done.out) done.li.style.transform = "";
@@ -120,7 +125,11 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
       pending = null;
       render(items);
     }
-    if (done.out) {
+    if (done.page) {
+      done.li.style.transform = "";
+      pageDrop.drop(Number(done.li.dataset.id), e.type === "pointerup" ? [e.clientX, e.clientY] : null);
+      moveIndicator();
+    } else if (done.out) {
       dropZone.drop(Number(done.li.dataset.id));
       moveIndicator();
     } else if (done.to !== done.from) onMove(Number(done.li.dataset.id), done.rows[done.to].item);
@@ -189,9 +198,11 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
     li.onmousedown = (e) => { if (e.shiftKey || e.ctrlKey) e.preventDefault(); };
     label.ondblclick = (e) => { e.stopPropagation(); rename(Number(li.dataset.id)); };
     li.onpointerdown = (e) => {
+      delete li.dataset.dragged;
       if (e.button !== 0 || e.target.closest("button, input")) return;
-      drag = { li, startY: e.clientY, active: false };
+      drag = { li, startX: e.clientX, startY: e.clientY, active: false };
     };
+    li.ondragstart = (e) => e.preventDefault();
     li.onauxclick = (e) => { if (e.button === 1) close(li, Number(li.dataset.id)); };
     li.oncontextmenu = (e) => {
       e.preventDefault();
@@ -212,10 +223,7 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
     audio.title = item.audio === "muted" ? "Ativar som" : "Silenciar";
     audio.classList.toggle("tab__audio--muted", item.audio === "muted");
     audio.innerHTML = item.audio ? `<span class="k-icon">${glyph(item.audio === "muted" ? "volume-x" : "volume-2")}</span>` : "";
-    li.title = item.container ? `${item.container.name} · ${item.url}` : item.url;
-    li.classList.toggle("tab--contained", Boolean(item.container));
-    if (item.container) li.style.setProperty("--container-color", item.container.color);
-    else li.style.removeProperty("--container-color");
+    li.title = item.url;
     paintLeading(li, item);
   }
 
@@ -263,7 +271,7 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
     for (const id of [...rows.keys()]) if (!keep.has(id)) rows.delete(id);
     for (const id of [...selected]) if (!keep.has(id)) selected.delete(id);
     if (selected.size < 2) selected.clear();
-    list.replaceChildren(...next);
+    if (next.length !== list.children.length || next.some((li, i) => list.children[i] !== li)) list.replaceChildren(...next);
     flip(before);
     fresh.forEach(enter);
     paintSelection();
