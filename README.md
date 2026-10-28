@@ -8,7 +8,7 @@
 
 Feito sobre o [Helium](https://github.com/imputnet/helium) (Chromium sem Google), com a barra lateral no estilo do Arc, Material 3 e as cores do tema do sistema.
 
-![versão](https://img.shields.io/badge/versão-0.3.0-7cc2a8?style=flat-square)
+![versão](https://img.shields.io/badge/versão-0.4.0-7cc2a8?style=flat-square)
 ![Chromium](https://img.shields.io/badge/Chromium-156-4c8bf5?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-x86__64-e0a64b?style=flat-square)
 ![licença](https://img.shields.io/badge/licença-GPL--3.0-b07ce8?style=flat-square)
@@ -31,7 +31,7 @@ O Chromium guarda abas numa faixa no topo, configurações em dois lugares e tra
 
 ### A barra lateral
 
-- **Espaços** com ícone, cor e container próprios. Ctrl+Shift+← / → ou rolar de lado troca de espaço; cada um lembra a última aba.
+- **Espaços** com ícone, cor e sessão própria: cada espaço tem seus logins e cookies. Ctrl+Shift+← / → ou rolar de lado troca de espaço; cada um lembra a última aba.
 - **Fixadas** em grade de cartões, com pastas. Um link aberto de uma fixada aparece num **Peek** por cima da página.
 - **Hoje**: as abas do dia. Paradas dormem e as esquecidas são arquivadas, com Desfazer.
 - **Favoritos**, downloads com anel de progresso, extensões fixadas e o endereço da aba atual.
@@ -49,7 +49,7 @@ O Chromium guarda abas numa faixa no topo, configurações em dois lugares e tra
 
 **Spotlight**
 
-Ctrl+T e Ctrl+L abrem uma busca única: abas abertas, histórico, favoritos, comandos do navegador e `!bangs`. A aba só nasce quando você escolhe um resultado.
+Ctrl+T e Ctrl+L abrem uma busca única: no topo a busca, o site que você já visita completado e as sugestões do buscador; embaixo, Abas, Favoritos e Histórico em seções. Aliases como `a`, `f`, `h` e `yt` restringem a busca, e a aba só nasce quando você escolhe um resultado.
 
 <img src="ranga/docs/img/spotlight.webp" alt="Spotlight buscando 'lobo'">
 
@@ -78,7 +78,7 @@ Enquanto a página carrega, um traço na cor do tema corre pela borda do cartão
 
 **Várias abas de uma vez**
 
-Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de espaço, abrir num container, fixar, copiar os links.
+Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de espaço, guardar num grupo, fixar, copiar os links.
 
 <img src="ranga/docs/img/multiselect.webp" alt="Três abas marcadas e o menu de ações em lote">
 
@@ -93,7 +93,8 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 ## Também
 
 - **Privacidade do Helium**: sem serviços do Google, uBlock Origin embutido, ruído contra fingerprinting, Global Privacy Control e só HTTPS.
-- **Containers**: cookies e logins separados por container, com um grupo de abas salvo e recolhível na barra. Duas contas do mesmo site lado a lado.
+- **Abas divididas**: arraste uma aba da barra pra cima da página pra dividir à esquerda, à direita, em cima ou embaixo, abrir em nova janela ou levar pra outra janela do Ranga. Cada metade tem botões pra arrastar, separar e fechar.
+- **Grupos**: abas salvas num grupo recolhível na barra, com nome e ícone, que voltam ao reabrir.
 - **Mini player**: o que toca em outra aba aparece no pé da barra, com tocar/pausar, próxima e picture-in-picture.
 - **Nova aba** com saudação, tempo, atalhos, tarefas e notícias.
 - **Tema do sistema**: segue as cores do Ciel (o shell do meu desktop) e a transparência do material, no claro e no escuro.
