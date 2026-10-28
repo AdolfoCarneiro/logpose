@@ -54,3 +54,8 @@ ranga/ui/media-controls.patch
 ranga/ui/incognito-overlays.patch
 ranga/ui/overlay-preload.patch
 ranga/ui/extensions-web-store.patch
+ranga/ui/link-copied-toast.patch
+ranga/ui/container-session-cookies.patch
+ranga/ui/spotlight-suggestions.patch
+ranga/ui/split-view.patch
+ranga/ui/escape-exits-fullscreen.patch

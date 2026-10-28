@@ -1,0 +1,31 @@
+Containers guardam os cookies de sessão como a partição principal: login feito sem "lembrar de mim" num container continuava só na memória e saía ao fechar ou atualizar o Ranga, enquanto fora do container voltava junto com as abas.
+
+--- a/chrome/browser/net/profile_network_context_service.cc
++++ b/chrome/browser/net/profile_network_context_service.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/net/profile_network_context_service.h"
+ 
++#include <algorithm>
+ #include <memory>
+ #include <string>
+ #include <string_view>
+@@ -39,6 +40,7 @@
+ #include "chrome/browser/domain_reliability/service_factory.h"
+ #include "chrome/browser/net/system_network_context_manager.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ranga/ranga_containers.h"
+ #include "chrome/browser/signin/signin_util.h"
+ #include "chrome/browser/ssl/sct_reporting_service.h"
+ #include "chrome/browser/ssl/sct_reporting_service_factory.h"
+@@ -1439,7 +1441,9 @@
+         base::FilePath(chrome::kReportingAndNelStoreFilename);
+ #endif  // BUILDFLAG(ENABLE_REPORTING)
+ 
+-    if (relative_partition_path.empty()) {  // This is the main partition.
++    if (relative_partition_path.empty() ||
++        std::ranges::contains(relative_partition_path.GetComponents(),
++                              kRangaContainerPartitionDomain)) {
+       network_context_params->restore_old_session_cookies =
+           profile_->ShouldRestoreOldSessionCookies();
+       network_context_params->persist_session_cookies =

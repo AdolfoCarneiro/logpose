@@ -1,0 +1,224 @@
+Sugestões de pesquisa no spotlight: rangaPrivate.getSearchSuggestions pede ao mecanismo de busca padrão as sugestões do texto, como a barra de endereço, sem cookies e só com "Sugestões enquanto digita" (search.suggest_enabled) ligado.
+
+--- a/chrome/common/extensions/api/ranga_private.idl
++++ b/chrome/common/extensions/api/ranga_private.idl
+@@ -115,6 +115,7 @@
+   callback RejectedCallback = void(DOMString[] rejected);
+   callback PeekCallback = void(optional PeekState peek);
+   callback ResolvedInputCallback = void(ResolvedInput input);
++  callback SuggestionsCallback = void(DOMString[] suggestions);
+   callback DoneCallback = void();
+ 
+   interface Functions {
+@@ -198,6 +199,13 @@
+         DOMString text,
+         ResolvedInputCallback callback);
+ 
++    // Searches the default search engine suggests for <code>text</code>,
++    // as the address bar would show them; empty when it has none.
++    static void getSearchSuggestions(
++        long windowId,
++        DOMString text,
++        SuggestionsCallback callback);
++
+     // Finds <code>text</code> in the window's active tab, from the
+     // highlighted match on, and highlights the next (or previous) one.
+     static void find(
+--- a/chrome/browser/extensions/api/ranga_private/BUILD.gn
++++ b/chrome/browser/extensions/api/ranga_private/BUILD.gn
+@@ -12,6 +12,7 @@
+ 
+   deps = [
+     "//base",
++    "//net/traffic_annotation",
+     "//chrome/app:command_ids",
+     "//chrome/browser/autocomplete",
+     "//chrome/browser/extensions",
+@@ -28,11 +29,13 @@
+     "//chrome/common/extensions/api",
+     "//components/find_in_page",
+     "//components/omnibox/browser",
++    "//components/prefs",
+     "//components/search_engines",
+     "//components/tabs:public",
+     "//content/public/browser",
+     "//services/media_session/public/cpp",
+     "//services/media_session/public/mojom",
++    "//services/network/public/cpp",
+     "//services/network/public/mojom",
+     "//third_party/metrics_proto",
+     "//extensions/browser",
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.h
+@@ -5,11 +5,19 @@
+ #ifndef CHROME_BROWSER_EXTENSIONS_API_RANGA_PRIVATE_RANGA_PRIVATE_API_H_
+ #define CHROME_BROWSER_EXTENSIONS_API_RANGA_PRIVATE_RANGA_PRIVATE_API_H_
+ 
++#include <memory>
++#include <optional>
++#include <string>
++
+ #include "base/scoped_observation.h"
+ #include "components/find_in_page/find_result_observer.h"
+ #include "components/find_in_page/find_tab_helper.h"
+ #include "extensions/browser/extension_function.h"
+ 
++namespace network {
++class SimpleURLLoader;
++}  // namespace network
++
+ namespace extensions {
+ 
+ class RangaPrivateGetExtensionActionsFunction : public ExtensionFunction {
+@@ -120,6 +128,22 @@
+   ResponseAction Run() override;
+ };
+ 
++class RangaPrivateGetSearchSuggestionsFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("rangaPrivate.getSearchSuggestions", UNKNOWN)
++
++  RangaPrivateGetSearchSuggestionsFunction();
++
++ protected:
++  ~RangaPrivateGetSearchSuggestionsFunction() override;
++  ResponseAction Run() override;
++
++ private:
++  void OnLoaded(std::optional<std::string> body);
++
++  std::unique_ptr<network::SimpleURLLoader> loader_;
++};
++
+ class RangaPrivateFindFunction : public ExtensionFunction,
+                                   public find_in_page::FindResultObserver {
+  public:
+--- a/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
++++ b/chrome/browser/extensions/api/ranga_private/ranga_private_api.cc
+@@ -14,6 +14,7 @@
+ #include <vector>
+ 
+ #include "base/base64.h"
++#include "base/json/json_reader.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "chrome/app/chrome_command_ids.h"
+@@ -46,12 +47,14 @@
+ #include "chrome/browser/ui/toolbar/toolbar_action_view_model.h"
+ #include "chrome/browser/ui/toolbar/toolbar_actions_model.h"
+ #include "chrome/common/extensions/api/ranga_private.h"
++#include "chrome/common/pref_names.h"
+ #include "chrome/common/webui_url_constants.h"
+ #include "components/find_in_page/find_notification_details.h"
+ #include "components/find_in_page/find_types.h"
+ #include "components/omnibox/browser/autocomplete_classifier.h"
+ #include "components/omnibox/browser/autocomplete_match.h"
+ #include "components/omnibox/browser/autocomplete_match_type.h"
++#include "components/prefs/pref_service.h"
+ #include "components/search_engines/choice_made_location.h"
+ #include "components/search_engines/template_url.h"
+ #include "components/search_engines/template_url_service.h"
+@@ -63,6 +66,10 @@
+ #include "content/public/browser/page_navigator.h"
+ #include "content/public/browser/storage_partition.h"
+ #include "content/public/browser/web_contents.h"
++#include "net/traffic_annotation/network_traffic_annotation.h"
++#include "services/network/public/cpp/resource_request.h"
++#include "services/network/public/cpp/shared_url_loader_factory.h"
++#include "services/network/public/cpp/simple_url_loader.h"
+ #include "services/media_session/public/cpp/media_metadata.h"
+ #include "services/media_session/public/cpp/media_position.h"
+ #include "services/media_session/public/mojom/media_session.mojom.h"
+@@ -474,6 +481,92 @@
+       ArgumentList(ranga_private::ResolveInput::Results::Create(input)));
+ }
+ 
++RangaPrivateGetSearchSuggestionsFunction::
++    RangaPrivateGetSearchSuggestionsFunction() = default;
++
++RangaPrivateGetSearchSuggestionsFunction::
++    ~RangaPrivateGetSearchSuggestionsFunction() = default;
++
++ExtensionFunction::ResponseAction
++RangaPrivateGetSearchSuggestionsFunction::Run() {
++  auto params = ranga_private::GetSearchSuggestions::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  Profile* profile = browser->GetProfile();
++  TemplateURLService* service =
++      TemplateURLServiceFactory::GetForProfile(profile);
++  const TemplateURL* engine =
++      service ? service->GetDefaultSearchProvider() : nullptr;
++  const std::u16string text = base::UTF8ToUTF16(params->text);
++  if (!engine || engine->suggestions_url().empty() || text.empty() ||
++      !profile->GetPrefs()->GetBoolean(prefs::kSearchSuggestEnabled)) {
++    return RespondNow(ArgumentList(
++        ranga_private::GetSearchSuggestions::Results::Create({})));
++  }
++  const GURL url(engine->suggestions_url_ref().ReplaceSearchTerms(
++      TemplateURLRef::SearchTermsArgs(text), service->search_terms_data()));
++  if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS()) {
++    return RespondNow(ArgumentList(
++        ranga_private::GetSearchSuggestions::Results::Create({})));
++  }
++  auto request = std::make_unique<network::ResourceRequest>();
++  request->url = url;
++  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
++  constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
++      net::DefineNetworkTrafficAnnotation("ranga_search_suggestions", R"(
++        semantics {
++          sender: "Ranga spotlight"
++          description:
++            "Asks the default search engine for search suggestions while "
++            "the user types in the spotlight, as the address bar does."
++          trigger: "Typing in the spotlight."
++          data: "The text typed in the spotlight."
++          destination: OTHER
++        }
++        policy {
++          cookies_allowed: NO
++          setting:
++            "Ranga settings, Busca e início, Sugestões de pesquisa."
++          policy_exception_justification: "Not implemented."
++        })");
++  loader_ = network::SimpleURLLoader::Create(std::move(request),
++                                             kTrafficAnnotation);
++  loader_->DownloadToString(
++      profile->GetDefaultStoragePartition()
++          ->GetURLLoaderFactoryForBrowserProcess()
++          .get(),
++      base::BindOnce(&RangaPrivateGetSearchSuggestionsFunction::OnLoaded,
++                     this),
++      64 * 1024);
++  return RespondLater();
++}
++
++void RangaPrivateGetSearchSuggestionsFunction::OnLoaded(
++    std::optional<std::string> body) {
++  std::vector<std::string> suggestions;
++  std::optional<base::Value> json =
++      body ? base::JSONReader::Read(*body, base::JSON_PARSE_RFC)
++           : std::nullopt;
++  const base::ListValue* list = json ? json->GetIfList() : nullptr;
++  const base::ListValue* found =
++      list && list->size() > 1 ? (*list)[1].GetIfList() : nullptr;
++  if (found) {
++    for (const base::Value& entry : *found) {
++      if (entry.is_string() && suggestions.size() < 8) {
++        suggestions.push_back(entry.GetString());
++      }
++    }
++  }
++  Respond(ArgumentList(
++      ranga_private::GetSearchSuggestions::Results::Create(suggestions)));
++}
++
+ ExtensionFunction::ResponseAction RangaPrivateFindFunction::Run() {
+   auto params = ranga_private::Find::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
