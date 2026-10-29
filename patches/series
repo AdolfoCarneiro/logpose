@@ -59,3 +59,5 @@ logpose/ui/container-session-cookies.patch
 logpose/ui/spotlight-suggestions.patch
 logpose/ui/split-view.patch
 logpose/ui/escape-exits-fullscreen.patch
+logpose/ui/google-default.patch
+logpose/ui/kde-blur.patch

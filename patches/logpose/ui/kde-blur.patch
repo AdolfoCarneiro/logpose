@@ -1,0 +1,328 @@
+Blur atrás da janela translúcida no KDE (org_kde_kwin_blur, o mesmo que o Konsole pede), só na área da janela, sem a sombra. Fora do KWin o protocolo não existe e nada muda.
+
+--- a/third_party/wayland-protocols/BUILD.gn
++++ b/third_party/wayland-protocols/BUILD.gn
+@@ -103,6 +103,10 @@
+   sources = [ "kde/src/protocols/appmenu.xml" ]
+ }
+ 
++wayland_protocol("org_kde_kwin_blur") {
++  sources = [ "kde/src/protocols/blur.xml" ]
++}
++
+ wayland_protocol("org_kde_kwin_idle") {
+   sources = [ "kde/src/protocols/idle.xml" ]
+ }
+--- a/ui/ozone/platform/wayland/BUILD.gn
++++ b/ui/ozone/platform/wayland/BUILD.gn
+@@ -64,6 +64,8 @@
+     "host/linux_ui_delegate_wayland.h",
+     "host/org_kde_kwin_appmenu.cc",
+     "host/org_kde_kwin_appmenu.h",
++    "host/org_kde_kwin_blur.cc",
++    "host/org_kde_kwin_blur.h",
+     "host/org_kde_kwin_idle.cc",
+     "host/org_kde_kwin_idle.h",
+     "host/overlay_prioritizer.cc",
+@@ -269,6 +271,7 @@
+     "//third_party/wayland-protocols:linux_dmabuf_protocol",
+     "//third_party/wayland-protocols:linux_drm_syncobj_protocol",
+     "//third_party/wayland-protocols:org_kde_kwin_appmenu",
++    "//third_party/wayland-protocols:org_kde_kwin_blur",
+     "//third_party/wayland-protocols:org_kde_kwin_idle",
+     "//third_party/wayland-protocols:pointer_constraints_protocol",
+     "//third_party/wayland-protocols:pointer_gestures_protocol",
+--- a/ui/ozone/platform/wayland/common/wayland_object.cc
++++ b/ui/ozone/platform/wayland/common/wayland_object.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <alpha-compositing-unstable-v1-client-protocol.h>
+ #include <appmenu-client-protocol.h>
++#include <blur-client-protocol.h>
+ #include <color-management-v1-client-protocol.h>
+ #include <content-type-v1-client-protocol.h>
+ #include <cursor-shape-v1-client-protocol.h>
+@@ -103,6 +104,10 @@
+   org_kde_kwin_appmenu_release(appmenu);
+ }
+ 
++void delete_blur(org_kde_kwin_blur* blur) {
++  org_kde_kwin_blur_release(blur);
++}
++
+ }  // namespace
+ 
+ bool CanBind(const std::string& interface,
+@@ -159,6 +164,8 @@
+ IMPLEMENT_WAYLAND_OBJECT_TRAITS_WITH_DELETER(org_kde_kwin_appmenu,
+                                              delete_appmenu)
+ IMPLEMENT_WAYLAND_OBJECT_TRAITS(org_kde_kwin_appmenu_manager)
++IMPLEMENT_WAYLAND_OBJECT_TRAITS_WITH_DELETER(org_kde_kwin_blur, delete_blur)
++IMPLEMENT_WAYLAND_OBJECT_TRAITS(org_kde_kwin_blur_manager)
+ IMPLEMENT_WAYLAND_OBJECT_TRAITS(org_kde_kwin_idle)
+ IMPLEMENT_WAYLAND_OBJECT_TRAITS(org_kde_kwin_idle_timeout)
+ IMPLEMENT_WAYLAND_OBJECT_TRAITS(overlay_prioritized_surface)
+--- a/ui/ozone/platform/wayland/common/wayland_object.h
++++ b/ui/ozone/platform/wayland/common/wayland_object.h
+@@ -111,6 +111,8 @@
+ DECLARE_WAYLAND_OBJECT_TRAITS(gtk_primary_selection_source)
+ DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_appmenu)
+ DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_appmenu_manager)
++DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_blur)
++DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_blur_manager)
+ DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_idle)
+ DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_idle_timeout)
+ DECLARE_WAYLAND_OBJECT_TRAITS(overlay_prioritized_surface)
+--- /dev/null
++++ b/ui/ozone/platform/wayland/host/org_kde_kwin_blur.cc
+@@ -0,0 +1,73 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "ui/ozone/platform/wayland/host/org_kde_kwin_blur.h"
++
++#include <blur-client-protocol.h>
++
++#include "base/logging.h"
++#include "ui/ozone/platform/wayland/host/wayland_connection.h"
++
++namespace ui {
++
++namespace {
++constexpr uint32_t kVersion = 1;
++}  // namespace
++
++constexpr char OrgKdeKwinBlurManager::kInterfaceName[];
++
++void OrgKdeKwinBlurManager::Instantiate(WaylandConnection* connection,
++                                        wl_registry* registry,
++                                        uint32_t name,
++                                        const std::string& interface,
++                                        uint32_t version) {
++  CHECK_EQ(interface, kInterfaceName) << "Expected \"" << kInterfaceName
++                                      << "\" but got \"" << interface << "\"";
++
++  if (connection->org_kde_kwin_blur_manager_ ||
++      !wl::CanBind(interface, version, kVersion, kVersion)) {
++    return;
++  }
++
++  auto manager = wl::Bind<org_kde_kwin_blur_manager>(registry, name, kVersion);
++  if (!manager) {
++    LOG(ERROR) << "Failed to bind to org_kde_kwin_blur_manager global";
++    return;
++  }
++  connection->org_kde_kwin_blur_manager_ =
++      std::make_unique<OrgKdeKwinBlurManager>(manager.release(), connection);
++}
++
++OrgKdeKwinBlurManager::OrgKdeKwinBlurManager(
++    org_kde_kwin_blur_manager* manager,
++    WaylandConnection* connection)
++    : manager_(manager), connection_(connection) {}
++
++OrgKdeKwinBlurManager::~OrgKdeKwinBlurManager() = default;
++
++std::unique_ptr<OrgKdeKwinBlur> OrgKdeKwinBlurManager::Create(
++    wl_surface* surface) {
++  return std::make_unique<OrgKdeKwinBlur>(
++      org_kde_kwin_blur_manager_create(manager_.get(), surface), connection_);
++}
++
++OrgKdeKwinBlur::OrgKdeKwinBlur(org_kde_kwin_blur* blur,
++                               WaylandConnection* connection)
++    : blur_(blur), connection_(connection) {}
++
++OrgKdeKwinBlur::~OrgKdeKwinBlur() = default;
++
++void OrgKdeKwinBlur::SetRegion(const gfx::Rect& rect) {
++  if (rect == region_) {
++    return;
++  }
++  region_ = rect;
++  wl::Object<wl_region> region(
++      wl_compositor_create_region(connection_->compositor()));
++  wl_region_add(region.get(), rect.x(), rect.y(), rect.width(), rect.height());
++  org_kde_kwin_blur_set_region(blur_.get(), region.get());
++  org_kde_kwin_blur_commit(blur_.get());
++}
++
++}  // namespace ui
+--- /dev/null
++++ b/ui/ozone/platform/wayland/host/org_kde_kwin_blur.h
+@@ -0,0 +1,62 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef UI_OZONE_PLATFORM_WAYLAND_HOST_ORG_KDE_KWIN_BLUR_H_
++#define UI_OZONE_PLATFORM_WAYLAND_HOST_ORG_KDE_KWIN_BLUR_H_
++
++#include "base/memory/raw_ptr.h"
++#include "ui/gfx/geometry/rect.h"
++#include "ui/ozone/platform/wayland/common/wayland_object.h"
++
++namespace ui {
++
++class WaylandConnection;
++
++// Blur behind a surface, applied by KWin on the surface's next commit.
++class OrgKdeKwinBlur {
++ public:
++  OrgKdeKwinBlur(org_kde_kwin_blur* blur, WaylandConnection* connection);
++  OrgKdeKwinBlur(const OrgKdeKwinBlur&) = delete;
++  OrgKdeKwinBlur& operator=(const OrgKdeKwinBlur&) = delete;
++  ~OrgKdeKwinBlur();
++
++  // Blurs what is behind |rect|, in surface coordinates.
++  void SetRegion(const gfx::Rect& rect);
++
++ private:
++  wl::Object<org_kde_kwin_blur> blur_;
++  const raw_ptr<WaylandConnection> connection_;
++  gfx::Rect region_;
++};
++
++// Wraps the KDE Wayland blur manager, which is provided via
++// org_kde_kwin_blur_manager interface.
++class OrgKdeKwinBlurManager
++    : public wl::GlobalObjectRegistrar<OrgKdeKwinBlurManager> {
++ public:
++  static constexpr const char kInterfaceName[] = "org_kde_kwin_blur_manager";
++
++  static void Instantiate(WaylandConnection* connection,
++                          wl_registry* registry,
++                          uint32_t name,
++                          const std::string& interface,
++                          uint32_t version);
++
++  OrgKdeKwinBlurManager(org_kde_kwin_blur_manager* manager,
++                        WaylandConnection* connection);
++  OrgKdeKwinBlurManager(const OrgKdeKwinBlurManager&) = delete;
++  OrgKdeKwinBlurManager& operator=(const OrgKdeKwinBlurManager&) = delete;
++  ~OrgKdeKwinBlurManager();
++
++  std::unique_ptr<OrgKdeKwinBlur> Create(wl_surface* surface);
++
++ private:
++  wl::Object<org_kde_kwin_blur_manager> manager_;
++
++  const raw_ptr<WaylandConnection> connection_;
++};
++
++}  // namespace ui
++
++#endif  // UI_OZONE_PLATFORM_WAYLAND_HOST_ORG_KDE_KWIN_BLUR_H_
+--- a/ui/ozone/platform/wayland/host/wayland_connection.cc
++++ b/ui/ozone/platform/wayland/host/wayland_connection.cc
+@@ -34,6 +34,7 @@
+ #include "ui/ozone/platform/wayland/host/fractional_scale_manager.h"
+ #include "ui/ozone/platform/wayland/host/gtk_primary_selection_device_manager.h"
+ #include "ui/ozone/platform/wayland/host/org_kde_kwin_appmenu.h"
++#include "ui/ozone/platform/wayland/host/org_kde_kwin_blur.h"
+ #include "ui/ozone/platform/wayland/host/org_kde_kwin_idle.h"
+ #include "ui/ozone/platform/wayland/host/overlay_prioritizer.h"
+ #include "ui/ozone/platform/wayland/host/proxy/wayland_proxy_impl.h"
+@@ -160,6 +161,8 @@
+                               &GtkPrimarySelectionDeviceManager::Instantiate);
+   RegisterGlobalObjectFactory(OrgKdeKwinAppmenuManager::kInterfaceName,
+                               &OrgKdeKwinAppmenuManager::Instantiate);
++  RegisterGlobalObjectFactory(OrgKdeKwinBlurManager::kInterfaceName,
++                              &OrgKdeKwinBlurManager::Instantiate);
+   RegisterGlobalObjectFactory(OrgKdeKwinIdle::kInterfaceName,
+                               &OrgKdeKwinIdle::Instantiate);
+   RegisterGlobalObjectFactory(OverlayPrioritizer::kInterfaceName,
+--- a/ui/ozone/platform/wayland/host/wayland_connection.h
++++ b/ui/ozone/platform/wayland/host/wayland_connection.h
+@@ -43,6 +43,7 @@
+ class ExtIdleNotifier;
+ class GtkPrimarySelectionDeviceManager;
+ class OrgKdeKwinAppmenuManager;
++class OrgKdeKwinBlurManager;
+ class OrgKdeKwinIdle;
+ class OverlayPrioritizer;
+ class SinglePixelBuffer;
+@@ -200,6 +201,10 @@
+     return org_kde_kwin_appmenu_manager_.get();
+   }
+ 
++  OrgKdeKwinBlurManager* org_kde_kwin_blur_manager() const {
++    return org_kde_kwin_blur_manager_.get();
++  }
++
+   OrgKdeKwinIdle* org_kde_kwin_idle() { return org_kde_kwin_idle_.get(); }
+ 
+   ZwpPrimarySelectionDeviceManager* zwp_primary_selection_device_manager()
+@@ -320,6 +325,7 @@
+   friend class FractionalScaleManager;
+   friend class GtkPrimarySelectionDeviceManager;
+   friend class OrgKdeKwinAppmenuManager;
++  friend class OrgKdeKwinBlurManager;
+   friend class OrgKdeKwinIdle;
+   friend class OverlayPrioritizer;
+   friend class SinglePixelBuffer;
+@@ -478,6 +484,7 @@
+ 
+   // Objects specific to KDE Plasma desktop environment.
+   std::unique_ptr<OrgKdeKwinAppmenuManager> org_kde_kwin_appmenu_manager_;
++  std::unique_ptr<OrgKdeKwinBlurManager> org_kde_kwin_blur_manager_;
+   std::unique_ptr<OrgKdeKwinIdle> org_kde_kwin_idle_;
+ 
+   std::unique_ptr<WaylandDataDragController> data_drag_controller_;
+--- a/ui/ozone/platform/wayland/host/wayland_toplevel_window.cc
++++ b/ui/ozone/platform/wayland/host/wayland_toplevel_window.cc
+@@ -22,6 +22,7 @@
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/ozone/platform/wayland/host/dump_util.h"
+ #include "ui/ozone/platform/wayland/host/org_kde_kwin_appmenu.h"
++#include "ui/ozone/platform/wayland/host/org_kde_kwin_blur.h"
+ #include "ui/ozone/platform/wayland/host/wayland_bubble.h"
+ #include "ui/ozone/platform/wayland/host/wayland_buffer_manager_host.h"
+ #include "ui/ozone/platform/wayland/host/wayland_connection.h"
+@@ -189,6 +190,7 @@
+   xdg_toplevel_.reset();
+   toplevel_session_.reset();
+   appmenu_.reset();
++  blur_.reset();
+ 
+   WaylandWindow::Hide();
+   ClearInFlightRequestsSerial();
+@@ -757,6 +759,17 @@
+     }
+   }
+   xdg_toplevel_->SetWindowGeometry(geometry_dip);
++
++  // Log Pose: a janela translúcida pede ao KWin o blur do que está atrás
++  // dela, como o Konsole; só na área da janela, sem a sombra em volta.
++  if (!IsOpaqueWindow()) {
++    if (auto* blur_manager = connection()->org_kde_kwin_blur_manager()) {
++      if (!blur_) {
++        blur_ = blur_manager->Create(root_surface()->surface());
++      }
++      blur_->SetRegion(geometry_dip);
++    }
++  }
+ }
+ 
+ void WaylandToplevelWindow::AckConfigure(uint32_t serial) {
+--- a/ui/ozone/platform/wayland/host/wayland_toplevel_window.h
++++ b/ui/ozone/platform/wayland/host/wayland_toplevel_window.h
+@@ -32,6 +32,7 @@
+ namespace ui {
+ 
+ class OrgKdeKwinAppmenu;
++class OrgKdeKwinBlur;
+ class XdgToplevel;
+ 
+ class WaylandToplevelWindow : public WaylandWindow,
+@@ -281,6 +282,9 @@
+   std::string appmenu_service_name_;
+   std::string appmenu_object_path_;
+ 
++  // Blur behind the window when it is translucent (KDE).
++  std::unique_ptr<OrgKdeKwinBlur> blur_;
++
+   base::WeakPtrFactory<WaylandToplevelWindow> weak_ptr_factory_{this};
+ };
+ 

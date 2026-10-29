@@ -1,0 +1,27 @@
+Google como mecanismo de busca padrão (o Helium deixa o DuckDuckGo primeiro).
+
+--- a/components/search_engines/template_url_prepopulate_data.cc
++++ b/components/search_engines/template_url_prepopulate_data.cc
+@@ -318,7 +318,7 @@
+     const std::vector<raw_ptr<const PrepopulatedEngine>>&
+         regional_prepopulated_engines) {
+   return FindPrepopulatedEngineInternal(prefs, regional_prepopulated_engines,
+-                                        duckduckgo.id,
++                                        break_stuff_google.id,
+                                         /*use_first_as_fallback=*/true);
+ }
+ 
+--- a/third_party/search_engines_data/resources/definitions/regional_settings.json
++++ b/third_party/search_engines_data/resources/definitions/regional_settings.json
+@@ -134,10 +134,10 @@
+     "ZZ": {
+       // Default
+       "search_engines": [
++          "&break_stuff_google",
+           "&duckduckgo",
+           "&ecosia",
+           "&bing",
+-          "&break_stuff_google",
+           "&qwant",
+           "&kagi",
+           "&startpage",

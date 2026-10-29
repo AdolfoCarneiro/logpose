@@ -92,9 +92,23 @@ async function acceptServicesSchema() {
   if (consent?.value && schema && schema.value < 1) await chrome.settingsPrivate.setPref("helium.services.schema_version", 1).catch(() => {});
 }
 
+// a aba que abre com o navegador nasce antes da extensão e fica com a nova aba do Chromium;
+// leva ela pra nova aba do Log Pose, uma vez por sessão (o storage.session zera ao fechar o navegador)
+async function fixEarlyNewTabs() {
+  if ((await chrome.storage.session.get("earlyNewTabs")).earlyNewTabs) return;
+  await chrome.storage.session.set({ earlyNewTabs: true });
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (/^chrome:\/\/newtab\/?$/.test(tab.url || tab.pendingUrl || "")) {
+      chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("newtab.html") }).catch(() => {});
+    }
+  }
+}
+
 applyShortcuts();
 applyLinks();
 acceptServicesSchema();
+fixEarlyNewTabs();
 chrome.runtime.onStartup.addListener(() => {
   applyShortcuts();
   applyLinks();

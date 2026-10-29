@@ -104,14 +104,27 @@ def palette(colors):
     return f"scheme {scheme}\n" + "".join(f"{k} {v}\n" for k, v in values.items())
 
 
-def to_css(colors, opacity=None):
+# fonte do shell do denden ([font] do shell.toml ao lado do colors.toml), com os padrões dele;
+# sem shell.toml (Ciel) fica a fonte do Kurobe
+def read_font(colors_src):
+    path = os.path.join(os.path.dirname(colors_src), "shell.toml")
+    try:
+        with open(path, "rb") as f:
+            font = tomllib.load(f).get("font", {})
+    except (OSError, ValueError):
+        return None
+    return font.get("family") or "Adwaita Sans"
+
+
+def to_css(colors, opacity=None, font=None):
     values = base(colors)
     dark = colors.get("mode", "dark") != "light"
     lines = "".join(f"  --k-color-{k}: {v};\n" for k, v in values.items())
     frame_value = frame_color(colors) if opacity is None else with_alpha(frame_color(colors), opacity)
     frame = f"  --logpose-frame: {frame_value};\n"
     scheme = f"  color-scheme: {'dark' if dark else 'light'};\n"
-    return ":root {\n" + lines + frame + scheme + "}\n"
+    fonts = f"  --k-type-family: \"{font}\", sans-serif;\n" if font else ""
+    return ":root {\n" + lines + frame + scheme + fonts + "}\n"
 
 
 def write_atomic(path, text):
@@ -127,7 +140,7 @@ def main(src, dest):
     out = os.path.dirname(dest)
     os.makedirs(out, exist_ok=True)
     opacity = read_opacity(os.path.join(out, "material-opacity"))
-    write_atomic(dest, to_css(colors, opacity))
+    write_atomic(dest, to_css(colors, opacity, read_font(src)))
     write_atomic(os.path.join(out, "frame-color"), with_alpha(frame_color(colors), opacity) + "\n")
     write_atomic(os.path.join(out, "palette"), palette(colors))
 

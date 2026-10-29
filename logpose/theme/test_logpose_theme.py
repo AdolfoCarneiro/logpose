@@ -172,6 +172,24 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class Font(unittest.TestCase):
+    def test_reads_denden_font_with_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            colors = os.path.join(d, "colors.toml")
+            self.assertIsNone(logpose_theme.read_font(colors))
+            with open(os.path.join(d, "shell.toml"), "w") as f:
+                f.write('[font]\nbase-size = 12\n')
+            self.assertEqual(logpose_theme.read_font(colors), "Adwaita Sans")
+            with open(os.path.join(d, "shell.toml"), "w") as f:
+                f.write('[font]\nfamily = "Inter"\n')
+            self.assertEqual(logpose_theme.read_font(colors), "Inter")
+
+    def test_css_carries_font_only_when_given(self):
+        self.assertNotIn("--k-type-family", logpose_theme.to_css(ToCss.BASE))
+        css = logpose_theme.to_css(ToCss.BASE, font="Adwaita Sans")
+        self.assertIn('--k-type-family: "Adwaita Sans", sans-serif;', css)
+
+
 class ShellState(unittest.TestCase):
     def test_prefers_denden_then_ciel(self):
         with tempfile.TemporaryDirectory() as d:
