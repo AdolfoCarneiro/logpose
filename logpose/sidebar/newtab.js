@@ -47,12 +47,21 @@ function paintClock() {
 paintClock();
 setInterval(paintClock, 30 * 1000);
 
-async function search() {
-  if (logposePrivate && tab) await call("executeCommand", tab.windowId, "openLocation").catch(() => {});
+// o spotlight abre com o que já foi digitado na página (spotlightSeed)
+async function search(seed = "") {
+  if (!logposePrivate || !tab) return;
+  if (seed) await chrome.storage.session.set({ spotlightSeed: seed });
+  await call("executeCommand", tab.windowId, "openLocation").catch(() => {});
 }
 const keys = current(stored.shortcuts).find((s) => s.command === "openLocation")?.keys;
 $("keys").replaceChildren(...label(keys).map((k) => el("kbd", "", k)));
-$("search").onclick = search;
+$("search").onclick = () => search();
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.key.length !== 1 || e.key === " ") return;
+  if (e.target.closest?.("input, textarea, [contenteditable]")) return;
+  e.preventDefault();
+  search(e.key);
+});
 
 async function paintShortcuts() {
   const space = tab ? stored.spaces?.active?.[tab.windowId] : null;

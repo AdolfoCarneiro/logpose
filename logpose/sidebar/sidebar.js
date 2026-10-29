@@ -632,10 +632,9 @@ const iconOf = (id) => document.querySelector(`#${id} .k-icon`);
 document.getElementById("back").onclick = async () => { kick(iconOf("back"), "translateX(-7px)"); chrome.tabs.goBack((await activeTab()).id); };
 document.getElementById("forward").onclick = async () => { kick(iconOf("forward"), "translateX(7px)"); chrome.tabs.goForward((await activeTab()).id); };
 document.getElementById("reload").onclick = async () => { spin(iconOf("reload")); chrome.tabs.reload((await activeTab()).id); };
-// nova aba como no Chrome: nasce com a página inicial e a busca por cima; Esc fica na página
+// nova aba com a página inicial; a busca dela (ou começar a digitar) abre o spotlight
 async function newTabPage() {
   await blankTab(activeSpace(spaces, windowId).id, true);
-  if (logposePrivate) call("executeCommand", windowId, "openLocation").catch(() => {});
 }
 document.getElementById("new-tab").onclick = newTabPage;
 

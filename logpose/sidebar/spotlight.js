@@ -247,8 +247,12 @@ async function open() {
   if (/^https?:/.test(target?.url ?? "")) commands = [...commands, ...LOCAL_COMMANDS];
   showAlias();
   query.value = mode === "current" && !empty ? displayUrl(target?.url ?? "", true) : "";
+  // o que já foi digitado na página inicial antes de a busca abrir
+  const { spotlightSeed } = await chrome.storage.session.get("spotlightSeed");
+  if (spotlightSeed) chrome.storage.session.remove("spotlightSeed");
   query.focus();
-  query.select();
+  if (spotlightSeed && empty) query.value = spotlightSeed;
+  else query.select();
   for (const el of [document.getElementById("card"), document.getElementById("scrim")]) {
     el.style.animation = "none";
     void el.offsetWidth;

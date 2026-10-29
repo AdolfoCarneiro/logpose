@@ -41,7 +41,7 @@ O Chromium guarda abas numa faixa no topo, configurações em dois lugares e tra
 
 **Spotlight**
 
-Ctrl+T e Ctrl+L abrem uma busca única: no topo a busca, o site que você já visita completado e as sugestões do buscador; embaixo, Abas, Favoritos e Histórico em seções. Aliases como `a`, `f`, `h` e `yt` restringem a busca. A aba nova já abre com a página inicial (saudação, tempo, tarefas, mercado e notícias) e a busca por cima; Esc fica na página.
+Ctrl+T e Ctrl+L abrem uma busca única: no topo a busca, o site que você já visita completado e as sugestões do buscador; embaixo, Abas, Favoritos e Histórico em seções. Aliases como `a`, `f`, `h` e `yt` restringem a busca. A aba nova abre com a página inicial (saudação, tempo, tarefas, mercado e notícias); é só começar a digitar pra buscar.
 
 
 </td>
