@@ -4,6 +4,20 @@ import tomllib
 
 DEFAULT_OPACITY = 85
 
+STATE = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+THEME = os.path.join(STATE, "logpose", "theme.css")
+
+
+# estado do shell do sistema: o do denden, senão o do Ciel, que guardam as coisas no mesmo formato
+def shell_state(*path):
+    candidates = [os.path.join(STATE, shell, *path) for shell in ("denden", "ciel")]
+    return next((c for c in candidates if os.path.exists(c)), candidates[0])
+
+
+# LOGPOSE_COLORS aponta pra outro arquivo de cores
+def colors_path():
+    return os.environ.get("LOGPOSE_COLORS") or shell_state("theme", "colors.toml")
+
 
 def _rgb(hex_color):
     return [int(hex_color[i:i + 2], 16) for i in (1, 3, 5)]
@@ -119,4 +133,4 @@ def main(src, dest):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(*(sys.argv[1:3] if len(sys.argv) > 2 else (colors_path(), THEME)))

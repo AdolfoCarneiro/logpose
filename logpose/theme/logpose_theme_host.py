@@ -11,10 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logpose_theme
 
-STATE = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "logpose")
-THEME = os.path.join(STATE, "theme.css")
-COLORS = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "ciel", "theme", "colors.toml")
-WEATHER = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "ciel", "settings", "weather.json")
+THEME = logpose_theme.THEME
+COLORS = logpose_theme.colors_path()
+WEATHER = logpose_theme.shell_state("settings", "weather.json")
 
 
 def encode(obj):
@@ -130,8 +129,18 @@ def listen():
     os._exit(0)
 
 
+# o denden não tem gancho de troca de tema: refaz o tema quando as cores mudam
+def follow_colors(colors, theme):
+    for _ in changes(colors, 1):
+        try:
+            logpose_theme.main(colors, theme)
+        except (OSError, ValueError, KeyError):
+            pass
+
+
 def main():
     threading.Thread(target=listen, daemon=True).start()
+    threading.Thread(target=follow_colors, args=(COLORS, THEME), daemon=True).start()
     for css in changes(THEME, 0.2):
         send({"type": "theme", "css": css})
 

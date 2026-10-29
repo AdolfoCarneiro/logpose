@@ -76,7 +76,7 @@ mkdir -p "$profile/NativeMessagingHosts"
 cat > "$profile/NativeMessagingHosts/logpose.theme.json" <<JSON
 {
   "name": "logpose.theme",
-  "description": "Log Pose: tema do Ciel",
+  "description": "Log Pose: tema do sistema",
   "path": "$prefix/current/theme/logpose_theme_host.py",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://hncljkmljckjojdjincglklbdihcaeko/"]
@@ -89,8 +89,8 @@ hooks="$config/ciel/hooks/theme-set.d"
 if [ -d "$config/ciel" ]; then
   mkdir -p "$hooks"
   ln -sfn "$prefix/current/theme/hook-theme-set" "$hooks/logpose"
-  "$prefix/current/theme/hook-theme-set" || true
 fi
+"$prefix/current/theme/hook-theme-set" || true
 
 echo "Log Pose $version${build:+ ($build)} instalado em $dest"
 echo "abrir: logpose   (menu de apps: Log Pose)"

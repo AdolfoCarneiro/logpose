@@ -84,7 +84,7 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 - **Grupos**: abas salvas num grupo recolhível na barra, com nome e ícone, que voltam ao reabrir.
 - **Mini player**: o que toca em outra aba aparece no pé da barra, com tocar/pausar, próxima e picture-in-picture.
 - **Nova aba** com saudação, tempo, atalhos, tarefas e notícias.
-- **Tema do sistema**: segue as cores do Ciel (quando instalado) e a transparência do material, no claro e no escuro.
+- **Tema do sistema**: segue as cores do denden ou do Ciel e a transparência do material, no claro e no escuro.
 - **Janela pequena**: links vindos de outros apps abrem numa janela compacta; "Abrir no Log Pose" leva pra janela principal.
 - **Volta de onde parou**: abas, espaços e nomes de aba voltam ao reabrir, até depois de uma falha.
 - **Atalhos configuráveis**, procurar na página num cartão, zoom em chip no endereço, informações do site pelo cadeado, captura de tela, QR code.

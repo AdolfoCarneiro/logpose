@@ -172,6 +172,25 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class ShellState(unittest.TestCase):
+    def test_prefers_denden_then_ciel(self):
+        with tempfile.TemporaryDirectory() as d:
+            old = logpose_theme.STATE
+            logpose_theme.STATE = d
+            try:
+                ciel = os.path.join(d, "ciel", "theme", "colors.toml")
+                denden = os.path.join(d, "denden", "theme", "colors.toml")
+                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), denden)
+                os.makedirs(os.path.dirname(ciel))
+                open(ciel, "w").close()
+                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), ciel)
+                os.makedirs(os.path.dirname(denden))
+                open(denden, "w").close()
+                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), denden)
+            finally:
+                logpose_theme.STATE = old
+
+
 class HostMessages(unittest.TestCase):
     def test_decode_reads_one_message(self):
         import io
