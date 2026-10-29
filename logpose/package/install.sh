@@ -85,12 +85,7 @@ JSON
 onepassword="$config/chromium/NativeMessagingHosts/com.1password.1password.json"
 [ -f "$onepassword" ] && cp "$onepassword" "$profile/NativeMessagingHosts/"
 
-hooks="$config/ciel/hooks/theme-set.d"
-if [ -d "$config/ciel" ]; then
-  mkdir -p "$hooks"
-  ln -sfn "$prefix/current/theme/hook-theme-set" "$hooks/logpose"
-fi
-"$prefix/current/theme/hook-theme-set" || true
+"$prefix/current/theme/update-theme" || true
 
 echo "Log Pose $version${build:+ ($build)} instalado em $dest"
 echo "abrir: logpose   (menu de apps: Log Pose)"

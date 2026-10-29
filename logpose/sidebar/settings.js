@@ -26,7 +26,7 @@ function paint() {
       option.setAttribute("aria-pressed", String(option.dataset.value === String(settings[group.dataset.key])));
     }
   }
-  themeStyle.textContent = settings.followCielTheme ? themeCss : "";
+  themeStyle.textContent = settings.followSystemTheme ? themeCss : "";
 }
 
 async function save(key, value) {

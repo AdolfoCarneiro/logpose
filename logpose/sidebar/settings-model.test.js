@@ -7,14 +7,20 @@ test("sem nada salvo, valem os padrões", () => {
 });
 
 test("valores salvos válidos sobrescrevem os padrões", () => {
-  const s = loadSettings({ followCielTheme: false, density: "compact" });
-  assert.equal(s.followCielTheme, false);
+  const s = loadSettings({ followSystemTheme: false, density: "compact" });
+  assert.equal(s.followSystemTheme, false);
   assert.equal(s.density, "compact");
   assert.equal(s.showFullUrl, DEFAULTS.showFullUrl);
 });
 
+test("quem desligou o tema do Ciel continua com o do sistema desligado", () => {
+  assert.equal(loadSettings({ followCielTheme: false }).followSystemTheme, false);
+  assert.equal(loadSettings({ followCielTheme: false, followSystemTheme: true }).followSystemTheme, true);
+  assert.equal("followCielTheme" in loadSettings({ followCielTheme: false }), false);
+});
+
 test("tipos errados e chaves desconhecidas são ignorados", () => {
-  const s = loadSettings({ followCielTheme: "sim", density: "gigante", lixo: 1 });
+  const s = loadSettings({ followSystemTheme: "sim", density: "gigante", lixo: 1 });
   assert.deepEqual(s, DEFAULTS);
 });
 

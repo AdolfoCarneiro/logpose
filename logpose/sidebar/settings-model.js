@@ -1,5 +1,5 @@
 export const DEFAULTS = Object.freeze({
-  followCielTheme: true,
+  followSystemTheme: true,
   density: "comfortable",
   showFullUrl: false,
   materialOpacity: 82,
@@ -24,7 +24,9 @@ const RANGES = { materialOpacity: [0, 100] };
 
 export function loadSettings(stored) {
   const settings = { ...DEFAULTS };
-  for (const [key, value] of Object.entries(stored ?? {})) {
+  const { followCielTheme, ...rest } = stored ?? {};
+  const renamed = typeof followCielTheme === "boolean" ? { followSystemTheme: followCielTheme, ...rest } : rest;
+  for (const [key, value] of Object.entries(renamed)) {
     if (!(key in DEFAULTS) || typeof value !== typeof DEFAULTS[key]) continue;
     if (CHOICES[key] && !CHOICES[key].includes(value)) continue;
     if (RANGES[key] && (!Number.isInteger(value) || value < RANGES[key][0] || value > RANGES[key][1])) continue;

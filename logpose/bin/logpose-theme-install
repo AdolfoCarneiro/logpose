@@ -5,12 +5,6 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 id="${1:-hncljkmljckjojdjincglklbdihcaeko}"
 profile="${LOGPOSE_PROFILE:-$HOME/.local/share/logpose/profile}"
 
-# o Ciel avisa a troca de tema por gancho; com o denden o host segue o colors.toml sozinho
-if [ -d "$HOME/.config/ciel" ]; then
-  mkdir -p "$HOME/.config/ciel/hooks/theme-set.d"
-  ln -sfn "$root/logpose/theme/hook-theme-set" "$HOME/.config/ciel/hooks/theme-set.d/logpose"
-fi
-
 for dir in "$profile" "$HOME/.local/share/logpose/dev-profile"; do
   mkdir -p "$dir/NativeMessagingHosts"
   cat > "$dir/NativeMessagingHosts/logpose.theme.json" <<JSON
@@ -24,5 +18,5 @@ for dir in "$profile" "$HOME/.local/share/logpose/dev-profile"; do
 JSON
 done
 
-"$root/logpose/theme/hook-theme-set"
+"$root/logpose/theme/update-theme"
 echo "ok"

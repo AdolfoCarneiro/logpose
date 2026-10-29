@@ -10,10 +10,9 @@ KWINRC = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~
 THEME = os.path.join(STATE, "logpose", "theme.css")
 
 
-# estado do shell do sistema: o do denden, senão o do Ciel, que guardam as coisas no mesmo formato
+# estado do shell do sistema (denden)
 def shell_state(*path):
-    candidates = [os.path.join(STATE, shell, *path) for shell in ("denden", "ciel")]
-    return next((c for c in candidates if os.path.exists(c)), candidates[0])
+    return os.path.join(STATE, "denden", *path)
 
 
 # LOGPOSE_COLORS aponta pra outro arquivo de cores
@@ -106,7 +105,7 @@ def palette(colors):
 
 
 # fonte do shell do denden ([font] do shell.toml ao lado do colors.toml), com os padrões dele;
-# sem shell.toml (Ciel) fica a fonte do Kurobe
+# sem shell.toml fica a fonte do Kurobe
 def read_font(colors_src):
     path = os.path.join(os.path.dirname(colors_src), "shell.toml")
     try:

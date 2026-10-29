@@ -636,7 +636,7 @@ function openSpaceForm(space = null) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "swatch k-state" + (color ? "" : " swatch--theme");
-    b.title = color ? color : "Cor do tema do Ciel";
+    b.title = color ? color : "Cor do tema do sistema";
     if (color) b.style.background = color;
     b.dataset.value = color ?? "";
     b.setAttribute("aria-pressed", String(color === (space?.color ?? null)));
@@ -1031,7 +1031,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 function applySettings() {
   document.body.classList.toggle("compact", settings.density === "compact");
-  themeStyle.textContent = settings.followCielTheme ? themeCss : "";
+  themeStyle.textContent = settings.followSystemTheme ? themeCss : "";
   render();
 }
 
@@ -1047,7 +1047,7 @@ themePort.onMessage.addListener((msg) => {
   }
   if (msg.type !== "theme") return;
   themeCss = msg.css;
-  if (settings.followCielTheme) themeStyle.textContent = themeCss;
+  if (settings.followSystemTheme) themeStyle.textContent = themeCss;
 });
 const askBuild = () => themePort.postMessage({ type: "build" });
 askBuild();

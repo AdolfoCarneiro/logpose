@@ -34,7 +34,7 @@ manifest["version"] = f'{manifest["version"]}.{stamp}'
 json.dump(manifest, open(path, "w"), ensure_ascii=False, indent=2)
 PY
 mkdir -p "$dir/app/theme"
-cp "$root/logpose/theme/logpose_theme.py" "$root/logpose/theme/logpose_theme_host.py" "$root/logpose/theme/hook-theme-set" "$dir/app/theme/"
+cp "$root/logpose/theme/logpose_theme.py" "$root/logpose/theme/logpose_theme_host.py" "$root/logpose/theme/update-theme" "$dir/app/theme/"
 
 cp "$root/logpose/branding/"icon-*.png "$root/logpose/branding/icon.svg" "$dir/icons/"
 cp "$root/logpose/package/logpose.desktop" "$root/logpose/package/install.sh" "$root/logpose/package/logpose-update" "$dir/"

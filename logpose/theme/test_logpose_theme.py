@@ -23,7 +23,7 @@ class ToCss(unittest.TestCase):
         "red": "#d8737a",
     }
 
-    def test_maps_ciel_keys_to_kurobe(self):
+    def test_maps_shell_keys_to_kurobe(self):
         css = logpose_theme.to_css(dict(self.BASE, secondary="#90add3", tertiary="#b59ad4"))
         self.assertTrue(css.startswith(":root {"))
         self.assertIn("--k-color-bg: #1b1f28;", css)
@@ -36,7 +36,7 @@ class ToCss(unittest.TestCase):
         self.assertIn("--k-color-on-error: #0f1117;", css)
         self.assertIn("color-scheme: dark;", css)
 
-    def test_derives_secondary_and_tertiary_like_ciel(self):
+    def test_derives_secondary_and_tertiary_like_the_shell(self):
         css = logpose_theme.to_css(self.BASE)
         self.assertIn(f"--k-color-secondary: {logpose_theme.mix('#71b1ec', '#c6ccdb', 0.45)};", css)
         self.assertIn(f"--k-color-tertiary: {logpose_theme.mix('#71b1ec', '#1b1f28', 0.25)};", css)
@@ -220,20 +220,12 @@ class Font(unittest.TestCase):
 
 
 class ShellState(unittest.TestCase):
-    def test_prefers_denden_then_ciel(self):
+    def test_reads_denden_state(self):
         with tempfile.TemporaryDirectory() as d:
             old = logpose_theme.STATE
             logpose_theme.STATE = d
             try:
-                ciel = os.path.join(d, "ciel", "theme", "colors.toml")
-                denden = os.path.join(d, "denden", "theme", "colors.toml")
-                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), denden)
-                os.makedirs(os.path.dirname(ciel))
-                open(ciel, "w").close()
-                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), ciel)
-                os.makedirs(os.path.dirname(denden))
-                open(denden, "w").close()
-                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), denden)
+                self.assertEqual(logpose_theme.shell_state("theme", "colors.toml"), os.path.join(d, "denden", "theme", "colors.toml"))
             finally:
                 logpose_theme.STATE = old
 
