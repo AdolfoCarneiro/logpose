@@ -10,6 +10,14 @@ if [ -f "$onepassword" ] && [ ! -f "$profile/NativeMessagingHosts/com.1password.
   cp "$onepassword" "$profile/NativeMessagingHosts/"
 fi
 
+# a versão da extensão não muda entre edições e o Chromium seguiria rodando o background.js
+# guardado no perfil; quando os arquivos da barra mudam, apaga o registro do service worker
+stamp="$(cd "$root/logpose/sidebar" && find . -type f ! -name '*.test.js' -print0 | sort -z | xargs -0 cat | cksum)"
+if [ "$(cat "$profile/.logpose-sidebar-stamp" 2>/dev/null)" != "$stamp" ]; then
+  rm -rf "$profile/Default/Service Worker"
+  mkdir -p "$profile" && echo "$stamp" > "$profile/.logpose-sidebar-stamp"
+fi
+
 export LANGUAGE="${LOGPOSE_LANGUAGE:-pt_BR}"
 exec "$root/build/src/out/Default/logpose" \
   --user-data-dir="$profile" \

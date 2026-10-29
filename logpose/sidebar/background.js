@@ -93,20 +93,31 @@ async function acceptServicesSchema() {
 }
 
 // as abas que abrem com o navegador nascem antes da extensão: a nova aba fica com a do Chromium e
-// as páginas do Log Pose (o onboarding) ficam bloqueadas. Uma vez por sessão (o storage.session zera
-// ao fechar o navegador), leva a nova aba pra do Log Pose e recarrega as páginas dele.
-async function fixEarlyTabs() {
-  if ((await chrome.storage.session.get("earlyTabs")).earlyTabs) return;
-  await chrome.storage.session.set({ earlyTabs: true });
-  const own = chrome.runtime.getURL("");
-  for (const tab of await chrome.tabs.query({})) {
-    const url = tab.url || tab.pendingUrl || "";
-    if (/^chrome:\/\/newtab\/?$/.test(url)) {
-      chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("newtab.html") }).catch(() => {});
-    } else if (url.startsWith(own)) {
-      chrome.tabs.reload(tab.id).catch(() => {});
-    }
+// as páginas do Log Pose (o onboarding, abas restauradas) ficam bloqueadas, com o endereço no título.
+// Nos primeiros segundos da sessão (o storage.session zera ao fechar o navegador) corrige as duas.
+const EARLY_MS = 15000;
+
+async function earlySession() {
+  let { earlyUntil } = await chrome.storage.session.get("earlyUntil");
+  if (!earlyUntil) {
+    earlyUntil = Date.now() + EARLY_MS;
+    await chrome.storage.session.set({ earlyUntil });
   }
+  return Date.now() < earlyUntil;
+}
+
+function fixEarlyTab(tab) {
+  const url = tab.url || tab.pendingUrl || "";
+  if (/^chrome:\/\/newtab\/?$/.test(url)) {
+    chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("newtab.html") }).catch(() => {});
+  } else if (url.startsWith(chrome.runtime.getURL("")) && tab.status === "complete" && tab.title === url) {
+    chrome.tabs.reload(tab.id).catch(() => {});
+  }
+}
+
+async function fixEarlyTabs() {
+  if (!(await earlySession())) return;
+  for (const tab of await chrome.tabs.query({})) fixEarlyTab(tab);
 }
 
 applyShortcuts();
@@ -129,6 +140,9 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 chrome.tabs.onActivated.addListener(autoPip);
+chrome.tabs.onUpdated.addListener(async (_id, change, tab) => {
+  if (change.status === "complete" && (await earlySession())) fixEarlyTab(tab);
+});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "logpose-lifecycle") runLifecycle();
