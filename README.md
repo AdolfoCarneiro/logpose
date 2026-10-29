@@ -15,6 +15,8 @@ Feito sobre o [Helium](https://github.com/imputnet/helium) (Chromium sem Google)
 
 </div>
 
+<img src="logpose/docs/img/hero.webp" alt="Log Pose com a barra lateral aberta: espaço Pessoal, favoritos e abas de hoje ao lado da página" width="100%">
+
 > [!NOTE]
 > O Log Pose ainda está em desenvolvimento (0.x). Feito e compilado no Fedora; em outro Linux deve funcionar, sem garantia.
 
@@ -87,6 +89,8 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 - **Volta de onde parou**: abas, espaços e nomes de aba voltam ao reabrir, até depois de uma falha.
 - **Atalhos configuráveis**, procurar na página num cartão, zoom em chip no endereço, informações do site pelo cadeado, captura de tela, QR code.
 - **Funciona com o 1Password**, Widevine (streaming) e PWAs.
+
+<img src="logpose/docs/img/newtab.webp" alt="Nova aba com saudação, busca, tempo e tarefas" width="100%">
 
 ## Atalhos
 
