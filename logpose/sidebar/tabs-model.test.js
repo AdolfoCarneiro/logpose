@@ -106,3 +106,9 @@ test("páginas internas usam o ícone do Log Pose", () => {
   assert.equal(faviconOf({ url: "logpose://settings" }), icon);
   assert.equal(faviconOf({ url: "about:blank", favIconUrl: "" }), "");
 });
+
+test("aba em ilha leva o groupId; sem ilha, null", () => {
+  const [a, b] = toItems([{ id: 1, index: 0, url: "https://a", groupId: 9 }, { id: 2, index: 1, url: "https://b", groupId: -1 }], 1);
+  assert.equal(a.group, 9);
+  assert.equal(b.group, null);
+});

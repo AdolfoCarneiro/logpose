@@ -24,6 +24,7 @@ export function toItems(tabs, activeTabId, nameOf = () => "") {
       asleep: Boolean(t.discarded),
       audio: t.mutedInfo?.muted ? "muted" : t.audible ? "playing" : "",
       split: t.splitViewId > 0 ? t.splitViewId : null,
+      group: t.groupId > 0 ? t.groupId : null,
     }));
 }
 

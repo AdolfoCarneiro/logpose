@@ -519,3 +519,20 @@ body.dragging-tab--over #pins-grid:empty::before { transform: rotate(-20deg) sca
 .group-page--closed .k-list-item__leading, .group-page--closed .k-list-item__label { opacity: 0.55; }
 .group-page--closed .k-list-item__leading img { filter: grayscale(0.5); }
 .group-page__back { flex: none; color: var(--k-color-primary); }
+
+.island-head { position: relative; display: flex; align-items: center; gap: var(--k-space-xs); min-height: 32px; margin-top: var(--k-space-xxs); padding: 0 var(--k-space-sm) 0 var(--k-space-xs); border-radius: var(--k-shape-large); cursor: pointer; user-select: none; list-style: none; }
+.island-head__chip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 24px; padding: 0 8px; border-radius: var(--k-shape-full); background: color-mix(in srgb, var(--island-color) 22%, transparent); color: color-mix(in srgb, var(--island-color) 70%, var(--k-color-on-surface)); font-weight: 600; transition: border-radius var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast); }
+.island-head__dot { flex: none; width: 10px; height: 10px; border-radius: var(--k-shape-full); background: var(--island-color); }
+.island-head__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.island-head__title[hidden] { display: none; }
+.island-head .tab__rename.k-text-field { height: 24px; min-width: 120px; }
+.island-head__count { flex: 1; color: var(--k-color-on-surface-variant); font-variant-numeric: tabular-nums; }
+.island-head__chevron { font-size: 16px; color: var(--k-color-on-surface-variant); transition: transform var(--k-motion-spring-spatial-fast-duration) var(--k-motion-spring-spatial-fast); }
+.island-head--collapsed .island-head__chip { border-radius: var(--k-shape-small); background: var(--island-color); color: var(--k-color-surface); }
+.island-head--collapsed .island-head__dot { background: var(--k-color-surface); }
+.island-head--collapsed .island-head__chevron { transform: rotate(-90deg); }
+.island-head--active { background: color-mix(in srgb, var(--island-color) 14%, transparent); }
+#tabs .tab[data-island] { margin-left: var(--k-space-sm); background-image: linear-gradient(var(--island-color), var(--island-color)); background-repeat: no-repeat; background-size: 3px 100%; background-position: 0 0; }
+#tabs .tab[data-island="first"] { background-size: 3px calc(100% - 6px); background-position: 0 100%; }
+#tabs .tab[data-island="last"] { background-size: 3px calc(100% - 6px); background-position: 0 0; margin-bottom: var(--k-space-xxs); }
+#tabs .tab[data-island="only"] { background-size: 3px calc(100% - 12px); background-position: 0 50%; margin-bottom: var(--k-space-xxs); }
