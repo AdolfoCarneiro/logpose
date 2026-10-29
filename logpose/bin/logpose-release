@@ -38,7 +38,8 @@ name="$(basename "$package" .tar.zst)"
 previous="$(gh release view -R "$repo" --json tagName -q .tagName 2>/dev/null || true)"
 range="$sha"
 [ -n "$previous" ] && git -C "$root" cat-file -e "${previous#build-}" 2>/dev/null && range="${previous#build-}..$sha"
-notes="$(git -C "$root" log --format='- %s' "$range" | head -50)"
+# -n em vez de | head: com pipefail, o head fechando o pipe derrubava o script na primeira release
+notes="$(git -C "$root" log --format='- %s' -n 50 "$range")"
 version="$(cat "$root/logpose/VERSION")"
 
 gh release create "$tag" "$package" "$package.sha256" -R "$repo" --target "$sha" \
