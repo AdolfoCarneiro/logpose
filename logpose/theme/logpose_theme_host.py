@@ -129,13 +129,26 @@ def listen():
     os._exit(0)
 
 
-# o denden não tem gancho de troca de tema: refaz o tema quando as cores mudam
-def follow_colors(colors, theme):
-    for _ in changes(colors, 1):
-        try:
-            logpose_theme.main(colors, theme)
-        except (OSError, ValueError, KeyError):
-            pass
+def mtime(path):
+    try:
+        return os.stat(path).st_mtime_ns
+    except FileNotFoundError:
+        return None
+
+
+# o denden não tem gancho de troca de tema: refaz o tema quando as cores ou a borda do KWin
+# (a cor do pet) mudam
+def follow_colors(colors, theme, interval=1):
+    last = None
+    while True:
+        stamp = (mtime(colors), mtime(logpose_theme.KWINRC))
+        if stamp != last and stamp[0] is not None:
+            last = stamp
+            try:
+                logpose_theme.main(colors, theme)
+            except (OSError, ValueError, KeyError):
+                pass
+        time.sleep(interval)
 
 
 def main():

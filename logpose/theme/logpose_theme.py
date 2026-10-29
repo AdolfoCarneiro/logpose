@@ -1,3 +1,4 @@
+import configparser
 import os
 import sys
 import tomllib
@@ -5,6 +6,7 @@ import tomllib
 DEFAULT_OPACITY = 82  # a do Konsole
 
 STATE = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+KWINRC = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "kwinrc")
 THEME = os.path.join(STATE, "logpose", "theme.css")
 
 
@@ -134,9 +136,24 @@ def write_atomic(path, text):
     os.replace(tmp, path)
 
 
-def main(src, dest):
+# cor da borda da janela ativa no KWin (o denden pinta com a cor do pet), que vira o destaque
+def border_accent(kwinrc):
+    config = configparser.ConfigParser(strict=False, interpolation=None)
+    try:
+        config.read(kwinrc)
+        rgb = [int(v) for v in config["Round-Corners"]["OutlineColor"].split(",")[:3]]
+    except (KeyError, ValueError, configparser.Error):
+        return None
+    if len(rgb) != 3 or config["Round-Corners"].get("OutlineIsGradient", "false") == "true":
+        return None
+    return "#" + "".join(f"{max(0, min(255, v)):02x}" for v in rgb)
+
+
+def main(src, dest, kwinrc=None):
     with open(src, "rb") as f:
         colors = tomllib.load(f)
+    if accent := border_accent(kwinrc or KWINRC):
+        colors["accent"] = accent
     out = os.path.dirname(dest)
     os.makedirs(out, exist_ok=True)
     opacity = read_opacity(os.path.join(out, "material-opacity"))

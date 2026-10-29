@@ -8,6 +8,9 @@ import unittest
 import logpose_theme
 import logpose_theme_host
 
+# os testes não leem a borda do KWin da máquina
+logpose_theme.KWINRC = os.path.join(tempfile.gettempdir(), "logpose-test-sem-kwinrc")
+
 
 class ToCss(unittest.TestCase):
     BASE = {
@@ -170,6 +173,34 @@ class Host(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BorderAccent(unittest.TestCase):
+    def kwinrc(self, text):
+        path = os.path.join(tempfile.mkdtemp(), "kwinrc")
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_reads_window_border_color(self):
+        path = self.kwinrc("[Round-Corners]\nOutlineColor=255,113,26\nOutlineIsGradient=false\n")
+        self.assertEqual(logpose_theme.border_accent(path), "#ff711a")
+
+    def test_ignores_gradient_missing_and_broken(self):
+        self.assertIsNone(logpose_theme.border_accent(self.kwinrc("[Round-Corners]\nOutlineColor=1,2,3\nOutlineIsGradient=true\n")))
+        self.assertIsNone(logpose_theme.border_accent(self.kwinrc("[Plugins]\nblurEnabled=true\n")))
+        self.assertIsNone(logpose_theme.border_accent(self.kwinrc("[Round-Corners]\nOutlineColor=abc\n")))
+        self.assertIsNone(logpose_theme.border_accent("/nao/existe/kwinrc"))
+
+    def test_main_uses_border_as_accent(self):
+        d = tempfile.mkdtemp()
+        src = os.path.join(d, "colors.toml")
+        with open(src, "w") as f:
+            f.write('background = "#000000"\nforeground = "#d4d4d4"\naccent = "#7fbf4d"\n')
+        dest = os.path.join(d, "theme.css")
+        logpose_theme.main(src, dest, self.kwinrc("[Round-Corners]\nOutlineColor=255,113,26\n"))
+        with open(dest) as f:
+            self.assertIn("--k-color-primary: #ff711a;", f.read())
 
 
 class Font(unittest.TestCase):
