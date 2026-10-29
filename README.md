@@ -67,7 +67,7 @@ Enquanto a página carrega, um traço na cor do tema corre pela borda do cartão
 
 **Várias abas de uma vez**
 
-Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de espaço, guardar num grupo, fixar, copiar os links.
+Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de espaço, juntar numa ilha, guardar num grupo, fixar, copiar os links.
 
 
 </td>
@@ -81,7 +81,8 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 
 - **Privacidade do Helium**: sem serviços do Google, uBlock Origin embutido, ruído contra fingerprinting, Global Privacy Control e só HTTPS.
 - **Abas divididas**: arraste uma aba da barra pra cima da página pra dividir à esquerda, à direita, em cima ou embaixo, abrir em nova janela ou levar pra outra janela do Log Pose. Cada metade tem botões pra arrastar, separar e fechar.
-- **Grupos**: abas salvas num grupo recolhível na barra, com nome e ícone, que voltam ao reabrir.
+- **Ilhas**: botão direito numa aba, "Nova ilha", e as abas ficam juntas na lista com uma cor; nome e cor se troca no cabeçalho. Fechou as abas, a ilha some.
+- **Grupos**: abas salvas num grupo recolhível na barra, que voltam ao reabrir. "Novo grupo" no menu da aba cria na hora; nome, cor e ícone se trocam no cabeçalho.
 - **Mini player**: o que toca em outra aba aparece no pé da barra, com tocar/pausar, próxima e picture-in-picture.
 - **Nova aba** com saudação, tempo, atalhos, tarefas e notícias.
 - **Tema do sistema**: segue as cores do denden ou do Ciel e a transparência do material, no claro e no escuro.
