@@ -63,6 +63,18 @@ logpose_dev_setup() {
     fi
 }
 
+# quilt com os patches como estavam ao aplicar, pra desaplicar o que mudou desde então. O .pc guarda
+# a pasta dos patches e vale mais que QUILT_PATCHES, então troca ele também.
+logpose_quilt_applied() {
+    local status=0
+    echo "$_applied" > .pc/.quilt_patches
+    echo "$_applied/series.merged" > .pc/.quilt_series
+    QUILT_PATCHES="$_applied" QUILT_SERIES="$_applied/series.merged" quilt "$@" || status=$?
+    echo "$QUILT_PATCHES" > .pc/.quilt_patches
+    echo "$QUILT_SERIES" > .pc/.quilt_series
+    return "$status"
+}
+
 # Reaplica só os patches que mudaram desde a última aplicação (e os que vêm depois deles na série),
 # pra não encostar no resto da árvore e não forçar rebuild do que não mudou.
 logpose_dev_patches() {
@@ -104,10 +116,10 @@ logpose_dev_patches() {
     fi
 
     if [ "$first" -eq 0 ]; then
-        QUILT_PATCHES="$_applied" quilt pop -a
+        logpose_quilt_applied pop -a
     elif [ "$first" -gt 0 ]; then
         echo "reaplicando a partir de ${applied[$first]}"
-        QUILT_PATCHES="$_applied" quilt pop "${applied[$((first - 1))]}"
+        logpose_quilt_applied pop "${applied[$((first - 1))]}"
     fi
     quilt push -a
 
