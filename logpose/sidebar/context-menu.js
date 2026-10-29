@@ -14,6 +14,27 @@ export function showMenu(entries, x, y) {
       hr.setAttribute("role", "separator");
       return hr;
     }
+    if (entry.swatches) {
+      const row = document.createElement("li");
+      row.className = "k-menu__swatches";
+      row.setAttribute("role", "presentation");
+      row.append(...entry.swatches.map((s) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "k-state" + (s.icon ? " k-menu__choice" : " k-menu__swatch");
+        b.title = s.title ?? s.value;
+        b.setAttribute("aria-pressed", String(Boolean(s.selected)));
+        if (s.color) b.style.background = s.color;
+        if (s.icon) b.append(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(s.icon) }));
+        b.onclick = (e) => {
+          e.stopPropagation();
+          hideMenu();
+          entry.pick(s.value);
+        };
+        return b;
+      }));
+      return row;
+    }
     if (entry.heading) {
       const title = document.createElement("li");
       title.className = "k-menu__heading k-type-caption";
