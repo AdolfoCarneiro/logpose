@@ -30,6 +30,7 @@ h1 { margin: 0; }
 .slider-row { display: flex; align-items: center; gap: var(--k-space-md); }
 .slider-row output { width: 4ch; text-align: right; color: var(--k-color-on-surface-variant); }
 .setting > .text { flex: 1; min-width: 0; }
+.setting-field { flex: none; width: 220px; border-radius: var(--k-shape-full); }
 .setting > :last-child { flex: none; }
 .extension-name { flex-direction: row; align-items: center; gap: var(--k-space-md); }
 .extension-name img { width: 24px; height: 24px; }

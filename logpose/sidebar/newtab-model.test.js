@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { greeting, parseNews, ago, weatherIcon, hourly, shortcuts } from "./newtab-model.js";
+import { greeting, parseNews, ago, weatherIcon, hourly, shortcuts, parseTickers, tickerLabel, quoteFromChart, money, points, percent } from "./newtab-model.js";
 
 test("a saudação segue a hora do dia", () => {
   assert.equal(greeting(6), "Bom dia");
@@ -46,4 +46,30 @@ test("os atalhos juntam fixadas e mais visitados sem repetir", () => {
     { url: "https://youtube.com/", title: "YouTube", pinned: true },
     { url: "https://github.com/", title: "github.com", pinned: false },
   ]);
+});
+
+test("as ações escritas viram tickers do Yahoo, B3 com .SA", () => {
+  assert.deepEqual(parseTickers("petr4, VALE3 ;AAPL  bova11 petr4 ^GSPC <script>"), ["PETR4.SA", "VALE3.SA", "AAPL", "BOVA11.SA", "^GSPC"]);
+  assert.deepEqual(parseTickers(""), []);
+  assert.equal(parseTickers("A B C D E F", 3).length, 3);
+  assert.equal(tickerLabel("PETR4.SA"), "PETR4");
+  assert.equal(tickerLabel("AAPL"), "AAPL");
+});
+
+test("a cotação sai do chart do Yahoo com a variação do dia", () => {
+  const chart = (meta) => ({ chart: { result: [{ meta }] } });
+  assert.deepEqual(quoteFromChart(chart({ symbol: "^BVSP", regularMarketPrice: 170433.92, regularMarketChangePercent: -0.335, currency: "BRL" })), { symbol: "^BVSP", price: 170433.92, change: -0.335, currency: "BRL" });
+  const q = quoteFromChart(chart({ symbol: "PETR4.SA", regularMarketPrice: 52.96, chartPreviousClose: 50, currency: "BRL" }));
+  assert.ok(Math.abs(q.change - 5.92) < 1e-9);
+  assert.equal(quoteFromChart({ chart: { result: null } }), null);
+  assert.equal(quoteFromChart(chart({ symbol: "X" })), null);
+});
+
+test("valores do mercado no jeito brasileiro", () => {
+  assert.equal(money(5.367).replace(/\s/g, " "), "R$ 5,37");
+  assert.equal(points(170433.92), "170.434");
+  assert.equal(percent(0.389), "+0,39%");
+  assert.equal(percent(-0.335), "−0,34%");
+  assert.equal(percent(0), "0,00%");
+  assert.equal(percent(null), "");
 });

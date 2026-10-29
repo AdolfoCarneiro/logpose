@@ -92,3 +92,44 @@ export function shortcuts(pinned, top, max = 10) {
   }
   return out;
 }
+
+// "PETR4, vale3 AAPL" → ["PETR4.SA", "VALE3.SA", "AAPL"]: papéis da B3 (4 letras e o número) vão
+// pro Yahoo com .SA, o resto como foi escrito
+export function parseTickers(text, max = 12) {
+  const tickers = [];
+  for (const raw of String(text ?? "").toUpperCase().split(/[\s,;]+/)) {
+    if (!/^[\^A-Z0-9.=-]{1,15}$/.test(raw)) continue;
+    const ticker = /^[A-Z]{4}\d{1,2}F?$/.test(raw) ? `${raw}.SA` : raw;
+    if (!tickers.includes(ticker)) tickers.push(ticker);
+  }
+  return tickers.slice(0, max);
+}
+
+export function tickerLabel(symbol) {
+  return symbol.replace(/\.SA$/, "");
+}
+
+// cotação do chart do Yahoo (range=1d): preço e variação do dia
+export function quoteFromChart(json) {
+  const meta = json?.chart?.result?.[0]?.meta;
+  if (!meta || typeof meta.regularMarketPrice !== "number") return null;
+  const previous = meta.chartPreviousClose ?? meta.previousClose;
+  const change = typeof meta.regularMarketChangePercent === "number"
+    ? meta.regularMarketChangePercent
+    : previous ? (meta.regularMarketPrice / previous - 1) * 100 : null;
+  return { symbol: meta.symbol, price: meta.regularMarketPrice, change, currency: meta.currency || "BRL" };
+}
+
+export function money(value, currency = "BRL") {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value);
+}
+
+export function points(value) {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(value);
+}
+
+export function percent(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${Math.abs(value).toFixed(2).replace(".", ",")}%`;
+}

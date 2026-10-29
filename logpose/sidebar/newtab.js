@@ -4,10 +4,14 @@ import { current, label } from "./shortcuts-model.js";
 import { available as logposePrivate, call } from "./logpose-private.js";
 import { loadSettings } from "./settings-model.js";
 import { links } from "./pins-model.js";
-import { greeting, fullDate, parseNews, ago, weatherIcon, weatherLabel, hourly, shortcuts } from "./newtab-model.js";
+import { greeting, fullDate, parseNews, ago, weatherIcon, weatherLabel, hourly, shortcuts, parseTickers, tickerLabel, quoteFromChart, money, points, percent } from "./newtab-model.js";
 
 const NEWS_URL = "https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-419";
 const FRESH = 30 * 60 * 1000;
+const MARKET_FRESH = 5 * 60 * 1000;
+const DOLLAR_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL";
+const SELIC_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json";
+const chartUrl = (symbol) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
 const LOGPOSE = "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/";
 const $ = (id) => document.getElementById(id);
 const themeStyle = $("logpose-theme");
@@ -31,7 +35,7 @@ function el(tag, className, text) {
 }
 
 const tab = await chrome.tabs.getCurrent();
-const stored = await chrome.storage.local.get(["settings", "shortcuts", "spaces", "pins", "tasks", "newsCache", "weatherCache"]);
+const stored = await chrome.storage.local.get(["settings", "shortcuts", "spaces", "pins", "tasks", "newsCache", "weatherCache", "marketCache"]);
 const settings = loadSettings(stored.settings);
 
 function paintClock() {
@@ -169,6 +173,75 @@ $("news-refresh").onclick = (e) => {
   paintNews(true);
 };
 
+async function json(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(String(response.status));
+  return response.json();
+}
+
+async function yahoo(symbol) {
+  return quoteFromChart(await json(chartUrl(symbol)));
+}
+
+// dólar, Selic, Ibovespa, S&P 500 e as ações escolhidas; o que falhar fica de fora
+async function marketSnapshot(tickers, force) {
+  const key = tickers.join(",");
+  const hit = stored.marketCache;
+  if (!force && hit?.key === key && Date.now() - hit.at < MARKET_FRESH) return hit.data;
+  const [dollar, selic, ibov, sp500, ...mine] = await Promise.allSettled([
+    json(DOLLAR_URL), json(SELIC_URL), yahoo("^BVSP"), yahoo("^GSPC"), ...tickers.map(yahoo),
+  ]);
+  const value = (r) => (r.status === "fulfilled" ? r.value : null);
+  const usd = value(dollar)?.USDBRL;
+  const rate = value(selic)?.[0]?.valor;
+  const data = {
+    indicators: [
+      usd && { name: "Dólar", value: money(Number(usd.bid)), change: Number(usd.pctChange), query: "dólar hoje" },
+      rate && { name: "Selic", value: `${String(rate).replace(".", ",")}% a.a.`, query: "taxa selic" },
+      value(ibov) && { name: "Ibovespa", value: `${points(value(ibov).price)} pts`, change: value(ibov).change, query: "ibovespa" },
+      value(sp500) && { name: "S&P 500", value: `${points(value(sp500).price)} pts`, change: value(sp500).change, query: "s&p 500" },
+    ].filter(Boolean),
+    mine: mine.map(value).filter(Boolean).map((q) => ({ name: tickerLabel(q.symbol), value: money(q.price, q.currency), change: q.change, query: `${tickerLabel(q.symbol)} cotação` })),
+  };
+  if (!data.indicators.length && !data.mine.length) throw new Error("mercado");
+  stored.marketCache = { key, at: Date.now(), data };
+  await chrome.storage.local.set({ marketCache: stored.marketCache });
+  return data;
+}
+
+function quoteTile(quote) {
+  const a = el("a", "quote");
+  a.href = `https://www.google.com/search?q=${encodeURIComponent(quote.query)}`;
+  a.append(el("span", "quote__name k-type-caption", quote.name), el("span", "quote__value", quote.value));
+  if (typeof quote.change === "number") {
+    const dir = quote.change > 0 ? " quote__change--up" : quote.change < 0 ? " quote__change--down" : "";
+    a.append(el("span", `quote__change k-type-caption${dir}`, `${percent(quote.change)} hoje`));
+  }
+  return a;
+}
+
+async function paintMarket(force = false) {
+  const tickers = parseTickers(settings.marketTickers);
+  const state = $("market-state");
+  $("market-add").hidden = tickers.length > 0;
+  if (!stored.marketCache) state.replaceChildren(document.createElement("k-loading-indicator"));
+  try {
+    const data = await marketSnapshot(tickers, force);
+    state.replaceChildren();
+    $("market-list").replaceChildren(...data.indicators.map(quoteTile));
+    $("market-mine").replaceChildren(...data.mine.map(quoteTile));
+  } catch {
+    const retry = el("button", "k-button k-button--text k-type-button", "Tentar de novo");
+    retry.onclick = () => paintMarket(true);
+    state.replaceChildren(el("p", "hint k-type-label", "Não deu pra carregar o mercado."), retry);
+  }
+}
+$("market-refresh").onclick = (e) => {
+  e.currentTarget.querySelector(".k-icon").animate([{ transform: "rotate(0)" }, { transform: "rotate(360deg)" }], { duration: 600, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" });
+  paintMarket(true);
+};
+$("market-add").onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
+
 paintIcons();
 
 const themePort = chrome.runtime.connectNative("logpose.theme");
@@ -182,6 +255,10 @@ if (settings.newtabCards) {
   $("tasks").hidden = false;
   paintTasks();
   themePort.postMessage({ type: "location" });
+}
+if (settings.newtabMarket) {
+  $("market").hidden = false;
+  paintMarket();
 }
 if (settings.newtabNews) {
   $("news").hidden = false;

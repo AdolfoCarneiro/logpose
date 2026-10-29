@@ -64,7 +64,7 @@ Blur atrás da janela translúcida (ext_background_effect_v1, o que o KWin 6 anu
  DECLARE_WAYLAND_OBJECT_TRAITS(org_kde_kwin_idle)
 --- /dev/null
 +++ b/ui/ozone/platform/wayland/host/ext_background_effect.cc
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,96 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -73,7 +73,11 @@ Blur atrás da janela translúcida (ext_background_effect_v1, o que o KWin 6 anu
 +
 +#include <ext-background-effect-v1-client-protocol.h>
 +
++#include <algorithm>
++#include <cmath>
++
 +#include "base/logging.h"
++#include "base/numerics/safe_conversions.h"
 +#include "ui/ozone/platform/wayland/host/wayland_connection.h"
 +
 +namespace ui {
@@ -137,7 +141,22 @@ Blur atrás da janela translúcida (ext_background_effect_v1, o que o KWin 6 anu
 +  region_ = rect;
 +  wl::Object<wl_region> region(
 +      wl_compositor_create_region(connection_->compositor()));
-+  wl_region_add(region.get(), rect.x(), rect.y(), rect.width(), rect.height());
++  // Log Pose: cantos arredondados como os que o KWin (Rounded Corners) recorta
++  // na janela, em faixas de 1 px; com o retângulo, o blur sobrava nas quinas.
++  constexpr int kCornerRadius = 10;
++  const int radius =
++      std::min({kCornerRadius, rect.width() / 2, rect.height() / 2});
++  wl_region_add(region.get(), rect.x(), rect.y() + radius, rect.width(),
++                rect.height() - 2 * radius);
++  for (int row = 0; row < radius; ++row) {
++    const float dy = radius - row - 0.5f;
++    const int inset = base::ClampCeil(
++        radius - std::sqrt(static_cast<float>(radius * radius) - dy * dy));
++    const int width = rect.width() - 2 * inset;
++    wl_region_add(region.get(), rect.x() + inset, rect.y() + row, width, 1);
++    wl_region_add(region.get(), rect.x() + inset, rect.bottom() - 1 - row,
++                  width, 1);
++  }
 +  ext_background_effect_surface_v1_set_blur_region(effect_.get(), region.get());
 +}
 +

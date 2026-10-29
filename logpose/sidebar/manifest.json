@@ -26,7 +26,7 @@
   ],
   "host_permissions": [
     "https://news.google.com/*",
-    "https://api.open-meteo.com/*"
+    "https://api.open-meteo.com/*", "https://economia.awesomeapi.com.br/*", "https://api.bcb.gov.br/*", "https://query1.finance.yahoo.com/*"
   ],
   "side_panel": {
     "default_path": "sidebar.html"

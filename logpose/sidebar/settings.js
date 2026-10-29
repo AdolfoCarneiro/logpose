@@ -13,6 +13,9 @@ let themeCss = "";
 
 function paint() {
   for (const input of document.querySelectorAll("input[type=checkbox][data-key]")) input.checked = settings[input.dataset.key];
+  for (const input of document.querySelectorAll("input[type=text][data-key]")) {
+    if (document.activeElement !== input) input.value = settings[input.dataset.key];
+  }
   for (const input of document.querySelectorAll("input[type=range][data-key]")) {
     input.value = settings[input.dataset.key];
     input.style.setProperty("--k-slider-fill", `${input.value}%`);
@@ -35,6 +38,9 @@ async function save(key, value) {
 
 for (const input of document.querySelectorAll("input[type=checkbox][data-key]")) {
   input.addEventListener("change", () => save(input.dataset.key, input.checked));
+}
+for (const input of document.querySelectorAll("input[type=text][data-key]")) {
+  input.addEventListener("change", () => save(input.dataset.key, input.value.trim()));
 }
 for (const input of document.querySelectorAll("input[type=range][data-key]")) {
   input.addEventListener("input", () => {

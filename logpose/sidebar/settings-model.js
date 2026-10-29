@@ -11,6 +11,8 @@ export const DEFAULTS = Object.freeze({
   autoPip: true,
   newtabNews: true,
   newtabCards: true,
+  newtabMarket: true,
+  marketTickers: "",
 });
 
 const CHOICES = {
