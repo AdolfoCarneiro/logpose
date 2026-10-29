@@ -275,6 +275,10 @@ body.compact .ess { height: 44px; }
 #tabs .tab--asleep .k-list-item__leading, #tabs .tab--asleep .k-list-item__label { opacity: 0.55; transition: opacity var(--k-motion-duration-medium) var(--k-motion-easing-standard); }
 
 .top-actions { display: flex; align-items: center; gap: var(--k-space-xxs); min-width: 0; }
+/* minimizar, maximizar e fechar, na ordem do KWin: sem barra de título, ficam aqui */
+.window-controls { display: flex; align-items: center; gap: 2px; margin-left: var(--k-space-xxs); }
+.window-controls .k-icon { font-size: 16px; }
+.window-close:hover { background: var(--k-color-error); color: var(--k-color-on-error); }
 .extensions { display: flex; align-items: center; gap: var(--k-space-xxs); overflow: hidden; }
 .extension img { width: 22px; height: 22px; }
 #extensions-button[hidden] { display: none; }
