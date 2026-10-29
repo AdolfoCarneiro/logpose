@@ -632,10 +632,12 @@ const iconOf = (id) => document.querySelector(`#${id} .k-icon`);
 document.getElementById("back").onclick = async () => { kick(iconOf("back"), "translateX(-7px)"); chrome.tabs.goBack((await activeTab()).id); };
 document.getElementById("forward").onclick = async () => { kick(iconOf("forward"), "translateX(7px)"); chrome.tabs.goForward((await activeTab()).id); };
 document.getElementById("reload").onclick = async () => { spin(iconOf("reload")); chrome.tabs.reload((await activeTab()).id); };
-document.getElementById("new-tab").onclick = () => {
-  if (logposePrivate) call("executeCommand", windowId, "newTab").catch(() => chrome.tabs.create({ windowId }));
-  else chrome.tabs.create({ windowId });
-};
+// nova aba como no Chrome: nasce com a página inicial e a busca por cima; Esc fica na página
+async function newTabPage() {
+  await blankTab(activeSpace(spaces, windowId).id, true);
+  if (logposePrivate) call("executeCommand", windowId, "openLocation").catch(() => {});
+}
+document.getElementById("new-tab").onclick = newTabPage;
 
 let groupTab = null;
 
@@ -891,7 +893,7 @@ async function splitWithPrevious() {
 }
 
 const SHORTCUT_ACTIONS = {
-  newTab: () => call("executeCommand", windowId, "newTab"),
+  newTab: newTabPage,
   openLocation: () => call("executeCommand", windowId, "openLocation"),
   copyUrl: async () => chrome.runtime.sendMessage({ type: "copy-link", format: "copyUrl", tabId: (await activeTab())?.id }),
   copyMarkdown: async () => chrome.runtime.sendMessage({ type: "copy-link", format: "copyMarkdown", tabId: (await activeTab())?.id }),

@@ -1,5 +1,5 @@
 export const SHORTCUTS = [
-  { command: "newTab", title: "Nova aba", hint: "Abre a busca; a aba nasce ao escolher um resultado", keys: "Ctrl+T" },
+  { command: "newTab", title: "Nova aba", hint: "Abre a página inicial com a busca por cima", keys: "Ctrl+T" },
   { command: "openLocation", title: "Buscar ou trocar o endereço da aba", keys: "Ctrl+L" },
   { command: "copyUrl", title: "Copiar o link da aba", keys: "Ctrl+Shift+C" },
   { command: "copyMarkdown", title: "Copiar o link como Markdown", keys: "Ctrl+Alt+Shift+C" },
