@@ -48,7 +48,15 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  #include "base/trace_event/trace_event.h"
  #include "build/build_config.h"
  #include "build/buildflag.h"
-@@ -55,6 +56,7 @@
+@@ -30,6 +31,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/skia/include/core/SkPath.h"
++#include "third_party/skia/include/core/SkPathBuilder.h"
+ #include "ui/accessibility/ax_enums.mojom.h"
+ #include "ui/base/hit_test.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -55,6 +57,7 @@
  #include "ui/views/vector_icons.h"
  #include "ui/views/views_delegate.h"
  #include "ui/views/window/frame_background.h"
@@ -56,7 +64,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  #include "ui/views/window/frame_caption_button.h"
  #include "ui/views/window/vector_icons/vector_icons.h"
  #include "ui/views/window/window_shape.h"
-@@ -71,6 +73,70 @@
+@@ -71,6 +74,123 @@
  
  namespace {
  
@@ -66,13 +74,65 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +}
 +
 +// Botões da janela do Log Pose como os do tema Utterly Round do KWin: bolinhas
-+// laranja, verde e vermelha, com o símbolo ao passar o mouse, e cinza-claras
-+// com a janela inativa.
++// laranja, verde e vermelha, com o símbolo do tema ao passar o mouse, e
++// cinza-claras com a janela inativa. Os símbolos são os caminhos dos SVGs do
++// tema, no círculo de raio 1 centrado na origem.
++void LogPoseMaximizeGlyph(SkPathBuilder& p) {
++  p.moveTo(-0.2674f, -0.5000f);
++  p.lineTo(0.3504f, -0.5000f);
++  p.cubicTo(0.4327f, -0.5000f, 0.5000f, -0.4333f, 0.5000f, -0.3517f);
++  p.lineTo(0.5000f, 0.2608f);
++  p.close();
++  p.moveTo(0.2698f, 0.5000f);
++  p.lineTo(-0.3504f, 0.5000f);
++  p.cubicTo(-0.4327f, 0.5000f, -0.5000f, 0.4333f, -0.5000f, 0.3517f);
++  p.lineTo(-0.5000f, -0.2633f);
++  p.lineTo(0.2698f, 0.5000f);
++}
++void LogPoseRestoreGlyph(SkPathBuilder& p) {
++  p.moveTo(0.0338f, -0.8000f);
++  p.lineTo(0.0338f, -0.1833f);
++  p.cubicTo(0.0338f, -0.0956f, 0.1064f, 0.0116f, 0.1934f, 0.0116f);
++  p.lineTo(0.8000f, 0.0116f);
++  p.close();
++  p.moveTo(-0.0238f, 0.1833f);
++  p.cubicTo(-0.0238f, 0.0955f, -0.0999f, 0.0304f, -0.1834f, 0.0251f);
++  p.lineTo(-0.8000f, 0.0251f);
++  p.lineTo(-0.0238f, 0.8000f);
++  p.close();
++}
++void LogPoseCloseGlyph(SkPathBuilder& p) {
++  p.moveTo(-0.4758f, 0.3571f);
++  p.lineTo(0.3571f, -0.4758f);
++  p.cubicTo(0.3893f, -0.5081f, 0.4420f, -0.5081f, 0.4743f, -0.4758f);
++  p.lineTo(0.4758f, -0.4743f);
++  p.cubicTo(0.5081f, -0.4420f, 0.5081f, -0.3893f, 0.4758f, -0.3571f);
++  p.lineTo(-0.3571f, 0.4758f);
++  p.cubicTo(-0.3893f, 0.5081f, -0.4420f, 0.5081f, -0.4743f, 0.4758f);
++  p.lineTo(-0.4758f, 0.4743f);
++  p.cubicTo(-0.5081f, 0.4420f, -0.5081f, 0.3893f, -0.4758f, 0.3571f);
++  p.close();
++  p.moveTo(-0.3571f, -0.4758f);
++  p.lineTo(0.4758f, 0.3571f);
++  p.cubicTo(0.5080f, 0.3893f, 0.5080f, 0.4420f, 0.4758f, 0.4743f);
++  p.lineTo(0.4743f, 0.4758f);
++  p.cubicTo(0.4420f, 0.5081f, 0.3893f, 0.5081f, 0.3571f, 0.4758f);
++  p.lineTo(-0.4758f, -0.3571f);
++  p.cubicTo(-0.5081f, -0.3893f, -0.5081f, -0.4420f, -0.4758f, -0.4743f);
++  p.lineTo(-0.4743f, -0.4758f);
++  p.cubicTo(-0.4420f, -0.5081f, -0.3893f, -0.5081f, -0.3571f, -0.4758f);
++  p.close();
++}
++
 +class LogPoseCaptionButton : public views::FrameCaptionButton {
 + public:
-+  using views::FrameCaptionButton::FrameCaptionButton;
++  LogPoseCaptionButton(views::CaptionButtonIcon icon, int ht, bool restore)
++      : views::FrameCaptionButton(views::Button::PressedCallback(), icon, ht),
++        restore_(restore) {}
 +
 +  void PaintButtonContents(gfx::Canvas* canvas) override {
++    constexpr float kRadius = 7.5f;
++    constexpr SkColor kGlyph = SkColorSetRGB(0xef, 0xf0, 0xf1);
 +    const bool hot = GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
 +    SkColor color;
 +    switch (GetIcon()) {
@@ -87,47 +147,48 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +        break;
 +    }
 +    if (!GetPaintAsActive() && !hot) {
-+      color = SkColorSetRGB(0xef, 0xf0, 0xf1);
++      color = kGlyph;
 +    }
 +    const gfx::PointF center = gfx::RectF(GetContentsBounds()).CenterPoint();
 +    cc::PaintFlags dot;
 +    dot.setAntiAlias(true);
 +    dot.setColor(color);
-+    canvas->DrawCircle(center, 7.5f, dot);
++    canvas->DrawCircle(center, kRadius, dot);
 +    if (!hot) {
 +      return;
 +    }
 +    cc::PaintFlags glyph;
 +    glyph.setAntiAlias(true);
-+    glyph.setColor(SkColorSetARGB(0xf0, 0xff, 0xff, 0xff));
-+    glyph.setStyle(cc::PaintFlags::kStroke_Style);
-+    glyph.setStrokeWidth(1.6f);
-+    glyph.setStrokeCap(cc::PaintFlags::kRound_Cap);
-+    constexpr float d = 3.2f;
-+    switch (GetIcon()) {
-+      case views::CAPTION_BUTTON_ICON_MINIMIZE:
-+        canvas->DrawLine(center + gfx::Vector2dF(-d, 0),
-+                         center + gfx::Vector2dF(d, 0), glyph);
-+        break;
-+      case views::CAPTION_BUTTON_ICON_CLOSE:
-+        canvas->DrawLine(center + gfx::Vector2dF(-d, -d),
-+                         center + gfx::Vector2dF(d, d), glyph);
-+        canvas->DrawLine(center + gfx::Vector2dF(-d, d),
-+                         center + gfx::Vector2dF(d, -d), glyph);
-+        break;
-+      default:
-+        canvas->DrawRect(gfx::RectF(center.x() - d, center.y() - d, 2 * d,
-+                                    2 * d),
-+                         glyph);
-+        break;
++    glyph.setColor(kGlyph);
++    if (GetIcon() == views::CAPTION_BUTTON_ICON_MINIMIZE) {
++      glyph.setStyle(cc::PaintFlags::kStroke_Style);
++      glyph.setStrokeWidth(0.2654f * kRadius);
++      glyph.setStrokeCap(cc::PaintFlags::kRound_Cap);
++      canvas->DrawLine(center + gfx::Vector2dF(-0.5673f * kRadius, 0),
++                       center + gfx::Vector2dF(0.5673f * kRadius, 0), glyph);
++      return;
 +    }
++    SkPathBuilder builder;
++    if (GetIcon() == views::CAPTION_BUTTON_ICON_CLOSE) {
++      LogPoseCloseGlyph(builder);
++    } else if (restore_) {
++      LogPoseRestoreGlyph(builder);
++    } else {
++      LogPoseMaximizeGlyph(builder);
++    }
++    SkMatrix matrix = SkMatrix::Scale(kRadius, kRadius);
++    matrix.postTranslate(center.x(), center.y());
++    canvas->DrawPath(builder.detach(&matrix), glyph);
 +  }
++
++ private:
++  const bool restore_;
 +};
 +
  constexpr int kRoundedCaptionButtonSize = 16;
  
  class CaptionButtonBackgroundImageSource : public gfx::CanvasImageSource {
-@@ -601,6 +667,11 @@
+@@ -601,6 +721,11 @@
    const auto info = GetClientFrameElementInfo();
    const auto frame_height = FrameBorderInsets(false).top();
    const auto top_height = layout_->NonClientTopHeight(false);
@@ -139,7 +200,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
    return std::max(
        frame_height + info.toolbar_minimum_height,
        top_height + info.tabstrip_preferred_height -
-@@ -766,8 +837,15 @@
+@@ -766,8 +891,17 @@
      views::CaptionButtonIcon icon_type,
      int ht_component,
      const gfx::VectorIcon& icon_image) {
@@ -147,8 +208,10 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 -      views::Button::PressedCallback(), icon_type, ht_component);
 +  views::FrameCaptionButton* button =
 +      LogPoseCaptionButtons() && GetBrowserView()->GetIsNormalType()
-+          ? new LogPoseCaptionButton(views::Button::PressedCallback(),
-+                                     icon_type, ht_component)
++          ? new LogPoseCaptionButton(
++                icon_type, ht_component,
++                &icon_image == &views::kChromeRestoreIcon ||
++                    &icon_image == &views::kWindowControlRestoreOldIcon)
 +          : new views::FrameCaptionButton(views::Button::PressedCallback(),
 +                                          icon_type, ht_component);
 +  if (LogPoseCaptionButtons() && GetBrowserView()->GetIsNormalType()) {
