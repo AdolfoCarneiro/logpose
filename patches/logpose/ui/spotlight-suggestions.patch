@@ -69,19 +69,19 @@ Sugestões de pesquisa no spotlight: logposePrivate.getSearchSuggestions pede ao
 +
  namespace extensions {
  
- class LogPosePrivateGetExtensionActionsFunction : public ExtensionFunction {
+ class LogposePrivateGetExtensionActionsFunction : public ExtensionFunction {
 @@ -120,6 +128,22 @@
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateGetSearchSuggestionsFunction : public ExtensionFunction {
++class LogposePrivateGetSearchSuggestionsFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getSearchSuggestions", UNKNOWN)
 +
-+  LogPosePrivateGetSearchSuggestionsFunction();
++  LogposePrivateGetSearchSuggestionsFunction();
 +
 + protected:
-+  ~LogPosePrivateGetSearchSuggestionsFunction() override;
++  ~LogposePrivateGetSearchSuggestionsFunction() override;
 +  ResponseAction Run() override;
 +
 + private:
@@ -90,7 +90,7 @@ Sugestões de pesquisa no spotlight: logposePrivate.getSearchSuggestions pede ao
 +  std::unique_ptr<network::SimpleURLLoader> loader_;
 +};
 +
- class LogPosePrivateFindFunction : public ExtensionFunction,
+ class LogposePrivateFindFunction : public ExtensionFunction,
                                    public find_in_page::FindResultObserver {
   public:
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -133,14 +133,14 @@ Sugestões de pesquisa no spotlight: logposePrivate.getSearchSuggestions pede ao
        ArgumentList(logpose_private::ResolveInput::Results::Create(input)));
  }
  
-+LogPosePrivateGetSearchSuggestionsFunction::
-+    LogPosePrivateGetSearchSuggestionsFunction() = default;
++LogposePrivateGetSearchSuggestionsFunction::
++    LogposePrivateGetSearchSuggestionsFunction() = default;
 +
-+LogPosePrivateGetSearchSuggestionsFunction::
-+    ~LogPosePrivateGetSearchSuggestionsFunction() = default;
++LogposePrivateGetSearchSuggestionsFunction::
++    ~LogposePrivateGetSearchSuggestionsFunction() = default;
 +
 +ExtensionFunction::ResponseAction
-+LogPosePrivateGetSearchSuggestionsFunction::Run() {
++LogposePrivateGetSearchSuggestionsFunction::Run() {
 +  auto params = logpose_private::GetSearchSuggestions::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -193,13 +193,13 @@ Sugestões de pesquisa no spotlight: logposePrivate.getSearchSuggestions pede ao
 +      profile->GetDefaultStoragePartition()
 +          ->GetURLLoaderFactoryForBrowserProcess()
 +          .get(),
-+      base::BindOnce(&LogPosePrivateGetSearchSuggestionsFunction::OnLoaded,
++      base::BindOnce(&LogposePrivateGetSearchSuggestionsFunction::OnLoaded,
 +                     this),
 +      64 * 1024);
 +  return RespondLater();
 +}
 +
-+void LogPosePrivateGetSearchSuggestionsFunction::OnLoaded(
++void LogposePrivateGetSearchSuggestionsFunction::OnLoaded(
 +    std::optional<std::string> body) {
 +  std::vector<std::string> suggestions;
 +  std::optional<base::Value> json =
@@ -219,6 +219,6 @@ Sugestões de pesquisa no spotlight: logposePrivate.getSearchSuggestions pede ao
 +      logpose_private::GetSearchSuggestions::Results::Create(suggestions)));
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateFindFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateFindFunction::Run() {
    auto params = logpose_private::Find::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);

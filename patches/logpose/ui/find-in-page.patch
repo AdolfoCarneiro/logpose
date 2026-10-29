@@ -256,7 +256,7 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateFindFunction : public ExtensionFunction,
++class LogposePrivateFindFunction : public ExtensionFunction,
 +                                  public find_in_page::FindResultObserver {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.find", UNKNOWN)
@@ -266,7 +266,7 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
 +  void OnFindTabHelperDestroyed(find_in_page::FindTabHelper* helper) override;
 +
 + protected:
-+  ~LogPosePrivateFindFunction() override = default;
++  ~LogposePrivateFindFunction() override = default;
 +  ResponseAction Run() override;
 +
 + private:
@@ -277,16 +277,16 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
 +      observation_{this};
 +};
 +
-+class LogPosePrivateStopFindingFunction : public ExtensionFunction {
++class LogposePrivateStopFindingFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.stopFinding", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateStopFindingFunction() override = default;
++  ~LogposePrivateStopFindingFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateCreateTabFunction : public ExtensionFunction {
+ class LogposePrivateCreateTabFunction : public ExtensionFunction {
   public:
    DECLARE_EXTENSION_FUNCTION("logposePrivate.createTab", UNKNOWN)
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -314,7 +314,7 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
    return RespondNow(Error(kNoCommandError, params->command));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateFindFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateFindFunction::Run() {
 +  auto params = logpose_private::Find::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -343,7 +343,7 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
 +  return RespondLater();
 +}
 +
-+void LogPosePrivateFindFunction::OnFindResultAvailable(
++void LogposePrivateFindFunction::OnFindResultAvailable(
 +    content::WebContents* web_contents) {
 +  const find_in_page::FindNotificationDetails& details =
 +      observation_.GetSource()->find_result();
@@ -353,17 +353,17 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
 +  Finish(details.number_of_matches(), details.active_match_ordinal());
 +}
 +
-+void LogPosePrivateFindFunction::OnFindEmptyText(
++void LogposePrivateFindFunction::OnFindEmptyText(
 +    content::WebContents* web_contents) {
 +  Finish(0, 0);
 +}
 +
-+void LogPosePrivateFindFunction::OnFindTabHelperDestroyed(
++void LogposePrivateFindFunction::OnFindTabHelperDestroyed(
 +    find_in_page::FindTabHelper* helper) {
 +  Finish(0, 0);
 +}
 +
-+void LogPosePrivateFindFunction::Finish(int matches, int active) {
++void LogposePrivateFindFunction::Finish(int matches, int active) {
 +  if (!observation_.IsObserving()) {
 +    return;
 +  }
@@ -375,7 +375,7 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
 +  Release();
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateStopFindingFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateStopFindingFunction::Run() {
 +  auto params = logpose_private::StopFinding::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -394,4 +394,4 @@ Procurar na página do Log Pose: Ctrl+F, F3, Ctrl+G, o menu e o comando do spotl
 +  return RespondNow(NoArguments());
  }
  
- ExtensionFunction::ResponseAction LogPosePrivateCreateTabFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateCreateTabFunction::Run() {

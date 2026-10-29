@@ -71,21 +71,21 @@ Mini player: logposePrivate.getMediaSessions lista as abas da janela com mídia 
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateGetMediaSessionsFunction : public ExtensionFunction {
++class LogposePrivateGetMediaSessionsFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getMediaSessions", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetMediaSessionsFunction() override = default;
++  ~LogposePrivateGetMediaSessionsFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateMediaActionFunction : public ExtensionFunction {
++class LogposePrivateMediaActionFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.mediaAction", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateMediaActionFunction() override = default;
++  ~LogposePrivateMediaActionFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
@@ -124,7 +124,7 @@ Mini player: logposePrivate.getMediaSessions lista as abas da janela com mídia 
        ArgumentList(logpose_private::GetTabContainers::Results::Create(tabs)));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateGetMediaSessionsFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateGetMediaSessionsFunction::Run() {
 +  auto params = logpose_private::GetMediaSessions::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -202,7 +202,7 @@ Mini player: logposePrivate.getMediaSessions lista as abas da janela com mídia 
 +      logpose_private::GetMediaSessions::Results::Create(sessions)));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateMediaActionFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateMediaActionFunction::Run() {
 +  auto params = logpose_private::MediaAction::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -238,6 +238,6 @@ Mini player: logposePrivate.getMediaSessions lista as abas da janela com mídia 
 +  return RespondNow(NoArguments());
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateClearContainerFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateClearContainerFunction::Run() {
    auto params = logpose_private::ClearContainer::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);

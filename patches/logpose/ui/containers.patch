@@ -67,30 +67,30 @@ Containers: abas com cookies, logins e dados de sites próprios (uma partição 
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateCreateTabFunction : public ExtensionFunction {
++class LogposePrivateCreateTabFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.createTab", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateCreateTabFunction() override = default;
++  ~LogposePrivateCreateTabFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateGetTabContainersFunction : public ExtensionFunction {
++class LogposePrivateGetTabContainersFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getTabContainers", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetTabContainersFunction() override = default;
++  ~LogposePrivateGetTabContainersFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateClearContainerFunction : public ExtensionFunction {
++class LogposePrivateClearContainerFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.clearContainer", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateClearContainerFunction() override = default;
++  ~LogposePrivateClearContainerFunction() override = default;
 +  ResponseAction Run() override;
 +
 + private:
@@ -142,7 +142,7 @@ Containers: abas com cookies, logins e dados de sites próprios (uma partição 
    return RespondNow(Error(kNoCommandError, params->command));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateCreateTabFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateCreateTabFunction::Run() {
 +  auto params = logpose_private::CreateTab::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +  const logpose_private::CreateTabOptions& options = params->options;
@@ -187,7 +187,7 @@ Containers: abas com cookies, logins e dados de sites próprios (uma partição 
 +  return RespondNow(WithArguments(ExtensionTabUtil::GetTabId(raw)));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateGetTabContainersFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateGetTabContainersFunction::Run() {
 +  auto params = logpose_private::GetTabContainers::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -214,7 +214,7 @@ Containers: abas com cookies, logins e dados de sites próprios (uma partição 
 +      ArgumentList(logpose_private::GetTabContainers::Results::Create(tabs)));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateClearContainerFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateClearContainerFunction::Run() {
 +  auto params = logpose_private::ClearContainer::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +  if (params->container.empty()) {
@@ -232,14 +232,14 @@ Containers: abas com cookies, logins e dados de sites próprios (uma partição 
 +      content::StoragePartition::StorageKeyPolicyMatcherFunction(),
 +      std::move(cookies), /*perform_storage_cleanup=*/true, base::Time(),
 +      base::Time::Max(),
-+      base::BindOnce(&LogPosePrivateClearContainerFunction::OnCleared, this));
++      base::BindOnce(&LogposePrivateClearContainerFunction::OnCleared, this));
 +  partition->GetNetworkContext()->ClearHttpCache(
 +      base::Time(), base::Time::Max(), /*filter=*/nullptr,
-+      base::BindOnce(&LogPosePrivateClearContainerFunction::OnCleared, this));
++      base::BindOnce(&LogposePrivateClearContainerFunction::OnCleared, this));
 +  return RespondLater();
 +}
 +
-+void LogPosePrivateClearContainerFunction::OnCleared() {
++void LogposePrivateClearContainerFunction::OnCleared() {
 +  if (--pending_ == 0) {
 +    Respond(NoArguments());
 +  }

@@ -689,21 +689,21 @@ Janela pequena pra links de outros apps: com o Log Pose aberto, um link passado 
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateSetOpenLinksInLittleFunction : public ExtensionFunction {
++class LogposePrivateSetOpenLinksInLittleFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.setOpenLinksInLittle", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateSetOpenLinksInLittleFunction() override = default;
++  ~LogposePrivateSetOpenLinksInLittleFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateOpenInMainWindowFunction : public ExtensionFunction {
++class LogposePrivateOpenInMainWindowFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.openInMainWindow", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateOpenInMainWindowFunction() override = default;
++  ~LogposePrivateOpenInMainWindowFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
@@ -750,14 +750,14 @@ Janela pequena pra links de outros apps: com o Log Pose aberto, um link passado 
  }
  
 +ExtensionFunction::ResponseAction
-+LogPosePrivateSetOpenLinksInLittleFunction::Run() {
++LogposePrivateSetOpenLinksInLittleFunction::Run() {
 +  auto params = logpose_private::SetOpenLinksInLittle::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +  LogPoseSetOpenLinksInLittle(params->enabled);
 +  return RespondNow(NoArguments());
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateOpenInMainWindowFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateOpenInMainWindowFunction::Run() {
 +  auto params = logpose_private::OpenInMainWindow::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +

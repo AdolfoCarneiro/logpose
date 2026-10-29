@@ -156,25 +156,25 @@ O "Restaurar páginas?" do Chromium sai de cena: a barra lateral do Log Pose res
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateGetCrashedSessionFunction : public ExtensionFunction {
++class LogposePrivateGetCrashedSessionFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getCrashedSession", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetCrashedSessionFunction() override = default;
++  ~LogposePrivateGetCrashedSessionFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateResolveCrashedSessionFunction : public ExtensionFunction {
++class LogposePrivateResolveCrashedSessionFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.resolveCrashedSession", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateResolveCrashedSessionFunction() override = default;
++  ~LogposePrivateResolveCrashedSessionFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
+ class LogposePrivateExecuteCommandFunction : public ExtensionFunction {
   public:
    DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -191,7 +191,7 @@ O "Restaurar páginas?" do Chromium sai de cena: a barra lateral do Log Pose res
        logpose_private::GetEnabledCommands::Results::Create(enabled)));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateGetCrashedSessionFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateGetCrashedSessionFunction::Run() {
 +  auto params = logpose_private::GetCrashedSession::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -207,7 +207,7 @@ O "Restaurar páginas?" do Chromium sai de cena: a barra lateral do Log Pose res
 +}
 +
 +ExtensionFunction::ResponseAction
-+LogPosePrivateResolveCrashedSessionFunction::Run() {
++LogposePrivateResolveCrashedSessionFunction::Run() {
 +  auto params = logpose_private::ResolveCrashedSession::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -221,7 +221,7 @@ O "Restaurar páginas?" do Chromium sai de cena: a barra lateral do Log Pose res
 +  return RespondNow(NoArguments());
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateExecuteCommandFunction::Run() {
    auto params = logpose_private::ExecuteCommand::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);
 --- a/chrome/common/extensions/api/logpose_private.idl

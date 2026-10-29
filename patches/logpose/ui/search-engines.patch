@@ -42,25 +42,25 @@ logposePrivate.getSearchEngines / setDefaultSearchEngine: as configurações do 
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateGetSearchEnginesFunction : public ExtensionFunction {
++class LogposePrivateGetSearchEnginesFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getSearchEngines", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetSearchEnginesFunction() override = default;
++  ~LogposePrivateGetSearchEnginesFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateSetDefaultSearchEngineFunction : public ExtensionFunction {
++class LogposePrivateSetDefaultSearchEngineFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.setDefaultSearchEngine", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateSetDefaultSearchEngineFunction() override = default;
++  ~LogposePrivateSetDefaultSearchEngineFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
+ class LogposePrivateExecuteCommandFunction : public ExtensionFunction {
   public:
    DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -88,7 +88,7 @@ logposePrivate.getSearchEngines / setDefaultSearchEngine: as configurações do 
    return RespondNow(NoArguments());
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateGetSearchEnginesFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateGetSearchEnginesFunction::Run() {
 +  TemplateURLService* service = TemplateURLServiceFactory::GetForProfile(
 +      Profile::FromBrowserContext(browser_context()));
 +  if (!service) {
@@ -121,7 +121,7 @@ logposePrivate.getSearchEngines / setDefaultSearchEngine: as configurações do 
 +}
 +
 +ExtensionFunction::ResponseAction
-+LogPosePrivateSetDefaultSearchEngineFunction::Run() {
++LogposePrivateSetDefaultSearchEngineFunction::Run() {
 +  auto params = logpose_private::SetDefaultSearchEngine::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -143,7 +143,7 @@ logposePrivate.getSearchEngines / setDefaultSearchEngine: as configurações do 
 +  return RespondNow(NoArguments());
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateExecuteCommandFunction::Run() {
    auto params = logpose_private::ExecuteCommand::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);
 --- a/chrome/browser/extensions/api/logpose_private/BUILD.gn

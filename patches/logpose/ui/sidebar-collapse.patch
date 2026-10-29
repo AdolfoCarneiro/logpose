@@ -267,16 +267,16 @@ Barra lateral recolhível: logposePrivate.setSidebarMode põe a janela em "docke
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateSetSidebarModeFunction : public ExtensionFunction {
++class LogposePrivateSetSidebarModeFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.setSidebarMode", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateSetSidebarModeFunction() override = default;
++  ~LogposePrivateSetSidebarModeFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
+ class LogposePrivateExecuteCommandFunction : public ExtensionFunction {
   public:
    DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -293,7 +293,7 @@ Barra lateral recolhível: logposePrivate.setSidebarMode põe a janela em "docke
        logpose_private::SetShortcuts::Results::Create(rejected)));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateSetSidebarModeFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateSetSidebarModeFunction::Run() {
 +  auto params = logpose_private::SetSidebarMode::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -312,7 +312,7 @@ Barra lateral recolhível: logposePrivate.setSidebarMode põe a janela em "docke
 +  return RespondNow(NoArguments());
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateExecuteCommandFunction::Run() {
    auto params = logpose_private::ExecuteCommand::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);
 --- a/chrome/common/extensions/api/logpose_private.idl

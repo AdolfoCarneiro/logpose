@@ -1068,48 +1068,48 @@ Peek do Log Pose: links que uma Fixada abriria numa aba nova em primeiro plano (
    int pending_ = 0;
  };
  
-+class LogPosePrivateSetPeekTabsFunction : public ExtensionFunction {
++class LogposePrivateSetPeekTabsFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.setPeekTabs", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateSetPeekTabsFunction() override = default;
++  ~LogposePrivateSetPeekTabsFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateOpenPeekFunction : public ExtensionFunction {
++class LogposePrivateOpenPeekFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.openPeek", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateOpenPeekFunction() override = default;
++  ~LogposePrivateOpenPeekFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateClosePeekFunction : public ExtensionFunction {
++class LogposePrivateClosePeekFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.closePeek", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateClosePeekFunction() override = default;
++  ~LogposePrivateClosePeekFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivatePromotePeekFunction : public ExtensionFunction {
++class LogposePrivatePromotePeekFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.promotePeek", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivatePromotePeekFunction() override = default;
++  ~LogposePrivatePromotePeekFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateGetPeekFunction : public ExtensionFunction {
++class LogposePrivateGetPeekFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getPeek", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetPeekFunction() override = default;
++  ~LogposePrivateGetPeekFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
@@ -1172,7 +1172,7 @@ Peek do Log Pose: links que uma Fixada abriria numa aba nova em primeiro plano (
    }
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateSetPeekTabsFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateSetPeekTabsFunction::Run() {
 +  auto params = logpose_private::SetPeekTabs::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +  LogPoseSetPeekTabs(base::flat_set<int>(params->tab_ids.begin(),
@@ -1180,7 +1180,7 @@ Peek do Log Pose: links que uma Fixada abriria numa aba nova em primeiro plano (
 +  return RespondNow(NoArguments());
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateOpenPeekFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateOpenPeekFunction::Run() {
 +  auto params = logpose_private::OpenPeek::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -1204,7 +1204,7 @@ Peek do Log Pose: links que uma Fixada abriria numa aba nova em primeiro plano (
 +  return RespondNow(NoArguments());
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateClosePeekFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateClosePeekFunction::Run() {
 +  auto params = logpose_private::ClosePeek::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -1220,7 +1220,7 @@ Peek do Log Pose: links que uma Fixada abriria numa aba nova em primeiro plano (
 +  return RespondNow(NoArguments());
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivatePromotePeekFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivatePromotePeekFunction::Run() {
 +  auto params = logpose_private::PromotePeek::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -1238,7 +1238,7 @@ Peek do Log Pose: links que uma Fixada abriria numa aba nova em primeiro plano (
 +  return RespondNow(WithArguments(*tab_id));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateGetPeekFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateGetPeekFunction::Run() {
 +  auto params = logpose_private::GetPeek::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +

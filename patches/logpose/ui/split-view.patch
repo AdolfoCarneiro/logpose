@@ -56,34 +56,34 @@ Abas divididas do Log Pose: cada metade ganha no canto de cima os botões arrast
    std::unique_ptr<network::SimpleURLLoader> loader_;
  };
  
-+class LogPosePrivateDragTabFunction : public ExtensionFunction {
++class LogposePrivateDragTabFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.dragTab", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateDragTabFunction() override = default;
++  ~LogposePrivateDragTabFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateEndTabDragFunction : public ExtensionFunction {
++class LogposePrivateEndTabDragFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.endTabDrag", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateEndTabDragFunction() override = default;
++  ~LogposePrivateEndTabDragFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateArrangeSplitFunction : public ExtensionFunction {
++class LogposePrivateArrangeSplitFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.arrangeSplit", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateArrangeSplitFunction() override = default;
++  ~LogposePrivateArrangeSplitFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateFindFunction : public ExtensionFunction,
+ class LogposePrivateFindFunction : public ExtensionFunction,
                                    public find_in_page::FindResultObserver {
   public:
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -120,7 +120,7 @@ Abas divididas do Log Pose: cada metade ganha no canto de cima os botões arrast
        logpose_private::GetSearchSuggestions::Results::Create(suggestions)));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateDragTabFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateDragTabFunction::Run() {
 +  auto params = logpose_private::DragTab::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -135,7 +135,7 @@ Abas divididas do Log Pose: cada metade ganha no canto de cima os botões arrast
 +                   gfx::Point(params->x, params->y), params->zones))));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateEndTabDragFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateEndTabDragFunction::Run() {
 +  auto params = logpose_private::EndTabDrag::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -149,7 +149,7 @@ Abas divididas do Log Pose: cada metade ganha no canto de cima os botões arrast
 +  return RespondNow(NoArguments());
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateArrangeSplitFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateArrangeSplitFunction::Run() {
 +  auto params = logpose_private::ArrangeSplit::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -185,7 +185,7 @@ Abas divididas do Log Pose: cada metade ganha no canto de cima os botões arrast
 +                          " is not in a split."));
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateFindFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateFindFunction::Run() {
    auto params = logpose_private::Find::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);
 --- a/chrome/browser/ui/views/frame/browser_view.cc

@@ -304,16 +304,16 @@ Atalhos do Log Pose configuráveis: logposePrivate.setShortcuts recebe o mapa te
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateSetShortcutsFunction : public ExtensionFunction {
++class LogposePrivateSetShortcutsFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.setShortcuts", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateSetShortcutsFunction() override = default;
++  ~LogposePrivateSetShortcutsFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
+ class LogposePrivateExecuteCommandFunction : public ExtensionFunction {
   public:
    DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -339,7 +339,7 @@ Atalhos do Log Pose configuráveis: logposePrivate.setShortcuts recebe o mapa te
    return RespondNow(NoArguments());
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateSetShortcutsFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateSetShortcutsFunction::Run() {
 +  auto params = logpose_private::SetShortcuts::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -359,7 +359,7 @@ Atalhos do Log Pose configuráveis: logposePrivate.setShortcuts recebe o mapa te
 +      logpose_private::SetShortcuts::Results::Create(rejected)));
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateExecuteCommandFunction::Run() {
    auto params = logpose_private::ExecuteCommand::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);
 @@ -234,6 +257,10 @@

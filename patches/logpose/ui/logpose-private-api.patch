@@ -102,7 +102,7 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
    kBluetoothPeripheral = 272,
    kPublicSuffix = 273,
    kEnterpriseWebrtc = 274,
-+  kLogPosePrivate = 275,
++  kLogposePrivate = 275,
  
    // Add new entries at the end of the enum and be sure to update the
    // "ExtensionPermission3" enum in
@@ -112,7 +112,7 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
       APIPermissionInfo::kFlagCannotBeOptional},
      {APIPermissionID::kPdfViewerPrivate, "pdfViewerPrivate"},
      {APIPermissionID::kIndigoPrivate, "indigoPrivate"},
-+    {APIPermissionID::kLogPosePrivate, "logposePrivate",
++    {APIPermissionID::kLogposePrivate, "logposePrivate",
 +     APIPermissionInfo::kFlagCannotBeOptional},
      {APIPermissionID::kProxyOverrideRulesPrivate, "proxyOverrideRulesPrivate",
       APIPermissionInfo::kFlagCannotBeOptional},
@@ -173,39 +173,39 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
 +
 +namespace extensions {
 +
-+class LogPosePrivateGetExtensionActionsFunction : public ExtensionFunction {
++class LogposePrivateGetExtensionActionsFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getExtensionActions", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetExtensionActionsFunction() override = default;
++  ~LogposePrivateGetExtensionActionsFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateRunExtensionActionFunction : public ExtensionFunction {
++class LogposePrivateRunExtensionActionFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.runExtensionAction", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateRunExtensionActionFunction() override = default;
++  ~LogposePrivateRunExtensionActionFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateGetEnabledCommandsFunction : public ExtensionFunction {
++class LogposePrivateGetEnabledCommandsFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.getEnabledCommands", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateGetEnabledCommandsFunction() override = default;
++  ~LogposePrivateGetEnabledCommandsFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
-+class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
++class LogposePrivateExecuteCommandFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateExecuteCommandFunction() override = default;
++  ~LogposePrivateExecuteCommandFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
@@ -315,7 +315,7 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
 +}  // namespace
 +
 +ExtensionFunction::ResponseAction
-+LogPosePrivateGetExtensionActionsFunction::Run() {
++LogposePrivateGetExtensionActionsFunction::Run() {
 +  auto params = logpose_private::GetExtensionActions::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -347,7 +347,7 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
 +}
 +
 +ExtensionFunction::ResponseAction
-+LogPosePrivateRunExtensionActionFunction::Run() {
++LogposePrivateRunExtensionActionFunction::Run() {
 +  auto params = logpose_private::RunExtensionAction::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -375,7 +375,7 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
 +}
 +
 +ExtensionFunction::ResponseAction
-+LogPosePrivateGetEnabledCommandsFunction::Run() {
++LogposePrivateGetEnabledCommandsFunction::Run() {
 +  auto params = logpose_private::GetEnabledCommands::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -395,7 +395,7 @@ API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações
 +      logpose_private::GetEnabledCommands::Results::Create(enabled)));
 +}
 +
-+ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateExecuteCommandFunction::Run() {
 +  auto params = logpose_private::ExecuteCommand::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +

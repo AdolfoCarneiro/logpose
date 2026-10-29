@@ -40,16 +40,16 @@ Informações do site (conexão, permissões, cookies, ruído contra fingerprint
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateShowPageInfoFunction : public ExtensionFunction {
++class LogposePrivateShowPageInfoFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.showPageInfo", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateShowPageInfoFunction() override = default;
++  ~LogposePrivateShowPageInfoFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateResolveInputFunction : public ExtensionFunction {
+ class LogposePrivateResolveInputFunction : public ExtensionFunction {
   public:
    DECLARE_EXTENSION_FUNCTION("logposePrivate.resolveInput", UNKNOWN)
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -145,7 +145,7 @@ Informações do site (conexão, permissões, cookies, ruído contra fingerprint
    return RespondNow(Error(kNoCommandError, params->command));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateShowPageInfoFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateShowPageInfoFunction::Run() {
 +  auto params = logpose_private::ShowPageInfo::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -161,6 +161,6 @@ Informações do site (conexão, permissões, cookies, ruído contra fingerprint
 +  return RespondNow(NoArguments());
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateResolveInputFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateResolveInputFunction::Run() {
    auto params = logpose_private::ResolveInput::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);

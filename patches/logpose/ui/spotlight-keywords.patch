@@ -74,16 +74,16 @@ O spotlight e a barra de endereço da barra lateral leem o texto como a barra de
    ResponseAction Run() override;
  };
  
-+class LogPosePrivateResolveInputFunction : public ExtensionFunction {
++class LogposePrivateResolveInputFunction : public ExtensionFunction {
 + public:
 +  DECLARE_EXTENSION_FUNCTION("logposePrivate.resolveInput", UNKNOWN)
 +
 + protected:
-+  ~LogPosePrivateResolveInputFunction() override = default;
++  ~LogposePrivateResolveInputFunction() override = default;
 +  ResponseAction Run() override;
 +};
 +
- class LogPosePrivateFindFunction : public ExtensionFunction,
+ class LogposePrivateFindFunction : public ExtensionFunction,
                                    public find_in_page::FindResultObserver {
   public:
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
@@ -126,7 +126,7 @@ O spotlight e a barra de endereço da barra lateral leem o texto como a barra de
    return RespondNow(Error(kNoCommandError, params->command));
  }
  
-+ExtensionFunction::ResponseAction LogPosePrivateResolveInputFunction::Run() {
++ExtensionFunction::ResponseAction LogposePrivateResolveInputFunction::Run() {
 +  auto params = logpose_private::ResolveInput::Params::Create(args());
 +  EXTENSION_FUNCTION_VALIDATE(params);
 +
@@ -164,6 +164,6 @@ O spotlight e a barra de endereço da barra lateral leem o texto como a barra de
 +      ArgumentList(logpose_private::ResolveInput::Results::Create(input)));
 +}
 +
- ExtensionFunction::ResponseAction LogPosePrivateFindFunction::Run() {
+ ExtensionFunction::ResponseAction LogposePrivateFindFunction::Run() {
    auto params = logpose_private::Find::Params::Create(args());
    EXTENSION_FUNCTION_VALIDATE(params);
