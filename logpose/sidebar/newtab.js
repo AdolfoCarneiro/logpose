@@ -55,7 +55,17 @@ async function search(seed = "") {
 }
 const keys = current(stored.shortcuts).find((s) => s.command === "openLocation")?.keys;
 $("keys").replaceChildren(...label(keys).map((k) => el("kbd", "", k)));
-$("search").onclick = () => search();
+// o campo de busca da página fica focado; o que for digitado nele vai pro spotlight
+const searchInput = $("search-input");
+searchInput.focus();
+searchInput.addEventListener("input", () => {
+  const text = searchInput.value;
+  searchInput.value = "";
+  if (text.trim()) search(text);
+});
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") search();
+});
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.key.length !== 1 || e.key === " ") return;
   if (e.target.closest?.("input, textarea, [contenteditable]")) return;

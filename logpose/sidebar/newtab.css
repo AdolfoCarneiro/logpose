@@ -32,7 +32,8 @@ body {
 .search:hover { transform: scale(1.01); }
 .search:active { transform: scale(0.99); }
 .search .k-icon { font-size: 20px; color: var(--k-color-primary); }
-.search__text { flex: 1; }
+.search__text { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--k-color-on-surface); font: inherit; caret-color: var(--k-color-primary); }
+.search__text::placeholder { color: var(--k-color-on-surface-variant); }
 .keys { display: inline-flex; gap: 4px; }
 .keys kbd { padding: 2px 8px; border-radius: var(--k-shape-small); background: var(--k-color-surface-container-highest); font-family: inherit; }
 
