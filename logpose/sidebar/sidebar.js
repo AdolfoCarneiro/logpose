@@ -871,25 +871,7 @@ async function syncFullscreen() {
   }
 }
 
-async function syncMaximize() {
-  const win = await chrome.windows.get(windowId).catch(() => null);
-  if (!win) return;
-  const button = document.getElementById("window-maximize");
-  const maximized = win.state === "maximized";
-  button.dataset.icon = maximized ? "copy" : "square";
-  button.title = maximized ? "Restaurar" : "Maximizar";
-  paintIcons(button.parentElement);
-}
-
-document.getElementById("window-minimize").onclick = () => chrome.windows.update(windowId, { state: "minimized" });
-document.getElementById("window-maximize").onclick = async () => {
-  const win = await chrome.windows.get(windowId);
-  await chrome.windows.update(windowId, { state: win.state === "maximized" ? "normal" : "maximized" });
-  syncMaximize();
-};
-document.getElementById("window-close").onclick = () => chrome.windows.remove(windowId);
-
-chrome.windows.onBoundsChanged.addListener((win) => { if (win.id === windowId) { syncFullscreen(); syncMaximize(); } });
+chrome.windows.onBoundsChanged.addListener((win) => { if (win.id === windowId) syncFullscreen(); });
 
 async function splitWithPrevious() {
   const tabs = await chrome.tabs.query({ windowId });
@@ -979,7 +961,6 @@ if (!(await chrome.alarms.get("logpose-lifecycle"))) chrome.alarms.create("logpo
 paintIcons();
 const currentWindow = await chrome.windows.getCurrent();
 windowId = currentWindow.id;
-syncMaximize();
 incognito = currentWindow.incognito;
 document.body.classList.toggle("incognito", incognito);
 settings = loadSettings((await chrome.storage.local.get("settings")).settings);

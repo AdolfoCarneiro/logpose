@@ -1,0 +1,63 @@
+Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, como nos outros apps do KDE: o cartão da página desce até abaixo deles, e a faixa acima do cartão é da moldura (botões, e o resto arrasta a janela). A barra lateral fica de fora.
+
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -5480,6 +5480,15 @@
+   views::View::ConvertPointToTarget(parent(), this,
+                                     &point_in_browser_view_coords);
+ 
++  // Log Pose: a faixa acima do cartão da página é da moldura, com os botões
++  // da janela e o resto pra arrastar; a barra lateral do lado fica de fora.
++  if (LogPoseHidesNativeChrome(browser_) && multi_contents_view_ &&
++      multi_contents_view_->GetVisible() &&
++      point_in_browser_view_coords.y() < multi_contents_view_->y() &&
++      point_in_browser_view_coords.x() >= multi_contents_view_->x()) {
++    return HTNOWHERE;
++  }
++
+   // Check if the point is in the web_app_frame_toolbar_. Because this toolbar
+   // can entirely be within the window controls overlay area, this check needs
+   // to be done before the window controls overlay area check below.
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1456,8 +1456,16 @@
+         views().side_panel && views().side_panel->GetVisible();
+     const bool panel_right =
+         panel_shown && views().side_panel->IsRightAligned();
++    // Faixa no topo pros botões de minimizar, maximizar e fechar da moldura,
++    // que ficam por cima dela no canto da janela.
++    const int caption_height =
++        browser_params.trailing_exclusion.IsEmpty()
++            ? 0
++            : base::ClampCeil(
++                  browser_params.trailing_exclusion.content.height());
+     logpose_contents_bounds.Inset(gfx::Insets::TLBR(
+-        logpose_little ? kLogPoseLittleBarHeight : 8,
++        logpose_little ? kLogPoseLittleBarHeight
++                       : std::max(8, caption_height + 6),
+         panel_shown && !panel_right ? 0 : 8, 8, panel_right ? 0 : 8));
+   }
+   auto& contents_layout =
+--- a/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc
++++ b/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc
+@@ -7,6 +7,7 @@
+ #include <algorithm>
+ #include <utility>
+ 
++#include "base/command_line.h"
+ #include "base/trace_event/trace_event.h"
+ #include "build/build_config.h"
+ #include "build/buildflag.h"
+@@ -601,6 +602,12 @@
+   const auto info = GetClientFrameElementInfo();
+   const auto frame_height = FrameBorderInsets(false).top();
+   const auto top_height = layout_->NonClientTopHeight(false);
++  // Log Pose: sem abas nem toolbar nativas, a área de cima é a faixa dos
++  // botões da janela, da altura da linha de cima da barra lateral.
++  if (is_tabbed && !base::CommandLine::ForCurrentProcess()->HasSwitch(
++                       "logpose-native-chrome")) {
++    return frame_height + 36;
++  }
+   return std::max(
+       frame_height + info.toolbar_minimum_height,
+       top_height + info.tabstrip_preferred_height -

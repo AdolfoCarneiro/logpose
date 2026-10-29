@@ -61,3 +61,4 @@ logpose/ui/split-view.patch
 logpose/ui/escape-exits-fullscreen.patch
 logpose/ui/google-default.patch
 logpose/ui/background-blur.patch
+logpose/ui/window-buttons.patch
