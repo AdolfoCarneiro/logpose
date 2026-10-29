@@ -25,8 +25,7 @@ Roda num container Debian (`logpose/bin/logpose-dev`, imagem `logpose-dev:trixie
 - `logpose/bin/logpose-build`: recompila só o que mudou, com `nice`. O primeiro leva horas; depois, minutos.
 - `logpose/bin/logpose-build patches`: depois de editar ou puxar patches de `patches/`. Desaplica só a partir do primeiro patch que mudou e reaplica dali pra frente, pra não forçar rebuild do resto. Rode `build` em seguida.
 - `logpose/bin/logpose-build du` mostra o espaço; `reset` apaga `build/src`.
-- Um `out/` só, que serve pra testar e pra empacotar: sem component build (o pacote leva um binário só), sem o official build (o LTO deixaria cada link lento) e sem símbolos (`symbol_level=0`). `LOGPOSE_OFFICIAL=1 logpose-build args` volta pro official build, e mudar os args recompila tudo.
-- `sccache` em `~/.cache/logpose/sccache`, limitado a 20G (`LOGPOSE_SCCACHE_SIZE`). Ajuda quando `build/src` é refeito.
+- Um `out/` só, que serve pra testar e pra empacotar: sem component build (o pacote leva um binário só), sem o official build (o LTO deixaria cada link lento), sem DCHECK e sem símbolos (`symbol_level=0`). `LOGPOSE_OFFICIAL=1 logpose-build args` volta pro official build, e mudar os args recompila tudo.
 - Pra editar um patch: `logpose/bin/logpose-dev` abre um shell no container com o `he` do Helium (`he merge`, `cd build/src`, `quilt push/pop/refresh`, `he unmerge`).
 
 ## Instalável

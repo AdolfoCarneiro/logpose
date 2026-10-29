@@ -16,7 +16,8 @@ logpose_dev_args() {
     sed -i -e 's/^symbol_level=.*/symbol_level=0/' \
         -e 's/^blink_symbol_level=.*/blink_symbol_level=0/' \
         "${_out_dir}/args.gn"
-    echo 'v8_symbol_level=0' >> "${_out_dir}/args.gn"
+    # sem o official build o Chromium liga os DCHECKs, que derrubam abas e deixam tudo mais lento
+    printf 'v8_symbol_level=0\ndcheck_always_on=false\n' >> "${_out_dir}/args.gn"
     cat "${_out_dir}/args.gn"
 }
 
