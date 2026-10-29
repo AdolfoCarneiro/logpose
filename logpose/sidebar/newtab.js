@@ -9,6 +9,7 @@ import { greeting, fullDate, parseNews, ago, weatherIcon, weatherLabel, hourly, 
 const NEWS_URL = "https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-419";
 const FRESH = 30 * 60 * 1000;
 const MARKET_FRESH = 5 * 60 * 1000;
+const MARKET_RETRY = 30 * 1000;
 const DOLLAR_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL";
 const SELIC_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json";
 const chartUrl = (symbol) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
@@ -183,11 +184,19 @@ async function yahoo(symbol) {
   return quoteFromChart(await json(chartUrl(symbol)));
 }
 
-// dólar, Selic, Ibovespa, S&P 500 e as ações escolhidas; o que falhar fica de fora
+// mantém o último valor bom do que falhou agora (a API do Banco Central às vezes não responde)
+function withPrevious(fresh, previous, expected) {
+  const byName = new Map((previous ?? []).map((q) => [q.name, q]));
+  const got = new Set(fresh.map((q) => q.name));
+  return expected.map((name) => (got.has(name) ? fresh.find((q) => q.name === name) : byName.get(name))).filter(Boolean);
+}
+
+// dólar, Selic, Ibovespa, S&P 500 e as ações escolhidas; o que falhar fica com o último valor bom
+// e o mercado tenta de novo em 30 s em vez de 5 min
 async function marketSnapshot(tickers, force) {
   const key = tickers.join(",");
   const hit = stored.marketCache;
-  if (!force && hit?.key === key && Date.now() - hit.at < MARKET_FRESH) return hit.data;
+  if (!force && hit?.key === key && Date.now() - hit.at < (hit.partial ? MARKET_RETRY : MARKET_FRESH)) return hit.data;
   const [dollar, selic, ibov, sp500, ...mine] = await Promise.allSettled([
     json(DOLLAR_URL), json(SELIC_URL), yahoo("^BVSP"), yahoo("^GSPC"), ...tickers.map(yahoo),
   ]);
@@ -203,8 +212,11 @@ async function marketSnapshot(tickers, force) {
     ].filter(Boolean),
     mine: mine.map(value).filter(Boolean).map((q) => ({ name: tickerLabel(q.symbol), value: money(q.price, q.currency), change: q.change, query: `${tickerLabel(q.symbol)} cotação` })),
   };
+  const partial = data.indicators.length < 4 || data.mine.length < tickers.length;
+  data.indicators = withPrevious(data.indicators, hit?.data?.indicators, ["Dólar", "Selic", "Ibovespa", "S&P 500"]);
+  data.mine = withPrevious(data.mine, hit?.data?.mine, tickers.map(tickerLabel));
   if (!data.indicators.length && !data.mine.length) throw new Error("mercado");
-  stored.marketCache = { key, at: Date.now(), data };
+  stored.marketCache = { key, at: Date.now(), partial, data };
   await chrome.storage.local.set({ marketCache: stored.marketCache });
   return data;
 }
