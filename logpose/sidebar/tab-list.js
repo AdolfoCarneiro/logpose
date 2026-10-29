@@ -279,8 +279,18 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
     count.className = "island-head__count k-type-caption";
     const chevron = Object.assign(document.createElement("span"), { className: "k-icon island-head__chevron", textContent: glyph("chevron-down") });
     li.append(chip, count, chevron);
-    li.onclick = () => { if (!li.dataset.renaming) onIslandToggle(groupId); };
-    li.ondblclick = (e) => { e.stopPropagation(); renameIsland(groupId); };
+    let toggleTimer;
+    li.onclick = (e) => {
+      clearTimeout(toggleTimer);
+      if (li.dataset.renaming || e.detail > 1) return;
+      if (e.target.closest(".island-head__chip")) toggleTimer = setTimeout(() => onIslandToggle(groupId), 220);
+      else onIslandToggle(groupId);
+    };
+    li.ondblclick = (e) => {
+      e.stopPropagation();
+      clearTimeout(toggleTimer);
+      if (e.target.closest(".island-head__chip")) renameIsland(groupId);
+    };
     li.oncontextmenu = (e) => {
       e.preventDefault();
       e.stopPropagation();

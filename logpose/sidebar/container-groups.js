@@ -5,7 +5,7 @@ import { animate, pop } from "./motion.js";
 import { call } from "./logpose-private.js";
 import { faviconOf } from "./tabs-model.js";
 import { pinId, drifted, prune, tabOf, pinSnapshot } from "./pins-model.js";
-import { loadContainers, createContainer, pagesOf, addPage, removePage, updatePage, findPage, toggleGroup, pageIds, restorePages, pageTitle } from "./containers-model.js";
+import { loadContainers, createContainer, updateContainer, CONTAINER_COLORS, CONTAINER_ICONS, pagesOf, addPage, removePage, updatePage, findPage, toggleGroup, pageIds, restorePages, pageTitle } from "./containers-model.js";
 
 function icon(name) {
   return Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(name) });
@@ -32,6 +32,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
   let containers = loadContainers(undefined);
   let live = {};
   let renaming = false;
+  let pendingRename = null;
 
   async function save(next) {
     containers = next;
@@ -164,6 +165,38 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
     input.select();
   }
 
+  function renameName(id, label) {
+    const current = label.textContent;
+    const input = Object.assign(document.createElement("input"), { className: "k-text-field k-type-label tab__rename", value: current, maxLength: 32 });
+    let done = false;
+    renaming = true;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      renaming = false;
+      input.replaceWith(label);
+      const name = input.value.trim();
+      if (keep && name && name !== current) save(updateContainer(containers, id, { name }));
+      else changed();
+    };
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") finish(true);
+      else if (e.key === "Escape") finish(false);
+    };
+    input.onblur = () => finish(true);
+    input.onclick = (e) => e.stopPropagation();
+    input.ondblclick = (e) => e.stopPropagation();
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  function renameGroup(id) {
+    pendingRename = id;
+    changed();
+  }
+
   function pageMenu(container, page, tab, li, x, y) {
     const away = tab && drifted(page.url, tab.url);
     showMenu([
@@ -186,6 +219,9 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
       ...(open ? [{ icon: "x", label: "Fechar as abas do grupo", action: () => closeAll(container) }] : []),
       { icon: "plus", label: `Nova aba no grupo ${container.name}`, action: () => newTab(container.id) },
       "divider",
+      { icon: "pencil", label: "Renomear", action: () => renameGroup(container.id) },
+      { swatches: CONTAINER_COLORS.map((color) => ({ value: color, color, selected: color === container.color })), pick: (color) => save(updateContainer(containers, container.id, { color })) },
+      { swatches: CONTAINER_ICONS.map((name) => ({ value: name, icon: name, selected: name === container.icon })), pick: (name) => save(updateContainer(containers, container.id, { icon: name })) },
       { icon: "settings", label: `Editar ${container.name}`, action: () => edit(container.id) },
     ], x, y);
   }
@@ -242,14 +278,25 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
     head.title = container.collapsed ? "Mostrar o grupo" : "Recolher o grupo";
     const chip = document.createElement("span");
     chip.className = "group__chip";
-    chip.append(icon(container.icon), Object.assign(document.createElement("span"), { textContent: container.name }));
+    const name = Object.assign(document.createElement("span"), { textContent: container.name });
+    name.ondblclick = (e) => {
+      e.stopPropagation();
+      clearTimeout(toggleTimer);
+      renameName(container.id, name);
+    };
+    chip.append(icon(container.icon), name);
     const count = Object.assign(document.createElement("span"), { className: "group__count k-type-caption", textContent: openTabs.length ? `${openTabs.length}/${pages.length}` : String(pages.length) });
     const chevron = icon("chevron-down");
     chevron.classList.add("group__chevron");
     const add = iconButton("plus", `Nova aba no grupo ${container.name}`, () => newTab(container.id));
     add.classList.add("group__add");
     head.append(chip, count, add, chevron);
-    head.onclick = async () => {
+    head.onclick = (e) => {
+      clearTimeout(toggleTimer);
+      if (e.detail === 1 && e.target.closest(".group__chip")) toggleTimer = setTimeout(toggle, 220);
+      else if (e.detail === 1) toggle();
+    };
+    const toggle = async () => {
       const body = li.querySelector(".group__pages");
       if (body && !container.collapsed) {
         await animate(body, [{ height: `${body.offsetHeight}px`, opacity: 1 }, { height: "0px", opacity: 0 }], "spatial-fast")?.finished.catch(() => {});
@@ -269,6 +316,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
   }
 
   let expanded = null;
+  let toggleTimer;
 
   function render(tabs, activeId) {
     if (renaming) return;
@@ -281,6 +329,12 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
       if (before.has(id)) continue;
       const body = list.querySelector(`.group[data-id="${CSS.escape(id)}"] .group__pages`);
       if (body) animate(body, [{ height: "0px", opacity: 0 }, { height: `${body.offsetHeight}px`, opacity: 1 }], "spatial-default");
+    }
+    const label = pendingRename && list.querySelector(`.group[data-id="${CSS.escape(pendingRename)}"] .group__chip > span:last-child`);
+    if (label) {
+      const id = pendingRename;
+      pendingRename = null;
+      renameName(id, label);
     }
   }
 
@@ -296,7 +350,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
   });
 
   return {
-    load, persist, render, liveIds, saveTab, adopt, createFrom,
+    load, persist, render, liveIds, saveTab, adopt, createFrom, renameGroup,
     list: () => containers,
     pageOfTab: (tabId) => (live[tabId] ? findPage(containers, live[tabId]) : null),
   };

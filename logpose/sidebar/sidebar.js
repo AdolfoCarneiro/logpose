@@ -227,7 +227,10 @@ function groupEntries(ids) {
     "divider",
     { heading: "Guardar no grupo" },
     ...groups.list().map((g) => ({ icon: g.icon, label: g.name, action: save(g.id) })),
-    { icon: "plus", label: "Novo grupo", action: () => containerEditor.open() },
+    { icon: "plus", label: "Novo grupo", action: async () => {
+      tabList.clearSelection();
+      groups.renameGroup(await groups.createFrom({ name: nextGroupName(groups.list()) }, ids));
+    } },
   ];
 }
 
