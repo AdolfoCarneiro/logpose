@@ -1,0 +1,195 @@
+A UI nativa que sobrou (diálogos, bolhas, menus, menu de contexto da página, páginas chrome://) segue a paleta MD3 do tema do Ciel: o mixer de cor lê ~/.local/state/logpose/palette (gerado pelo hook de tema) e troca os tokens kColorSys* do Chromium, dos quais quase toda a UI deriva.
+
+--- a/chrome/browser/ui/color/logpose_color_mixer.cc
++++ b/chrome/browser/ui/color/logpose_color_mixer.cc
+@@ -1,5 +1,6 @@
+ #include "chrome/browser/ui/color/logpose_color_mixer.h"
+ 
++#include <map>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -11,6 +12,7 @@
+ #include "base/functional/bind.h"
+ #include "base/no_destructor.h"
+ #include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
+ #include "base/strings/string_util.h"
+ #include "base/task/thread_pool.h"
+ #include "base/time/time.h"
+@@ -26,21 +28,25 @@
+ 
+ namespace {
+ 
+-base::FilePath FrameColorPath() {
++using Palette = std::map<std::string, SkColor, std::less<>>;
++
++struct LogPoseColors {
++  std::optional<SkColor> frame;
++  Palette palette;
++
++  bool operator==(const LogPoseColors&) const = default;
++};
++
++base::FilePath StateDir() {
+   std::unique_ptr<base::Environment> env = base::Environment::Create();
+   std::optional<std::string> state = env->GetVar("XDG_STATE_HOME");
+   base::FilePath dir = state && !state->empty()
+                            ? base::FilePath(*state)
+                            : base::GetHomeDir().Append(".local/state");
+-  return dir.Append("logpose").Append("frame-color");
+-}
+-
+-std::optional<SkColor> ReadFrameColor(const base::FilePath& path) {
+-  std::string text;
+-  if (!base::ReadFileToString(path, &text)) {
+-    return std::nullopt;
+-  }
+-  std::string_view hex = base::TrimWhitespaceASCII(text, base::TRIM_ALL);
++  return dir.Append("logpose");
++}
++
++std::optional<SkColor> ParseColor(std::string_view hex) {
+   uint32_t value = 0;
+   if ((hex.size() != 7 && hex.size() != 9) || hex[0] != '#' ||
+       !base::HexStringToUInt(hex.substr(1), &value)) {
+@@ -51,6 +57,29 @@
+   }
+   return SkColorSetARGB(value & 0xff, (value >> 24) & 0xff,
+                         (value >> 16) & 0xff, (value >> 8) & 0xff);
++}
++
++LogPoseColors ReadColors(const base::FilePath& dir) {
++  LogPoseColors colors;
++  std::string text;
++  if (base::ReadFileToString(dir.Append("frame-color"), &text)) {
++    colors.frame =
++        ParseColor(base::TrimWhitespaceASCII(text, base::TRIM_ALL));
++  }
++  if (base::ReadFileToString(dir.Append("palette"), &text)) {
++    for (std::string_view line : base::SplitStringPiece(
++             text, "\n", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++      const size_t space = line.find(' ');
++      if (space == std::string_view::npos) {
++        continue;
++      }
++      if (std::optional<SkColor> color = ParseColor(base::TrimWhitespaceASCII(
++              line.substr(space + 1), base::TRIM_ALL))) {
++        colors.palette.emplace(std::string(line.substr(0, space)), *color);
++      }
++    }
++  }
++  return colors;
+ }
+ 
+ class LogPoseFrameColor {
+@@ -60,7 +89,8 @@
+     return *instance;
+   }
+ 
+-  std::optional<SkColor> color() const { return color_; }
++  std::optional<SkColor> color() const { return colors_.frame; }
++  const Palette& palette() const { return colors_.palette; }
+ 
+   void EnsureWatching() {
+     if (timer_.IsRunning()) {
+@@ -76,20 +106,20 @@
+   void Poll() {
+     base::ThreadPool::PostTaskAndReplyWithResult(
+         FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
+-        base::BindOnce(&ReadFrameColor, path_),
++        base::BindOnce(&ReadColors, dir_),
+         base::BindOnce(&LogPoseFrameColor::OnRead, base::Unretained(this)));
+   }
+ 
+-  void OnRead(std::optional<SkColor> color) {
+-    if (color == color_) {
++  void OnRead(LogPoseColors colors) {
++    if (colors == colors_) {
+       return;
+     }
+-    color_ = color;
++    colors_ = std::move(colors);
+     ui::NativeTheme::GetInstanceForNativeUi()->NotifyOnNativeThemeUpdated();
+   }
+ 
+-  const base::FilePath path_ = FrameColorPath();
+-  std::optional<SkColor> color_;
++  const base::FilePath dir_ = StateDir();
++  LogPoseColors colors_;
+   base::RepeatingTimer timer_;
+ };
+ 
+@@ -99,11 +129,70 @@
+                         const ui::ColorProviderKey& key) {
+   LogPoseFrameColor& frame = LogPoseFrameColor::Get();
+   frame.EnsureWatching();
+-  if (!frame.color() || key.app_controller) {
++  if (key.app_controller) {
+     return;
+   }
++  ui::ColorMixer& mixer = provider->AddMixer();
++  const Palette& palette = frame.palette();
++  const struct {
++    ui::ColorId id;
++    std::string_view token;
++  } tokens[] = {
++      {ui::kColorSysPrimary, "primary"},
++      {ui::kColorSysOnPrimary, "on-primary"},
++      {ui::kColorSysPrimaryContainer, "primary-container"},
++      {ui::kColorSysOnPrimaryContainer, "on-primary-container"},
++      {ui::kColorSysSecondary, "secondary"},
++      {ui::kColorSysOnSecondary, "on-secondary"},
++      {ui::kColorSysSecondaryContainer, "secondary-container"},
++      {ui::kColorSysOnSecondaryContainer, "on-secondary-container"},
++      {ui::kColorSysTertiary, "tertiary"},
++      {ui::kColorSysOnTertiary, "on-tertiary"},
++      {ui::kColorSysTertiaryContainer, "tertiary-container"},
++      {ui::kColorSysOnTertiaryContainer, "on-tertiary-container"},
++      {ui::kColorSysError, "error"},
++      {ui::kColorSysOnError, "on-error"},
++      {ui::kColorSysErrorContainer, "error-container"},
++      {ui::kColorSysOnErrorContainer, "on-error-container"},
++      {ui::kColorSysSurface, "surface-container-high"},
++      {ui::kColorSysSurface1, "surface-container-low"},
++      {ui::kColorSysSurface2, "surface-container"},
++      {ui::kColorSysSurface3, "surface-container-high"},
++      {ui::kColorSysSurface4, "surface-container-highest"},
++      {ui::kColorSysSurface5, "surface-container-highest"},
++      {ui::kColorSysSurfaceVariant, "surface-container-highest"},
++      {ui::kColorSysOnSurface, "on-surface"},
++      {ui::kColorSysOnSurfaceSecondary, "on-surface-variant"},
++      {ui::kColorSysOnSurfaceSubtle, "on-surface-variant"},
++      {ui::kColorSysOnSurfaceVariant, "on-surface-variant"},
++      {ui::kColorSysOnSurfacePrimary, "primary"},
++      {ui::kColorSysOutline, "outline"},
++      {ui::kColorSysNeutralOutline, "outline-variant"},
++      {ui::kColorSysTonalOutline, "outline-variant"},
++      {ui::kColorSysDivider, "outline-variant"},
++      {ui::kColorSysNeutralContainer, "surface-container-highest"},
++      {ui::kColorSysTonalContainer, "secondary-container"},
++      {ui::kColorSysOnTonalContainer, "on-secondary-container"},
++      {ui::kColorSysBase, "surface-container"},
++      {ui::kColorSysBaseContainer, "surface-container-high"},
++      {ui::kColorSysBaseContainerElevated, "surface-container-highest"},
++      {ui::kColorSysBaseTonalContainer, "secondary-container"},
++      {ui::kColorSysOnBaseTonalContainer, "on-secondary-container"},
++      {ui::kColorSysInverseSurface, "on-surface"},
++      {ui::kColorSysInverseOnSurface, "surface"},
++      {ui::kColorSysInversePrimary, "primary-container"},
++      {ui::kColorSysStateFocusRing, "primary"},
++      {ui::kColorSysOmniboxContainer, "surface-container-highest"},
++  };
++  for (const auto& token : tokens) {
++    if (auto it = palette.find(token.token); it != palette.end()) {
++      mixer[token.id] = ui::ColorTransform(it->second);
++    }
++  }
++  if (!frame.color()) {
++    return;
++  }
+   const SkColor color = SkColorSetA(*frame.color(), SK_AlphaOPAQUE);
+-  ui::ColorMixer& mixer = provider->AddMixer();
+   const ui::ColorId ids[] = {ui::kColorFrameActive, ui::kColorFrameInactive,
+                              kColorToolbar, kColorSidePanelContentBackground,
+                              kColorSidePanelContentAreaSeparator};

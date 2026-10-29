@@ -1,0 +1,57 @@
+Sombra suave sob o cartão da página, no vão de 8px em volta dele (ShadowFrameView do Chromium, raio 12, some em tela cheia). Ideia do patch 0041 do Flecha.
+
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -184,6 +184,7 @@
+ #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
+ #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
+ #include "chrome/browser/ui/views/frame/scrim_view.h"
++#include "chrome/browser/ui/views/frame/shadow_frame_view.h"
+ #include "chrome/browser/ui/views/frame/shadow_overlay_view.h"
+ #include "chrome/browser/ui/views/frame/tab_modal_dialog_host.h"
+ #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+@@ -1073,6 +1074,16 @@
+   auto multi_contents_view = std::make_unique<MultiContentsView>(
+       this, std::make_unique<MultiContentsViewDelegateImpl>(*browser_));
+   multi_contents_view_ = AddChildView(std::move(multi_contents_view));
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "logpose-native-chrome") &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
++    AddChildViewAt(std::make_unique<ShadowFrameView>(
++                       4, ShadowFrameView::ShadowAlpha{.light_key = 0.10,
++                                                       .light_ambient = 0.17,
++                                                       .dark_key = 0.20,
++                                                       .dark_ambient = 0.40}),
++                   GetIndexOf(multi_contents_view_).value());
++  }
+ 
+   set_contents_view(multi_contents_view_);
+ 
+@@ -2359,6 +2370,12 @@
+ 
+   if (LogPoseHidesNativeChrome(browser_)) {
+     LogPoseOverlayFor(this, "switcher.html")->Preload();
++    for (views::View* child : children()) {
++      if (auto* shadow = views::AsViewClass<ShadowFrameView>(child)) {
++        shadow->SetShadowCornerRadius(12);
++        shadow->SetShadowVisible(true);
++      }
++    }
+   }
+ 
+   // The fullscreen transition clears out focus, but there are some cases (for
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1435,6 +1435,12 @@
+   }
+   auto& contents_layout =
+       layout.AddChild(views().multi_contents_view, logpose_contents_bounds);
++  for (views::View* child : views().browser_view->children()) {
++    if (views::IsViewClass<ShadowFrameView>(child)) {
++      layout.AddChild(child, logpose_contents_bounds,
++                      !is_fullscreen(layout_data_->window_state));
++    }
++  }
+ 
+   // Maybe expand and clip the web contents to avoid issues during animation.
+   if (features::UseSidePanelFlyoverAnimation()) {

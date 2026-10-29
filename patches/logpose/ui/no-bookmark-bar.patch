@@ -1,0 +1,14 @@
+Sem a barra de favoritos nativa no modo Log Pose: a pasta de favoritos da barra lateral a substitui.
+
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -3745,6 +3745,9 @@
+ }
+ 
+ bool BrowserView::IsBookmarkBarVisible() const {
++  if (LogPoseHidesNativeChrome(browser_)) {
++    return false;
++  }
+   if (!WindowFeatureController::From(browser_)->SupportsWindowFeature(
+           WindowFeatureController::WindowFeature::kFeatureBookmarkBar)) {
+     return false;

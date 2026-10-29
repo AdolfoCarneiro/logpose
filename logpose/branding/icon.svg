@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17375a"/>
+      <stop offset="1" stop-color="#0b1a2e"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#e8f6ff" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#8fcdf2" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#3f8fc4" stop-opacity="0.7"/>
+    </radialGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#b9761f"/>
+      <stop offset="0.35" stop-color="#f8d36a"/>
+      <stop offset="0.7" stop-color="#e2a033"/>
+      <stop offset="1" stop-color="#a8681a"/>
+    </linearGradient>
+    <linearGradient id="leather" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9a6439"/>
+      <stop offset="1" stop-color="#6b4024"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- pulseira -->
+  <path d="M40 392 Q256 352 472 392 L472 452 Q256 412 40 452 Z" fill="url(#leather)"/>
+  <path d="M60 404 Q256 368 452 404" fill="none" stroke="#c99466" stroke-width="5" stroke-dasharray="14 12" stroke-linecap="round"/>
+  <path d="M60 440 Q256 404 452 440" fill="none" stroke="#c99466" stroke-width="5" stroke-dasharray="14 12" stroke-linecap="round"/>
+
+  <!-- base de latão -->
+  <path d="M178 330 L334 330 L334 386 Q256 404 178 386 Z" fill="url(#brass)"/>
+  <ellipse cx="256" cy="330" rx="78" ry="16" fill="#f8d36a"/>
+  <path d="M190 352 Q256 366 322 352" fill="none" stroke="#a8681a" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- esfera de vidro -->
+  <circle cx="256" cy="206" r="136" fill="url(#glass)" stroke="#bfe6ff" stroke-width="10"/>
+  <path d="M168 150 A104 104 0 0 1 236 100" fill="none" stroke="#ffffff" stroke-opacity="0.85" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- agulha -->
+  <g transform="rotate(28 256 214)">
+    <polygon points="256,104 276,214 236,214" fill="#e5484d"/>
+    <polygon points="256,104 256,214 236,214" fill="#c2363b"/>
+    <polygon points="236,214 276,214 256,316" fill="#eef2f8"/>
+    <polygon points="256,214 276,214 256,316" fill="#c9d3e3"/>
+  </g>
+  <circle cx="256" cy="214" r="16" fill="#f8d36a" stroke="#a8681a" stroke-width="5"/>
+</svg>

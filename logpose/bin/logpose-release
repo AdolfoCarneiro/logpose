@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+repo="${LOGPOSE_UPDATE_REPO:-AdolfoCarneiro/logpose}"
+sha="$(git -C "$root" rev-parse "${1:-HEAD}")"
+short="$(git -C "$root" rev-parse --short=10 "$sha")"
+tag="build-$short"
+
+say() {
+  echo "$*"
+  notify-send -a Log Pose -i logpose "Log Pose" "$*" 2>/dev/null || true
+}
+fail() {
+  say "Release $short não publicada: $*"
+  exit 1
+}
+
+mkdir -p "$root/build/release"
+exec 9>"$root/build/release/.release.lock"
+flock 9
+
+[ "$(git -C "$root" rev-parse HEAD)" = "$sha" ] || fail "o checkout não está nesse commit"
+[ -z "$(git -C "$root" status --porcelain)" ] || fail "há mudanças não commitadas"
+
+# o logpose-update compara o commit instalado com o da release pelo GitHub, então o commit precisa estar lá
+git -C "$root" fetch --quiet origin
+git -C "$root" merge-base --is-ancestor "$sha" origin/main || fail "o commit não está na origin/main: dê push antes"
+gh release view "$tag" -R "$repo" >/dev/null 2>&1 && { echo "release $tag já existe"; exit 0; }
+
+{ "$root/logpose/bin/logpose-build" patches && "$root/logpose/bin/logpose-build" build; } || fail "o build falhou"
+(cd "$root/logpose/sidebar" && node --test >/dev/null) || fail "os testes da barra falharam"
+package="$("$root/logpose/bin/logpose-package" | tail -1)"
+name="$(basename "$package" .tar.zst)"
+[ "$(tar -I zstd -xOf "$package" "$name/BUILD")" = "$short" ] || fail "o pacote não é do commit $short"
+(cd "$(dirname "$package")" && sha256sum "$(basename "$package")" > "$package.sha256")
+
+previous="$(gh release view -R "$repo" --json tagName -q .tagName 2>/dev/null || true)"
+range="$sha"
+[ -n "$previous" ] && git -C "$root" cat-file -e "${previous#build-}" 2>/dev/null && range="${previous#build-}..$sha"
+notes="$(git -C "$root" log --format='- %s' "$range" | head -50)"
+version="$(cat "$root/logpose/VERSION")"
+
+gh release create "$tag" "$package" "$package.sha256" -R "$repo" --target "$sha" \
+  --title "Log Pose $version ($short)" --notes "$notes" --latest \
+  || fail "o GitHub recusou a release"
+say "Release $short publicada"

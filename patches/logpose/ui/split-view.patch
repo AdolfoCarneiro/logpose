@@ -1,0 +1,422 @@
+Abas divididas do Log Pose: cada metade ganha no canto de cima os botões arrastar, abrir separadamente e fechar (pane.html), e arrastar uma aba (da barra lateral ou pelo botão da metade) sobre as páginas mostra onde ela vai cair (drop.html): dividir em qualquer um dos quatro lados ou abrir em nova janela. logposePrivate.dragTab, endTabDrag e arrangeSplit (lado a lado ou empilhado, com a aba no lado escolhido).
+
+--- a/chrome/common/extensions/api/logpose_private.idl
++++ b/chrome/common/extensions/api/logpose_private.idl
+@@ -116,6 +116,7 @@
+   callback PeekCallback = void(optional PeekState peek);
+   callback ResolvedInputCallback = void(ResolvedInput input);
+   callback SuggestionsCallback = void(DOMString[] suggestions);
++  callback ZoneCallback = void(DOMString zone);
+   callback DoneCallback = void();
+ 
+   interface Functions {
+@@ -206,6 +207,29 @@
+         DOMString text,
+         SuggestionsCallback callback);
+ 
++    // A tab dragged over the window's pages, at (<code>x</code>,
++    // <code>y</code>) in the calling page, or in the window when the caller
++    // is in another window: shows where it would go and answers the zone
++    // under the pointer (left, right, top, bottom, join or window, only those
++    // in <code>zones</code>), or "" outside the pages.
++    static void dragTab(
++        long windowId,
++        long x,
++        long y,
++        DOMString zones,
++        ZoneCallback callback);
++
++    // Ends a dragTab(), hiding where the tab would go.
++    static void endTabDrag(long windowId, optional DoneCallback callback);
++
++    // Lays out the split of <code>tabId</code> so the tab is on the
++    // <code>zone</code> side (left, right, top or bottom).
++    static void arrangeSplit(
++        long windowId,
++        long tabId,
++        DOMString zone,
++        optional DoneCallback callback);
++
+     // Finds <code>text</code> in the window's active tab, from the
+     // highlighted match on, and highlights the next (or previous) one.
+     static void find(
+--- a/chrome/browser/extensions/api/logpose_private/BUILD.gn
++++ b/chrome/browser/extensions/api/logpose_private/BUILD.gn
+@@ -31,6 +31,7 @@
+     "//components/omnibox/browser",
+     "//components/prefs",
+     "//components/search_engines",
++    "//components/split_tabs",
+     "//components/tabs:public",
+     "//content/public/browser",
+     "//services/media_session/public/cpp",
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
+@@ -144,6 +144,33 @@
+   std::unique_ptr<network::SimpleURLLoader> loader_;
+ };
+ 
++class LogPosePrivateDragTabFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.dragTab", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateDragTabFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateEndTabDragFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.endTabDrag", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateEndTabDragFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateArrangeSplitFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.arrangeSplit", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateArrangeSplitFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class LogPosePrivateFindFunction : public ExtensionFunction,
+                                   public find_in_page::FindResultObserver {
+  public:
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
+@@ -16,6 +16,7 @@
+ #include "base/base64.h"
+ #include "base/json/json_reader.h"
+ #include "base/functional/callback_helpers.h"
++#include "base/strings/string_number_conversions.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
+@@ -56,9 +57,11 @@
+ #include "components/omnibox/browser/autocomplete_match_type.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/search_engines/choice_made_location.h"
++#include "components/split_tabs/split_tab_visual_data.h"
+ #include "components/search_engines/template_url.h"
+ #include "components/search_engines/template_url_service.h"
+ #include "components/search_engines/template_url_starter_pack_data.h"
++#include "components/tabs/public/split_tab_data.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/media_session.h"
+ #include "content/public/browser/navigation_controller.h"
+@@ -82,6 +85,7 @@
+ #include "ui/base/page_transition_types.h"
+ #include "ui/base/window_open_disposition.h"
+ #include "ui/gfx/codec/png_codec.h"
++#include "ui/gfx/geometry/point.h"
+ #include "ui/gfx/geometry/rect_conversions.h"
+ #include "ui/gfx/geometry/rect_f.h"
+ #include "ui/gfx/image/image_skia.h"
+@@ -567,6 +571,71 @@
+       logpose_private::GetSearchSuggestions::Results::Create(suggestions)));
+ }
+ 
++ExtensionFunction::ResponseAction LogPosePrivateDragTabFunction::Run() {
++  auto params = logpose_private::DragTab::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  return RespondNow(ArgumentList(logpose_private::DragTab::Results::Create(
++      LogPoseDragTab(browser, GetSenderWebContents(),
++                   gfx::Point(params->x, params->y), params->zones))));
++}
++
++ExtensionFunction::ResponseAction LogPosePrivateEndTabDragFunction::Run() {
++  auto params = logpose_private::EndTabDrag::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  LogPoseEndTabDrag(browser);
++  return RespondNow(NoArguments());
++}
++
++ExtensionFunction::ResponseAction LogPosePrivateArrangeSplitFunction::Run() {
++  auto params = logpose_private::ArrangeSplit::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  TabStripModel* model = browser->GetTabStripModel();
++  for (int i = 0; i < model->count(); ++i) {
++    if (ExtensionTabUtil::GetTabId(model->GetWebContentsAt(i)) !=
++        params->tab_id) {
++      continue;
++    }
++    std::optional<split_tabs::SplitTabId> split =
++        model->GetTabAtIndex(i)->GetSplit();
++    if (!split) {
++      break;
++    }
++    const std::string& zone = params->zone;
++    model->UpdateSplitLayout(*split, zone == "top" || zone == "bottom"
++                                         ? split_tabs::SplitTabLayout::kStacked
++                                         : split_tabs::SplitTabLayout::kSideBySide);
++    const bool first =
++        static_cast<int>(model->GetSplitData(*split)->GetIndexRange().start()) == i;
++    if (first != (zone == "left" || zone == "top")) {
++      model->ReverseTabsInSplit(*split);
++    }
++    return RespondNow(NoArguments());
++  }
++  return RespondNow(Error("Tab " + base::NumberToString(params->tab_id) +
++                          " is not in a split."));
++}
++
+ ExtensionFunction::ResponseAction LogPosePrivateFindFunction::Run() {
+   auto params = logpose_private::Find::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -5711,6 +5711,7 @@
+   if (auto* progress = LogPoseProgressView(this)) {
+     progress->SetCard(LogPoseContentsArea(this), IsFullscreen() ? 0 : 12);
+   }
++  LogPoseLayoutPanes(this);
+ 
+   // TODO(jamescook): Why was this in the middle of layout code?
+   toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
+--- a/chrome/browser/ui/views/frame/logpose_spotlight_view.h
++++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.h
+@@ -19,6 +19,7 @@
+ }  // namespace content
+ 
+ namespace gfx {
++class Point;
+ class Rect;
+ }  // namespace gfx
+ 
+@@ -32,6 +33,7 @@
+   ~LogPoseSpotlightView() override;
+ 
+   const std::string& page() const { return page_; }
++  const std::string& mode() const { return mode_; }
+   void Show(std::string_view mode, const gfx::Rect& bounds, bool focus = true);
+   void Preload();
+   void Hide();
+@@ -42,6 +44,7 @@
+ 
+  private:
+   std::string page_;
++  std::string mode_;
+   base::RepeatingClosure on_hidden_;
+   int generation_ = 0;
+ };
+@@ -58,4 +61,13 @@
+ 
+ bool LogPoseShowFind(BrowserWindowInterface* browser, int step);
+ 
++void LogPoseLayoutPanes(BrowserView* browser_view);
++
++std::string LogPoseDragTab(BrowserWindowInterface* browser,
++                         content::WebContents* sender,
++                         const gfx::Point& page_point,
++                         std::string_view zones);
++
++void LogPoseEndTabDrag(BrowserWindowInterface* browser);
++
+ #endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LOGPOSE_SPOTLIGHT_VIEW_H_
+--- a/chrome/browser/ui/views/frame/logpose_spotlight_view.cc
++++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.cc
+@@ -9,8 +9,11 @@
+ #include "chrome/browser/logpose/logpose_links.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/contents_container_view.h"
++#include "chrome/browser/ui/views/frame/contents_web_view.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/logpose_peek_view.h"
++#include "components/sessions/content/session_tab_helper.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/render_widget_host_view.h"
+@@ -19,6 +22,7 @@
+ #include "ui/base/base_window.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/page_transition_types.h"
++#include "ui/gfx/geometry/point.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "url/gurl.h"
+ 
+@@ -37,6 +41,7 @@
+                               const gfx::Rect& bounds,
+                               bool focus) {
+   SetBoundsRect(bounds);
++  mode_ = std::string(mode);
+   content::WebContents* contents = GetWebContents();
+   contents->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
+   const GURL url(
+@@ -70,6 +75,7 @@
+   if (!GetVisible()) {
+     return;
+   }
++  mode_.clear();
+   SetVisible(false);
+   on_hidden_.Run();
+ }
+@@ -198,3 +204,143 @@
+       ->Show(step == 0 ? "open" : step > 0 ? "next" : "previous", card);
+   return true;
+ }
++
++namespace {
++
++bool LogPoseOwnsWindow(BrowserView* browser_view) {
++  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
++             "logpose-native-chrome") &&
++         browser_view->browser()->GetType() ==
++             BrowserWindowInterface::Type::TYPE_NORMAL &&
++         !LogPoseIsLittle(browser_view->browser());
++}
++
++LogPoseSpotlightView* LogPosePaneOverlay(BrowserView* browser_view,
++                                     std::string_view page) {
++  if (LogPoseSpotlightView* found = LogPoseFindOverlay(browser_view, page)) {
++    return found;
++  }
++  views::View* holder = browser_view->multi_contents_view();
++  while (holder && holder->parent() != browser_view) {
++    holder = holder->parent();
++  }
++  LogPoseSpotlightView* overlay = LogPoseOverlayFor(browser_view, page);
++  if (holder) {
++    browser_view->ReorderChildView(
++        overlay, *browser_view->GetIndexOf(holder) + 1);
++  }
++  return overlay;
++}
++
++views::WebView* LogPoseWebViewOf(views::View* root,
++                               content::WebContents* contents) {
++  if (auto* web = views::AsViewClass<views::WebView>(root);
++      web && web->web_contents() == contents) {
++    return web;
++  }
++  for (views::View* child : root->children()) {
++    if (views::WebView* found = LogPoseWebViewOf(child, contents)) {
++      return found;
++    }
++  }
++  return nullptr;
++}
++
++}  // namespace
++
++void LogPoseLayoutPanes(BrowserView* browser_view) {
++  if (!LogPoseOwnsWindow(browser_view)) {
++    return;
++  }
++  constexpr int kWidth = 116;
++  constexpr int kHeight = 44;
++  MultiContentsView* multi = browser_view->multi_contents_view();
++  const bool split = multi && multi->GetVisible() && multi->IsInSplitView() &&
++                     !browser_view->IsFullscreen();
++  for (size_t i = 0; i < 2; ++i) {
++    const std::string page = "pane.html?" + base::NumberToString(i);
++    ContentsContainerView* container =
++        split && i < multi->contents_container_views().size()
++            ? multi->contents_container_views()[i]
++            : nullptr;
++    content::WebContents* contents =
++        container ? container->contents_view()->web_contents() : nullptr;
++    if (!contents) {
++      if (LogPoseSpotlightView* overlay = LogPoseFindOverlay(browser_view, page)) {
++        overlay->Hide();
++      }
++      continue;
++    }
++    const gfx::Rect area = views::View::ConvertRectToTarget(
++        container, browser_view, container->GetLocalBounds());
++    const gfx::Rect pill(area.right() - kWidth - 6, area.y() + 6, kWidth,
++                         kHeight);
++    const std::string mode =
++        "tab:" + base::NumberToString(
++                     sessions::SessionTabHelper::IdForTab(contents).id()) +
++        ":" + base::NumberToString(browser_view->browser()->GetSessionID().id());
++    LogPoseSpotlightView* overlay = LogPosePaneOverlay(browser_view, page);
++    if (overlay->GetVisible() && overlay->mode() == mode) {
++      overlay->SetBoundsRect(pill);
++    } else {
++      overlay->Show(mode, pill, /*focus=*/false);
++    }
++  }
++}
++
++std::string LogPoseDragTab(BrowserWindowInterface* browser,
++                         content::WebContents* sender,
++                         const gfx::Point& page_point,
++                         std::string_view zones) {
++  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
++  if (!browser_view || !LogPoseOwnsWindow(browser_view)) {
++    return std::string();
++  }
++  views::WebView* page = sender ? LogPoseWebViewOf(browser_view, sender) : nullptr;
++  const gfx::Point point =
++      page ? views::View::ConvertPointToTarget(page, browser_view, page_point)
++           : page_point;
++  const gfx::Rect area = LogPoseContentsArea(browser_view);
++  std::string zone;
++  if (area.Contains(point) && !area.IsEmpty()) {
++    const double x = double(point.x() - area.x()) / area.width();
++    const double y = double(point.y() - area.y()) / area.height();
++    const std::pair<double, std::string_view> edges[] = {
++        {x, "left"}, {1 - x, "right"}, {y, "top"}, {1 - y, "bottom"}};
++    double nearest = 0.25;
++    for (const auto& [distance, name] : edges) {
++      if (distance < nearest && zones.find(name) != std::string_view::npos) {
++        nearest = distance;
++        zone = std::string(name);
++      }
++    }
++    if (zone.empty() && zones.find("join") != std::string_view::npos) {
++      zone = "join";
++    } else if (zone.empty() && zones.find("window") != std::string_view::npos) {
++      zone = "window";
++    }
++  }
++  LogPoseSpotlightView* overlay = LogPoseFindOverlay(browser_view, "drop.html");
++  if (zone.empty()) {
++    if (overlay) {
++      overlay->Hide();
++    }
++    return zone;
++  }
++  overlay = LogPoseOverlayFor(browser_view, "drop.html");
++  if (!overlay->GetVisible() || overlay->mode() != zone) {
++    overlay->Show(zone, area, /*focus=*/false);
++  } else {
++    overlay->SetBoundsRect(area);
++  }
++  return zone;
++}
++
++void LogPoseEndTabDrag(BrowserWindowInterface* browser) {
++  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
++  if (LogPoseSpotlightView* overlay =
++          browser_view ? LogPoseFindOverlay(browser_view, "drop.html")
++                       : nullptr) {
++    overlay->Hide();
++  }
++}

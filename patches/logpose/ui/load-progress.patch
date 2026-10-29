@@ -1,0 +1,376 @@
+Cobrinha de carregamento: um traço brilhante na cor do tema corre pela borda arredondada do cartão da página enquanto a aba ativa carrega, cresce com o progresso e fecha a volta quando termina (LogPoseLoadSnake). Segue a pref helium.browser.show_progress_bar.
+
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -3552,6 +3552,8 @@
+       "views/frame/base_tab_strip_region_view.cc",
+       "views/frame/base_tab_strip_region_view.h",
+       "views/frame/browser_view.cc",
++      "views/frame/logpose_load_snake.cc",
++      "views/frame/logpose_load_snake.h",
+       "views/frame/logpose_peek_view.cc",
+       "views/frame/logpose_peek_view.h",
+       "views/frame/logpose_spotlight_view.cc",
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -180,6 +180,7 @@
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/logpose_peek_view.h"
+ #include "chrome/browser/ui/views/frame/logpose_shortcuts.h"
++#include "chrome/browser/ui/views/frame/logpose_load_snake.h"
+ #include "chrome/browser/ui/views/frame/logpose_spotlight_view.h"
+ #include "extensions/browser/event_router.h"
+ #include "extensions/browser/extension_event_histogram_value.h"
+@@ -1086,6 +1087,8 @@
+                                                        .dark_key = 0.20,
+                                                        .dark_ambient = 0.40}),
+                    GetIndexOf(multi_contents_view_).value());
++    AddChildView(
++        std::make_unique<LogPoseLoadSnake>(browser_->GetProfile()->GetPrefs()));
+   }
+ 
+   set_contents_view(multi_contents_view_);
+@@ -1506,6 +1509,15 @@
+          browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL;
+ }
+ 
++LogPoseLoadSnake* LogPoseProgressView(BrowserView* browser_view) {
++  for (views::View* child : browser_view->children()) {
++    if (auto* progress = views::AsViewClass<LogPoseLoadSnake>(child)) {
++      return progress;
++    }
++  }
++  return nullptr;
++}
++
+ void ShowLogPoseSpotlight(BrowserView* browser_view, bool new_tab) {
+   LogPoseShowSpotlight(browser_view->browser(), new_tab ? "new" : "current");
+ }
+@@ -2713,6 +2725,9 @@
+   }
+ 
+   WebContentsObserver::Observe(new_contents);
++  if (auto* progress = LogPoseProgressView(this)) {
++    progress->SetWebContents(new_contents);
++  }
+ 
+   // If |contents_web_view| already has the correct WebContents, we can save
+   // some work.  This also prevents extra events from being reported by the
+@@ -5691,6 +5706,9 @@
+   }
+ 
+   LayoutSuperclass<views::View>(this);
++  if (auto* progress = LogPoseProgressView(this)) {
++    progress->SetCard(LogPoseContentsArea(this), IsFullscreen() ? 0 : 12);
++  }
+ 
+   // TODO(jamescook): Why was this in the middle of layout code?
+   toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/logpose_load_snake.h
+@@ -0,0 +1,61 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_VIEWS_FRAME_LOGPOSE_LOAD_SNAKE_H_
++#define CHROME_BROWSER_UI_VIEWS_FRAME_LOGPOSE_LOAD_SNAKE_H_
++
++#include "base/time/time.h"
++#include "base/timer/timer.h"
++#include "components/prefs/pref_change_registrar.h"
++#include "content/public/browser/web_contents_observer.h"
++#include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/views/view.h"
++
++class PrefService;
++
++// A glowing snake that runs around the page card while the active tab loads,
++// grows with the load progress and closes the loop when it finishes.
++class LogPoseLoadSnake : public views::View, public content::WebContentsObserver {
++  METADATA_HEADER(LogPoseLoadSnake, views::View)
++
++ public:
++  static constexpr int kOutset = 6;
++
++  explicit LogPoseLoadSnake(PrefService* prefs);
++  LogPoseLoadSnake(const LogPoseLoadSnake&) = delete;
++  LogPoseLoadSnake& operator=(const LogPoseLoadSnake&) = delete;
++  ~LogPoseLoadSnake() override;
++
++  void SetWebContents(content::WebContents* contents);
++  void SetCard(const gfx::Rect& card, float radius);
++
++ private:
++  void Begin(double progress);
++  void Finish();
++  void Reset();
++  void Tick();
++  bool Enabled() const;
++  void Sync();
++
++  // content::WebContentsObserver:
++  void DidStartNavigation(content::NavigationHandle* navigation) override;
++  void LoadProgressChanged(double progress) override;
++  void DidStopLoading() override;
++  void WebContentsDestroyed() override;
++
++  // views::View:
++  void OnPaint(gfx::Canvas* canvas) override;
++
++  PrefChangeRegistrar prefs_;
++  base::RepeatingTimer timer_;
++  base::TimeTicks started_;
++  base::TimeTicks finished_;
++  double target_ = 0;
++  double shown_ = 0;
++  bool loading_ = false;
++  bool finishing_ = false;
++  float radius_ = 0;
++};
++
++#endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LOGPOSE_LOAD_SNAKE_H_
+--- /dev/null
++++ b/chrome/browser/ui/views/frame/logpose_load_snake.cc
+@@ -0,0 +1,241 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/views/frame/logpose_load_snake.h"
++
++#include <algorithm>
++#include <cmath>
++
++#include "base/functional/bind.h"
++#include "cc/paint/paint_filter.h"
++#include "cc/paint/paint_flags.h"
++#include "chrome/common/pref_names.h"
++#include "components/prefs/pref_service.h"
++#include "content/public/browser/navigation_handle.h"
++#include "content/public/browser/web_contents.h"
++#include "third_party/skia/include/core/SkPath.h"
++#include "third_party/skia/include/core/SkPathBuilder.h"
++#include "third_party/skia/include/core/SkPathMeasure.h"
++#include "third_party/skia/include/core/SkRRect.h"
++#include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
++#include "ui/color/color_provider.h"
++#include "ui/compositor/layer.h"
++#include "ui/gfx/canvas.h"
++#include "ui/gfx/color_utils.h"
++#include "ui/gfx/geometry/skia_conversions.h"
++#include "ui/views/accessibility/view_accessibility.h"
++
++namespace {
++
++constexpr base::TimeDelta kFrame = base::Milliseconds(16);
++constexpr base::TimeDelta kClose = base::Milliseconds(520);
++constexpr double kLapsPerSecond = 0.42;
++constexpr double kMinimumLength = 0.12;
++constexpr double kProgressLength = 0.5;
++constexpr int kSlices = 28;
++constexpr float kWidth = 3;
++constexpr float kGlowWidth = 8;
++constexpr float kGlowSigma = 4;
++
++SkColor WithOpacity(SkColor color, double opacity) {
++  return SkColorSetA(color, static_cast<SkAlpha>(std::clamp(opacity, 0.0, 1.0) *
++                                                 SK_AlphaOPAQUE));
++}
++
++}  // namespace
++
++LogPoseLoadSnake::LogPoseLoadSnake(PrefService* prefs) {
++  SetCanProcessEventsWithinSubtree(false);
++  SetPaintToLayer();
++  layer()->SetFillsBoundsOpaquely(false);
++  SetVisible(false);
++  GetViewAccessibility().SetIsIgnored(true);
++  prefs_.Init(prefs);
++  prefs_.Add(prefs::kHeliumShowProgressBar,
++             base::BindRepeating(&LogPoseLoadSnake::Sync, base::Unretained(this)));
++}
++
++LogPoseLoadSnake::~LogPoseLoadSnake() = default;
++
++void LogPoseLoadSnake::SetWebContents(content::WebContents* contents) {
++  if (contents == web_contents()) {
++    return;
++  }
++  Observe(contents);
++  Sync();
++}
++
++void LogPoseLoadSnake::SetCard(const gfx::Rect& card, float radius) {
++  radius_ = radius;
++  gfx::Rect bounds = card;
++  bounds.Outset(kOutset);
++  SetBoundsRect(bounds);
++}
++
++bool LogPoseLoadSnake::Enabled() const {
++  return prefs_.prefs()->GetBoolean(prefs::kHeliumShowProgressBar);
++}
++
++void LogPoseLoadSnake::Sync() {
++  content::WebContents* contents = web_contents();
++  if (Enabled() && contents && contents->ShouldShowLoadingUI() &&
++      contents->GetVisibleURL().SchemeIsHTTPOrHTTPS()) {
++    Begin(contents->GetLoadProgress());
++  } else {
++    Reset();
++  }
++}
++
++void LogPoseLoadSnake::Begin(double progress) {
++  if (!loading_ || finishing_) {
++    started_ = base::TimeTicks::Now();
++    shown_ = 0;
++  }
++  loading_ = true;
++  finishing_ = false;
++  target_ = std::isfinite(progress) ? std::clamp(progress, 0.0, 1.0) : 0;
++  SetVisible(true);
++  if (!timer_.IsRunning()) {
++    timer_.Start(FROM_HERE, kFrame,
++                 base::BindRepeating(&LogPoseLoadSnake::Tick,
++                                     base::Unretained(this)));
++  }
++}
++
++void LogPoseLoadSnake::Finish() {
++  if (!loading_ || finishing_) {
++    return;
++  }
++  finishing_ = true;
++  finished_ = base::TimeTicks::Now();
++}
++
++void LogPoseLoadSnake::Reset() {
++  timer_.Stop();
++  loading_ = false;
++  finishing_ = false;
++  target_ = shown_ = 0;
++  SetVisible(false);
++}
++
++void LogPoseLoadSnake::Tick() {
++  shown_ += (target_ - shown_) * 0.12;
++  if (!finishing_ && web_contents() && !web_contents()->IsLoading() &&
++      base::TimeTicks::Now() - started_ > base::Milliseconds(400)) {
++    Finish();
++  }
++  if (finishing_ && base::TimeTicks::Now() - finished_ >= kClose) {
++    Reset();
++    return;
++  }
++  SchedulePaint();
++}
++
++void LogPoseLoadSnake::DidStartNavigation(content::NavigationHandle* navigation) {
++  if (!navigation->IsInPrimaryMainFrame() || navigation->IsSameDocument()) {
++    return;
++  }
++  if (Enabled() && navigation->GetURL().SchemeIsHTTPOrHTTPS()) {
++    Begin(0);
++  } else {
++    Reset();
++  }
++}
++
++void LogPoseLoadSnake::LoadProgressChanged(double progress) {
++  if (loading_ && !finishing_) {
++    target_ = std::max(target_, progress);
++  }
++}
++
++void LogPoseLoadSnake::DidStopLoading() {
++  Finish();
++}
++
++void LogPoseLoadSnake::WebContentsDestroyed() {
++  Reset();
++}
++
++void LogPoseLoadSnake::OnPaint(gfx::Canvas* canvas) {
++  if (!loading_) {
++    return;
++  }
++  gfx::RectF card(GetLocalBounds());
++  card.Inset(kOutset);
++  SkPathMeasure measure(
++      SkPath::RRect(SkRRect::MakeRectXY(gfx::RectFToSkRect(card), radius_,
++                                        radius_)),
++      true);
++  const double total = measure.getLength();
++  if (total <= 0) {
++    return;
++  }
++
++  const base::TimeTicks now = base::TimeTicks::Now();
++  double length = kMinimumLength + kProgressLength * shown_;
++  double fade = 1;
++  if (finishing_) {
++    const double t = (now - finished_) / kClose;
++    length += (1 - length) * std::min(1.0, t / 0.55);
++    fade = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
++  }
++  const double head =
++      std::fmod((now - started_).InSecondsF() * kLapsPerSecond, 1.0) * total;
++  const double tail = head - length * total;
++
++  const SkColor primary = GetColorProvider()->GetColor(ui::kColorSysPrimary);
++  const SkColor bright =
++      color_utils::AlphaBlend(SK_ColorWHITE, primary, 0.45f);
++
++  cc::PaintFlags glow;
++  glow.setAntiAlias(true);
++  glow.setStyle(cc::PaintFlags::kStroke_Style);
++  glow.setStrokeCap(cc::PaintFlags::kButt_Cap);
++  glow.setStrokeWidth(kGlowWidth);
++  glow.setImageFilter(sk_make_sp<cc::BlurPaintFilter>(
++      kGlowSigma, kGlowSigma, SkTileMode::kDecal, nullptr));
++  cc::PaintFlags line;
++  line.setAntiAlias(true);
++  line.setStyle(cc::PaintFlags::kStroke_Style);
++  line.setStrokeCap(cc::PaintFlags::kButt_Cap);
++  line.setStrokeWidth(kWidth);
++
++  const double line_layer = 1 - std::pow(1 - 0.92, 1.0 / kSlices);
++  const double glow_layer = 1 - std::pow(1 - 0.6, 1.0 / kSlices);
++  glow.setColor(WithOpacity(primary, fade * glow_layer));
++  line.setColor(WithOpacity(primary, fade * line_layer));
++  for (int i = 0; i < kSlices; ++i) {
++    for (double start = tail + (head - tail) * i / kSlices; start < head;) {
++      const double from = std::fmod(std::fmod(start, total) + total, total);
++      const double stop = std::min(head, start + (total - from));
++      SkPathBuilder segment;
++      if (measure.getSegment(from, from + (stop - start), &segment, true)) {
++        const SkPath path = segment.detach();
++        canvas->DrawPath(path, glow);
++        canvas->DrawPath(path, line);
++      }
++      start = stop;
++    }
++  }
++
++  const double neck = std::fmod(std::fmod(head - std::min(28.0, head - tail), total) + total, total);
++  SkPathBuilder face;
++  if (neck < std::fmod(head, total) &&
++      measure.getSegment(neck, std::fmod(head, total), &face, true)) {
++    line.setColor(WithOpacity(bright, fade * 0.9));
++    canvas->DrawPath(face.detach(), line);
++  }
++
++  SkPoint point;
++  if (measure.getPosTan(std::fmod(head, total), &point, nullptr)) {
++    cc::PaintFlags dot;
++    dot.setAntiAlias(true);
++    dot.setColor(WithOpacity(bright, fade));
++    canvas->DrawCircle(gfx::PointF(point.x(), point.y()), kWidth * 0.75f, dot);
++  }
++}
++
++BEGIN_METADATA(LogPoseLoadSnake)
++END_METADATA

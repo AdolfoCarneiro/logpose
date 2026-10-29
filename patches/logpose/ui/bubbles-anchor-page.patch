@@ -1,0 +1,26 @@
+Sem barra de endereço, as bolhas que se ancoravam nela (permissões, informações do site) abrem no canto de cima da página, e não no canto da janela por cima da barra lateral.
+
+--- a/chrome/browser/ui/views/bubble_anchor_util_views.cc
++++ b/chrome/browser/ui/views/bubble_anchor_util_views.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+ 
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+@@ -183,6 +184,13 @@
+   DCHECK(GetPageInfoAnchorConfiguration(browser).anchor.IsNull());
+ 
+   BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "logpose-native-chrome") &&
++      browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
++    const gfx::Rect contents =
++        browser_view->contents_container()->GetBoundsInScreen();
++    return gfx::Rect(contents.x() + 12, contents.y() + 4, 0, 0);
++  }
+   // Get position in view (taking RTL UI into account).
+   int x_within_browser_view = browser_view->GetMirroredXInView(
+       bubble_anchor_util::kNoToolbarLeftOffset);

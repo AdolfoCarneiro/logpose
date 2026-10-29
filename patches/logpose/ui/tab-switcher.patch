@@ -1,0 +1,61 @@
+Ctrl+Tab / Ctrl+Shift+Tab abrem o seletor de abas recentes do Log Pose (switcher.html da barra lateral) no lugar de pular pra próxima aba da faixa. A página do seletor é carregada escondida quando a janela abre, pra pegar o Ctrl solto já no primeiro uso.
+
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -2357,6 +2357,10 @@
+ 
+   OnWindowDidShow();
+ 
++  if (LogPoseHidesNativeChrome(browser_)) {
++    LogPoseOverlayFor(this, "switcher.html")->Preload();
++  }
++
+   // The fullscreen transition clears out focus, but there are some cases (for
+   // example, new window in Mac fullscreen with toolbar showing) where we need
+   // restore it.
+@@ -6061,6 +6065,14 @@
+       (command_id == IDC_NEW_TAB || command_id == IDC_FOCUS_LOCATION ||
+        command_id == IDC_FOCUS_SEARCH)) {
+     ShowLogPoseSpotlight(this, command_id == IDC_NEW_TAB);
++    return true;
++  }
++  if (LogPoseHidesNativeChrome(browser_) &&
++      (command_id == IDC_CYCLE_TO_NEXT_TAB ||
++       command_id == IDC_CYCLE_TO_PREV_TAB)) {
++    LogPoseOverlayFor(this, "switcher.html")
++        ->Show(command_id == IDC_CYCLE_TO_NEXT_TAB ? "next" : "previous",
++               GetLocalBounds());
+     return true;
+   }
+   if (LogPoseHidesNativeChrome(browser_) &&
+--- a/chrome/browser/ui/views/frame/logpose_spotlight_view.h
++++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.h
+@@ -32,6 +32,7 @@
+ 
+   const std::string& page() const { return page_; }
+   void Show(std::string_view mode, const gfx::Rect& bounds);
++  void Preload();
+   void Hide();
+ 
+   void CloseContents(content::WebContents* source) override;
+--- a/chrome/browser/ui/views/frame/logpose_spotlight_view.cc
++++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.cc
+@@ -42,6 +42,18 @@
+   contents->GetController().LoadURLWithParams(params);
+   SetVisible(true);
+   RequestFocus();
++}
++
++void LogPoseSpotlightView::Preload() {
++  content::WebContents* contents = GetWebContents();
++  if (!contents->GetController().IsInitialNavigation()) {
++    return;
++  }
++  contents->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
++  contents->GetController().LoadURL(
++      GURL(std::string("chrome-extension://hncljkmljckjojdjincglklbdihcaeko/") +
++           page_ + "#idle-0"),
++      content::Referrer(), ui::PAGE_TRANSITION_AUTO_TOPLEVEL, std::string());
+ }
+ 
+ void LogPoseSpotlightView::Hide() {

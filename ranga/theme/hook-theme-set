@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
-exec python3 "$here/ranga_theme.py" "$HOME/.local/state/ciel/theme/colors.toml" "$HOME/.local/state/ranga/theme.css"

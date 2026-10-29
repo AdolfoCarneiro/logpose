@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+profile="${LOGPOSE_PROFILE:-$HOME/.local/share/logpose/dev-profile}"
+onepassword="$HOME/.config/chromium/NativeMessagingHosts/com.1password.1password.json"
+
+if [ -f "$onepassword" ] && [ ! -f "$profile/NativeMessagingHosts/com.1password.1password.json" ]; then
+  mkdir -p "$profile/NativeMessagingHosts"
+  cp "$onepassword" "$profile/NativeMessagingHosts/"
+fi
+
+export LANGUAGE="${LOGPOSE_LANGUAGE:-pt_BR}"
+exec "$root/build/src/out/Default/logpose" \
+  --user-data-dir="$profile" \
+  --ozone-platform=wayland \
+  --logpose-sidebar-dir="$root/logpose/sidebar" \
+  ${LOGPOSE_EXTRA_EXTENSIONS:+--load-extension="$LOGPOSE_EXTRA_EXTENSIONS"} \
+  "$@"

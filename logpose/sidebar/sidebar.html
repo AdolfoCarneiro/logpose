@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
+  <link rel="stylesheet" href="sidebar.css">
+  <style id="logpose-theme"></style>
+</head>
+<body class="k-surface k-type-body">
+  <header class="top">
+    <nav class="nav">
+      <button id="back" class="k-icon-button k-state" title="Voltar" data-icon="arrow-left"></button>
+      <button id="forward" class="k-icon-button k-state" title="Avançar" data-icon="arrow-right"></button>
+      <button id="reload" class="k-icon-button k-state" title="Recarregar" data-icon="rotate-cw"></button>
+    </nav>
+    <div class="top-actions">
+      <div id="extensions" class="extensions"></div>
+      <button id="extensions-button" class="k-icon-button k-state" title="Extensões" data-icon="puzzle" aria-haspopup="dialog" hidden></button>
+      <button id="menu-button" class="k-icon-button k-state" title="Menu" data-icon="ellipsis-vertical" aria-haspopup="menu"></button>
+    </div>
+    <ul id="menu" class="k-menu k-type-label" role="menu" hidden>
+      <li class="k-menu__item k-state" data-action="logpose-settings"><span class="k-icon" data-icon="settings"></span>Configurações</li>
+      <li class="k-menu__item k-state" data-action="logpose-install-pwa" hidden><span class="k-icon" data-icon="app-window"></span>Instalar como app</li>
+      <li class="k-menu__item k-state" data-action="logpose-toggle-sidebar"><span class="k-icon" data-icon="panel-left-close"></span><span class="toggle-sidebar-label">Recolher barra lateral</span></li>
+      <li class="k-menu__item k-state" data-action="logpose-new-window"><span class="k-icon" data-icon="app-window"></span>Nova janela</li>
+      <li class="k-menu__item k-state" data-action="logpose-new-incognito"><span class="k-icon" data-icon="venetian-mask"></span>Nova janela anônima</li>
+      <li class="k-menu__item k-state" data-action="logpose-profiles" hidden><span class="k-icon" data-icon="users"></span>Perfis</li>
+      <li class="k-menu__item k-state" data-action="logpose-archive"><span class="k-icon" data-icon="archive"></span>Abas arquivadas</li>
+      <li class="k-menu__item k-state" data-action="chrome://history"><span class="k-icon" data-icon="history"></span>Histórico</li>
+      <li class="k-menu__item k-state" data-action="chrome://bookmarks"><span class="k-icon" data-icon="bookmark"></span>Gerenciar favoritos</li>
+      <li class="k-menu__item k-state" data-action="chrome://extensions"><span class="k-icon" data-icon="puzzle"></span>Extensões</li>
+    </ul>
+  </header>
+
+  <label class="address">
+    <button id="address-icon" class="address-info k-icon-button k-state" type="button" title="Informações do site" data-icon="globe"><span class="k-icon"></span></button>
+    <input id="address" class="k-text-field k-type-label" type="text" placeholder="Buscar ou digitar endereço" autocomplete="off" spellcheck="false">
+    <button id="zoom" class="address-zoom k-state k-type-label" type="button" title="Voltar ao tamanho normal" hidden></button>
+  </label>
+
+  <div id="space-content" class="space-content">
+    <div id="space-title" class="space-title k-type-panel"><span class="k-icon"></span><span class="name"></span></div>
+
+    <section id="pins" class="pins" aria-label="Fixadas" hidden><ul id="pins-grid" class="ess-grid"></ul></section>
+
+    <button id="favorites-button" class="favorites-button k-list-item k-state k-type-label" aria-haspopup="dialog">
+      <span class="k-list-item__leading"><span class="k-icon" data-icon="star"></span></span>
+      <span class="k-list-item__label">Favoritos</span>
+      <span class="k-icon chevron" data-icon="chevron-right"></span>
+    </button>
+
+    <section id="groups" class="groups" aria-label="Containers" hidden><ul id="groups-list" class="groups-list"></ul></section>
+
+    <div class="today-header">
+      <span class="k-type-section">Hoje</span>
+      <button id="clear-today" class="clear k-state k-type-label" title="Fechar as abas de hoje deste espaço, menos a atual"><span class="k-icon" data-icon="arrow-down"></span>Limpar</button>
+    </div>
+    <div id="new-tab" class="k-list-item k-state k-type-label new-tab">
+      <span class="k-list-item__leading"><span class="k-icon" data-icon="plus"></span></span>
+      <span class="k-list-item__label">Nova aba</span>
+    </div>
+    <div class="tabs-wrap">
+      <div id="active-indicator" class="active-indicator"></div>
+      <ul id="tabs" class="k-list"></ul>
+    </div>
+  </div>
+
+  <section id="player" class="player" aria-label="Mídia tocando" hidden>
+    <div class="player__head">
+      <button class="player__source k-state" type="button" title="Ir para a aba">
+        <span class="player__art"><img alt=""><span class="k-icon" data-icon="music"></span></span>
+        <span class="player__text"><span class="player__title k-type-label"></span><span class="player__subtitle k-type-caption"></span></span>
+      </button>
+      <button class="player__pip k-icon-button k-icon-button--small k-state" type="button" title="Picture-in-picture" data-icon="picture-in-picture-2"></button>
+      <button class="player__mute k-icon-button k-icon-button--small k-state" type="button" title="Silenciar" data-icon="volume-2"></button>
+    </div>
+    <div class="player__progress" role="presentation"><div class="player__bar"></div></div>
+    <div class="player__controls">
+      <span class="player__time k-type-caption"></span>
+      <button class="player__prev k-icon-button k-state" type="button" title="Anterior" data-icon="skip-back"></button>
+      <button class="player__play k-state" type="button" title="Tocar" data-icon="play"></button>
+      <button class="player__next k-icon-button k-state" type="button" title="Próxima" data-icon="skip-forward"></button>
+      <span class="player__duration k-type-caption"></span>
+    </div>
+  </section>
+
+  <div id="update" class="update-card" hidden>
+    <span class="k-icon" data-icon="sparkles"></span>
+    <span class="k-type-label">Atualização instalada</span>
+    <button id="update-restart" class="k-button k-button--filled k-type-button" type="button">Reiniciar</button>
+  </div>
+
+  <footer class="footer">
+    <button id="downloads-button" class="downloads-button k-icon-button k-state" title="Downloads" aria-haspopup="dialog" hidden>
+      <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="16"></circle><circle class="ring-fill" cx="18" cy="18" r="16"></circle></svg>
+      <span class="k-icon" data-icon="arrow-down-to-line"></span>
+    </button>
+    <nav id="spaces" class="spaces" aria-label="Espaços"></nav>
+  </footer>
+
+  <section id="favorites-popover" class="favorites-popover" role="dialog" aria-label="Favoritos" hidden>
+    <header class="favorites-header">
+      <button class="favorites-back k-icon-button k-icon-button--small k-state" title="Voltar" hidden><span class="k-icon" data-icon="chevron-left"></span></button>
+      <span class="favorites-title k-type-panel">Favoritos</span>
+    </header>
+    <ul class="favorites-list k-list"></ul>
+    <div class="favorites-actions">
+      <button class="favorites-save k-button k-button--tonal k-type-button"><span class="k-icon" data-icon="bookmark-plus"></span>Salvar página</button>
+      <button class="favorites-manage k-button k-button--tonal k-type-button"><span class="k-icon" data-icon="library"></span>Gerenciar</button>
+    </div>
+  </section>
+
+  <section id="archive-popover" class="favorites-popover archive-popover" role="dialog" aria-label="Abas arquivadas" hidden>
+    <header class="favorites-header"><span class="k-type-panel">Abas arquivadas</span></header>
+    <ul class="archive-list favorites-list k-list"></ul>
+    <button class="archive-empty-all k-button k-button--text k-type-button">Esvaziar arquivo</button>
+  </section>
+
+  <section id="extensions-popover" class="favorites-popover extensions-popover" role="dialog" aria-label="Extensões" hidden>
+    <header class="favorites-header"><span class="k-type-panel">Extensões</span></header>
+    <ul class="extensions-list favorites-list k-list"></ul>
+    <button class="extensions-manage k-button k-button--text k-type-button"><span class="k-icon" data-icon="settings"></span>Gerenciar extensões</button>
+  </section>
+
+  <section id="containers-popover" class="favorites-popover containers-popover" role="dialog" aria-label="Grupos" hidden>
+    <header class="favorites-header">
+      <button class="favorites-back k-icon-button k-icon-button--small k-state" title="Voltar" hidden><span class="k-icon" data-icon="chevron-left"></span></button>
+      <span class="containers-title k-type-panel">Grupos</span>
+    </header>
+    <div class="containers-list-view">
+      <ul class="containers-list favorites-list k-list"></ul>
+      <form class="containers-new">
+        <input name="name" class="k-text-field k-type-label" placeholder="Novo grupo" maxlength="32" autocomplete="off">
+        <button class="k-icon-button k-state" type="submit" title="Criar"><span class="k-icon" data-icon="plus"></span></button>
+      </form>
+    </div>
+    <form class="containers-edit" hidden>
+      <input name="name" class="k-text-field k-type-label" placeholder="Nome" maxlength="32" autocomplete="off">
+      <div class="icons"></div>
+      <div class="colors"></div>
+      <div class="actions">
+        <button type="button" class="containers-delete k-button k-button--text k-type-button">Apagar o grupo</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="downloads-popover" class="favorites-popover downloads-popover" role="dialog" aria-label="Downloads" hidden>
+    <header class="favorites-header"><span class="k-type-panel">Downloads</span></header>
+    <ul class="downloads-list favorites-list k-list"></ul>
+    <div class="downloads-actions">
+      <button class="downloads-clear k-button k-button--text k-type-button">Limpar lista</button>
+      <button class="downloads-all k-button k-button--text k-type-button">Ver todos</button>
+    </div>
+  </section>
+
+  <div id="snackbar" class="k-snackbar k-type-label" role="status" hidden>
+    <span class="k-snackbar__text"></span>
+    <button class="k-snackbar__action"></button>
+  </div>
+
+  <ul id="context-menu" class="k-menu k-type-label context-menu" role="menu" hidden></ul>
+
+  <ul id="space-menu" class="k-menu k-type-label" role="menu" hidden>
+    <li class="k-menu__item k-state" data-space-action="edit"><span class="k-icon" data-icon="palette"></span>Editar espaço</li>
+    <li class="k-menu__item k-state" data-space-action="delete"><span class="k-icon" data-icon="x"></span>Apagar espaço</li>
+  </ul>
+
+  <form id="space-form" class="space-form" hidden>
+    <span class="k-type-panel">Espaço</span>
+    <input name="name" class="k-text-field k-type-label" placeholder="Nome" autocomplete="off" maxlength="32">
+    <div class="icons"></div>
+    <div class="colors"></div>
+    <div class="space-session" hidden>
+      <span class="space-session__text k-type-caption hint"></span>
+      <button id="space-clear" type="button" class="k-button k-button--text k-type-button">Limpar dados</button>
+    </div>
+    <div class="actions">
+      <button id="space-cancel" type="button" class="k-button k-button--text k-type-button">Cancelar</button>
+      <button type="submit" class="k-button k-button--filled k-type-button">Salvar</button>
+    </div>
+  </form>
+
+  <script type="module" src="sidebar.js"></script>
+</body>
+</html>

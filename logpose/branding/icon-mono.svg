@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <path fill="#fff" fill-rule="evenodd" d="M256 54A152 152 0 1 1 255.9 54Z M256 82A124 124 0 1 0 256.1 82Z"/>
+  <path fill="#fff" d="M178 352 L334 352 L334 404 Q256 422 178 404 Z"/>
+  <path fill="#fff" d="M40 424 Q256 388 472 424 L472 468 Q256 432 40 468 Z"/>
+  <g transform="rotate(28 256 206)">
+    <polygon fill="#fff" points="256,100 280,206 232,206"/>
+    <polygon fill="#fff" fill-opacity="0.55" points="232,206 280,206 256,312"/>
+  </g>
+  <circle cx="256" cy="206" r="18" fill="#fff"/>
+</svg>

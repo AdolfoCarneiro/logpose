@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+src="$root/build/src"
+
+inside() {
+  local status=0
+  "$root/logpose/bin/logpose-dev" "set -e; source logpose/tools/dev_build.sh; $*" || status=$?
+  # se falhou no meio, devolve patches/ ao estado do git
+  if [ -f "$root/patches/series.merged" ]; then
+    "$root/logpose/bin/logpose-dev" ___helium_patches_op unmerge
+  fi
+  return "$status"
+}
+
+usage() {
+  cat >&2 <<'EOF'
+uso: logpose-build [comando]
+  (nada) | build   compila só o que mudou em build/src/out/Default
+  setup            baixa o Chromium, aplica os patches, marca e gn gen (uma vez, demora)
+  patches          reaplica os patches de patches/ que mudaram, depois rode build
+  args             regrava o args.gn de desenvolvimento e roda gn gen
+  du               espaço em disco do build e do cache
+  reset            apaga build/src (o próximo setup começa do zero)
+EOF
+  exit 1
+}
+
+case "${1:-build}" in
+  setup) inside logpose_dev_setup ;;
+  build)
+    [ -f "$src/out/Default/args.gn" ] || { echo "rode logpose-build setup antes" >&2; exit 1; }
+    shift || true
+    inside logpose_dev_build "$@"
+    ;;
+  patches) inside logpose_dev_patches ;;
+  args) inside 'logpose_dev_args && gn_gen' ;;
+  du)
+    du -sh "$root/build"/* "$src/out"/* "${LOGPOSE_SCCACHE_DIR:-$HOME/.cache/logpose/sccache}" 2>/dev/null || true
+    docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E '^(chromium-builder|logpose-dev):' || true
+    ;;
+  reset)
+    read -rp "apagar $src? [s/N] " answer
+    [ "$answer" = s ] || exit 1
+    rm -rf "$src" "$root/build/applied-patches" "$root/build/logpose-namesubs.tar.gz"
+    ;;
+  *) usage ;;
+esac

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+id="${1:?uso: logpose-theme-install <id-da-extensao>}"
+profile="${LOGPOSE_PROFILE:-$HOME/.local/share/logpose/profile}"
+
+mkdir -p "$HOME/.config/ciel/hooks/theme-set.d"
+ln -sfn "$root/logpose/theme/hook-theme-set" "$HOME/.config/ciel/hooks/theme-set.d/logpose"
+
+for dir in "$profile" "$HOME/.local/share/logpose/dev-profile"; do
+  mkdir -p "$dir/NativeMessagingHosts"
+  cat > "$dir/NativeMessagingHosts/logpose.theme.json" <<JSON
+{
+  "name": "logpose.theme",
+  "description": "Log Pose: tema do Ciel",
+  "path": "$root/logpose/theme/logpose_theme_host.py",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://$id/"]
+}
+JSON
+done
+
+"$root/logpose/theme/hook-theme-set"
+echo "ok"

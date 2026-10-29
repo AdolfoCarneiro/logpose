@@ -1,0 +1,25 @@
+Com o material translúcido do Log Pose, a janela não declara região opaca pro compositor Wayland. Antes ela se dizia toda opaca quando lado a lado, e o compositor deixava de desenhar o fundo atrás dela, apagando a transparência da barra lateral.
+
+--- a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_linux.cc
++++ b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_linux.cc
+@@ -10,6 +10,7 @@
+ #include "base/no_destructor.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/ui/browser_init_state.h"
++#include "chrome/browser/ui/color/logpose_color_mixer.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/views/frame/browser_frame_view_linux.h"
+ #include "chrome/browser/ui/views/frame/browser_native_widget_aura_linux.h"
+@@ -194,7 +195,11 @@
+       opaque_region.push_back(
+           gfx::ScaleToEnclosingRect(opaque_region_dip, scale));
+     }
+-    window->SetOpaqueRegion(opaque_region);
++    if (SkColorGetA(LogPoseMaterialColor(SK_ColorBLACK)) != SK_AlphaOPAQUE) {
++      window->SetOpaqueRegion(std::nullopt);
++    } else {
++      window->SetOpaqueRegion(opaque_region);
++    }
+   }
+ 
+   SizeConstraintsChanged();

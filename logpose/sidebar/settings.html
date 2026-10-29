@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="icon-128.png">
+  <title>Configurações</title>
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
+  <link rel="stylesheet" href="settings.css">
+  <style id="logpose-theme"></style>
+</head>
+<body class="k-surface k-type-body">
+  <div class="layout">
+    <nav id="nav" class="nav" aria-label="Seções"></nav>
+    <main>
+      <header class="page-header">
+        <h1 class="k-type-headline">Configurações</h1>
+        <button id="close" class="k-icon-button k-state" type="button" title="Fechar (Esc)"><span class="k-icon"></span></button>
+      </header>
+      <label class="search">
+        <span class="k-icon" data-icon="search"></span>
+        <input id="search" class="k-text-field k-type-label" type="search" placeholder="Buscar nas configurações" autocomplete="off" spellcheck="false">
+      </label>
+      <p id="no-results" class="k-type-body hint" hidden>Nada encontrado.</p>
+
+      <section class="card" id="aparencia" data-title="Aparência" data-nav-icon="palette">
+        <h2 class="k-type-section">Aparência</h2>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Seguir o tema do Ciel</span><span class="k-type-caption hint">Cores da barra e das páginas do Log Pose mudam junto com o tema do Ciel.</span></span>
+          <input class="k-switch" type="checkbox" data-key="followCielTheme">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Transparência do material</span><span class="k-type-caption hint">Opacidade da moldura e da barra lateral. A página continua opaca.</span></span>
+          <span class="slider-row"><input class="k-slider" type="range" min="0" max="100" step="5" data-key="materialOpacity"><output class="k-type-numeric" id="materialOpacity-value"></output></span>
+        </label>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Densidade</span><span class="k-type-caption hint">Tamanho das linhas e dos botões da barra lateral.</span></span>
+          <div class="k-segmented" data-key="density">
+            <button class="k-segmented__option k-type-label" data-value="comfortable">Confortável</button>
+            <button class="k-segmented__option k-type-label" data-value="compact">Compacta</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Tamanho do texto</span><span class="k-type-caption hint">Tamanho padrão da fonte das páginas.</span></span>
+          <div class="k-segmented" data-pref="webkit.webprefs.default_font_size" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="12">Pequeno</button>
+            <button class="k-segmented__option k-type-label" data-value="16">Médio</button>
+            <button class="k-segmented__option k-type-label" data-value="20">Grande</button>
+          </div>
+        </div>
+        <div class="setting" id="zoom-setting" hidden>
+          <span class="text"><span class="k-type-panel">Zoom das páginas</span><span class="k-type-caption hint">Zoom de quem não tem um próprio. Ctrl+0 volta pra ele.</span></span>
+          <div class="k-segmented" id="zoom">
+            <button class="k-segmented__option k-type-label" data-value="0.9">90%</button>
+            <button class="k-segmented__option k-type-label" data-value="1">100%</button>
+            <button class="k-segmented__option k-type-label" data-value="1.1">110%</button>
+            <button class="k-segmented__option k-type-label" data-value="1.25">125%</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Cobrinha de carregamento</span><span class="k-type-caption hint">Traço que contorna a página enquanto ela carrega.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.browser.show_progress_bar">
+        </label>
+      </section>
+
+      <section class="card" id="barra" data-title="Barra lateral" data-nav-icon="panel-left">
+        <h2 class="k-type-section">Barra lateral</h2>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Mostrar URL completa</span><span class="k-type-caption hint">Desligado, o campo de endereço mostra só o domínio.</span></span>
+          <input class="k-switch" type="checkbox" data-key="showFullUrl">
+        </label>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Posição da barra</span><span class="k-type-caption hint">Lado da janela onde a barra lateral fica.</span></span>
+          <div class="k-segmented" data-pref="side_panel.is_right_aligned" data-type="boolean">
+            <button class="k-segmented__option k-type-label" data-value="false">Esquerda</button>
+            <button class="k-segmented__option k-type-label" data-value="true">Direita</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Mini player</span><span class="k-type-caption hint">Quando outra aba toca áudio ou vídeo, um cartão no pé da barra mostra o que toca, com tocar/pausar, anterior/próxima, picture-in-picture e mudo.</span></span>
+          <input class="k-switch" type="checkbox" data-key="miniPlayer">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Picture-in-picture automático</span><span class="k-type-caption hint">Ao trocar de aba com um vídeo tocando, ele segue numa janelinha flutuante; ao voltar pra aba, a janelinha fecha.</span></span>
+          <input class="k-switch" type="checkbox" data-key="autoPip">
+        </label>
+      </section>
+
+      <section class="card" id="abas" data-title="Abas" data-nav-icon="layers">
+        <h2 class="k-type-section">Abas</h2>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Dormir abas paradas</span><span class="k-type-caption hint">A aba libera memória e recarrega quando você volta nela. Ativa e tocando áudio nunca dormem.</span></span>
+          <div class="k-segmented" data-key="sleepAfterMinutes" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="15">15 min</button>
+            <button class="k-segmented__option k-type-label" data-value="30">30 min</button>
+            <button class="k-segmented__option k-type-label" data-value="60">1 h</button>
+            <button class="k-segmented__option k-type-label" data-value="120">2 h</button>
+            <button class="k-segmented__option k-type-label" data-value="0">Nunca</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Arquivar abas esquecidas</span><span class="k-type-caption hint">Fecha e guarda em ⋮ → Abas arquivadas, com Desfazer. Fixadas nunca são arquivadas.</span></span>
+          <div class="k-segmented" data-key="archiveAfterHours" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="12">12 h</button>
+            <button class="k-segmented__option k-type-label" data-value="24">1 dia</button>
+            <button class="k-segmented__option k-type-label" data-value="168">7 dias</button>
+            <button class="k-segmented__option k-type-label" data-value="0">Nunca</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Links das Fixadas abrem em Peek</span><span class="k-type-caption hint">Um link que uma fixada abriria em aba nova aparece num cartão por cima da página. Esc fecha; “Abrir como aba” mantém.</span></span>
+          <input class="k-switch" type="checkbox" data-key="peekPinnedLinks">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Links de outros apps abrem numa janela pequena</span><span class="k-type-caption hint">Com o Log Pose aberto, um link vindo de outro app abre numa janela compacta, sem a barra lateral. “Abrir no Log Pose” leva a página pra janela principal.</span></span>
+          <input class="k-switch" type="checkbox" data-key="littleWindowLinks">
+        </label>
+      </section>
+
+      <section class="card" id="busca" data-title="Busca e início" data-nav-icon="search">
+        <h2 class="k-type-section">Busca e início</h2>
+        <div class="setting engines-setting" id="engines-setting" hidden>
+          <span class="text"><span class="k-type-panel">Busca</span><span class="k-type-caption hint">O que o spotlight usa quando o texto não é um endereço.</span></span>
+          <div id="engines" class="engines"></div>
+        </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Sugestões enquanto digita</span><span class="k-type-caption hint">Pede sugestões ao mecanismo de busca. O que você digita vai pra ele.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="search.suggest_enabled">
+        </label>
+        <div class="setting aliases-head">
+          <span class="text"><span class="k-type-panel">Aliases do spotlight</span><span class="k-type-caption hint">No spotlight, o alias e um espaço mudam o que ele procura: “a board” só nas abas abertas, “f repos” nos favoritos, “yt lofi” no YouTube. Num site, %s marca onde entram os termos.</span></span>
+          <button id="aliases-reset" class="k-button k-button--text k-type-button" type="button">Restaurar padrão</button>
+        </div>
+        <div id="alias-settings"></div>
+        <form id="alias-new" class="setting alias-row">
+          <input name="alias" class="k-text-field k-type-label alias-key" placeholder="alias" maxlength="8" autocomplete="off">
+          <input name="name" class="k-text-field k-type-label alias-name" placeholder="Nome do site" maxlength="32" autocomplete="off">
+          <input name="url" class="k-text-field k-type-label alias-url" placeholder="https://site.com/busca?q=%s" autocomplete="off">
+          <button class="k-button k-button--tonal k-type-button" type="submit">Adicionar</button>
+        </form>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Ao abrir</span><span class="k-type-caption hint">O que o Log Pose mostra quando você abre o navegador.</span></span>
+          <div class="k-segmented" data-pref="session.restore_on_startup" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="1">Continuar de onde parou</button>
+            <button class="k-segmented__option k-type-label" data-value="5">Nova aba</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Notícias na nova aba</span><span class="k-type-caption hint">Manchetes do Google Notícias em português, atualizadas a cada 30 minutos.</span></span>
+          <input class="k-switch" type="checkbox" data-key="newtabNews">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Tempo e tarefas na nova aba</span><span class="k-type-caption hint">Previsão por hora da cidade escolhida no Ciel (Open-Meteo) e uma lista de tarefas guardada no Log Pose.</span></span>
+          <input class="k-switch" type="checkbox" data-key="newtabCards">
+        </label>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/searchEngines">
+          <span class="text"><span class="k-type-panel">Mecanismos e atalhos de busca</span><span class="k-type-caption hint">Adicionar mecanismos e palavras-chave de site.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="privacidade" data-title="Privacidade e segurança" data-nav-icon="shield">
+        <h2 class="k-type-section">Privacidade e segurança</h2>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Só HTTPS</span><span class="k-type-caption hint">Avisa antes de abrir um site sem conexão segura.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="https_only_mode_enabled">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Global Privacy Control</span><span class="k-type-caption hint">Pede aos sites que não vendam nem compartilhem seus dados.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.global_privacy_control">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Não rastrear</span><span class="k-type-caption hint">Manda o pedido “Do Not Track” junto com cada página.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="enable_do_not_track">
+        </label>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Cookies de terceiros</span><span class="k-type-caption hint">Cookies de outros sites dentro da página (rastreamento entre sites).</span></span>
+          <div class="k-segmented" data-pref="profile.cookie_controls_mode" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="2">Bloquear</button>
+            <button class="k-segmented__option k-type-label" data-value="1">Só na janela anônima</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Pré-carregar páginas</span><span class="k-type-caption hint">Carrega antes as páginas que você deve abrir. Mais rápido, mas o site vê a visita.</span></span>
+          <div class="k-segmented" data-pref="net.network_prediction_options" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="0">Ligado</button>
+            <button class="k-segmented__option k-type-label" data-value="2">Desligado</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">DNS seguro</span><span class="k-type-caption hint">Usa DNS criptografado quando o provedor oferece.</span></span>
+          <div class="k-segmented" data-pref="dns_over_https.mode" data-type="string">
+            <button class="k-segmented__option k-type-label" data-value="automatic">Automático</button>
+            <button class="k-segmented__option k-type-label" data-value="off">Desligado</button>
+          </div>
+        </div>
+        <div class="setting" id="clear-setting">
+          <span class="text"><span class="k-type-panel">Limpar dados de navegação</span><span class="k-type-caption hint">Histórico, cookies, cache e downloads de um período.</span></span>
+          <button id="clear-open" class="k-button k-button--tonal k-type-button" type="button">Limpar…</button>
+        </div>
+        <div class="clear-panel" id="clear-panel" hidden>
+          <div class="k-segmented" id="clear-range">
+            <button class="k-segmented__option k-type-label" data-value="3600000" aria-pressed="true">Última hora</button>
+            <button class="k-segmented__option k-type-label" data-value="86400000">Último dia</button>
+            <button class="k-segmented__option k-type-label" data-value="604800000">7 dias</button>
+            <button class="k-segmented__option k-type-label" data-value="0">Tudo</button>
+          </div>
+          <label class="setting"><span class="text"><span class="k-type-panel">Histórico</span></span><input class="k-switch" type="checkbox" data-clear="history" checked></label>
+          <label class="setting"><span class="text"><span class="k-type-panel">Cookies e dados de sites</span><span class="k-type-caption hint">Sai da maioria dos sites.</span></span><input class="k-switch" type="checkbox" data-clear="cookies"></label>
+          <label class="setting"><span class="text"><span class="k-type-panel">Imagens e arquivos em cache</span></span><input class="k-switch" type="checkbox" data-clear="cache" checked></label>
+          <label class="setting"><span class="text"><span class="k-type-panel">Lista de downloads</span><span class="k-type-caption hint">Os arquivos ficam.</span></span><input class="k-switch" type="checkbox" data-clear="downloads"></label>
+          <label class="setting"><span class="text"><span class="k-type-panel">Dados de formulários</span></span><input class="k-switch" type="checkbox" data-clear="formData"></label>
+          <div class="clear-actions">
+            <button id="clear-cancel" class="k-button k-button--text k-type-button" type="button">Cancelar</button>
+            <button id="clear-run" class="k-button k-button--filled k-type-button" type="button">Limpar agora</button>
+          </div>
+        </div>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/content">
+          <span class="text"><span class="k-type-panel">Permissões dos sites</span><span class="k-type-caption hint">Câmera, microfone, localização, notificações, pop-ups e o que cada site pode usar.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/content/all">
+          <span class="text"><span class="k-type-panel">Dados salvos pelos sites</span><span class="k-type-caption hint">Ver e apagar cookies e armazenamento de cada site.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="senhas" data-title="Senhas e preenchimento" data-nav-icon="key-round">
+        <h2 class="k-type-section">Senhas e preenchimento</h2>
+        <p class="k-type-caption hint">Com o 1Password, deixe estes desligados pra não ter dois cofres oferecendo a mesma coisa.</p>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Oferecer salvar senhas</span></span>
+          <input class="k-switch" type="checkbox" data-pref="credentials_enable_service">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Entrar automaticamente</span><span class="k-type-caption hint">Usa a senha salva sem perguntar.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="credentials_enable_autosignin">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Preencher endereços</span></span>
+          <input class="k-switch" type="checkbox" data-pref="autofill.profile_enabled">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Preencher cartões</span></span>
+          <input class="k-switch" type="checkbox" data-pref="autofill.credit_card_enabled">
+        </label>
+        <button class="setting setting--link" type="button" data-open="chrome://password-manager/passwords">
+          <span class="text"><span class="k-type-panel">Senhas salvas</span><span class="k-type-caption hint">Gerenciador de senhas do navegador.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/autofill">
+          <span class="text"><span class="k-type-panel">Endereços e formas de pagamento</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="downloads" data-title="Downloads" data-nav-icon="download">
+        <h2 class="k-type-section">Downloads</h2>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Perguntar onde salvar</span><span class="k-type-caption hint" id="download-dir"></span></span>
+          <input class="k-switch" type="checkbox" data-pref="download.prompt_for_download">
+        </label>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/downloads">
+          <span class="text"><span class="k-type-panel">Trocar a pasta de downloads</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="idiomas" data-title="Idiomas" data-nav-icon="languages">
+        <h2 class="k-type-section">Idiomas</h2>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Corretor ortográfico</span><span class="k-type-caption hint" id="dictionaries"></span></span>
+          <input class="k-switch" type="checkbox" data-pref="browser.enable_spellchecking">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Oferecer tradução</span><span class="k-type-caption hint">Quando a página está num idioma que você não lê.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="translate.enabled">
+        </label>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/languages">
+          <span class="text"><span class="k-type-panel">Idiomas preferidos</span><span class="k-type-caption hint" id="languages"></span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="sistema" data-title="Sistema e desempenho" data-nav-icon="gauge">
+        <h2 class="k-type-section">Sistema e desempenho</h2>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">Economia de energia</span><span class="k-type-caption hint">Diminui animações e trabalho em segundo plano das páginas.</span></span>
+          <div class="k-segmented" data-pref="performance_tuning.battery_saver_mode.state" data-type="number">
+            <button class="k-segmented__option k-type-label" data-value="1">Bateria fraca</button>
+            <button class="k-segmented__option k-type-label" data-value="2">Na bateria</button>
+            <button class="k-segmented__option k-type-label" data-value="0">Nunca</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Aceleração por hardware</span><span class="k-type-caption hint">Usa a GPU pra desenhar páginas e vídeo. Vale depois de reabrir o navegador.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="hardware_acceleration_mode.enabled">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Continuar em segundo plano</span><span class="k-type-caption hint">Apps e extensões seguem rodando com o Log Pose fechado.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="background_mode.enabled">
+        </label>
+      </section>
+
+      <section class="card" id="servicos" data-title="Bloqueio e serviços" data-nav-icon="shield-check" hidden>
+        <h2 class="k-type-section">Bloqueio e serviços</h2>
+        <p class="k-type-caption hint">O uBlock Origin vem embutido. Os serviços on-line são da imput, a equipe do Helium (o Log Pose é um fork dele), e nunca recebem seu histórico.</p>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Serviços do Helium</span><span class="k-type-caption hint">Liga os itens abaixo. Desligado, nada sai do navegador pra imput.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.services.enabled">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Atualizar as listas do uBlock Origin</span><span class="k-type-caption hint">Sem isso, as listas só mudam numa versão nova do Log Pose.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.services.ublock_assets">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Extensões da Chrome Web Store</span><span class="k-type-caption hint">Instala e atualiza extensões passando pelo proxy anônimo.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.services.ext_proxy">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Dicionários do corretor</span><span class="k-type-caption hint">Baixa os dicionários de ortografia.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.services.spellcheck_files">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Atalhos de busca (!bangs)</span><span class="k-type-caption hint">Digite !g, !w, !yt… antes da busca pra ir direto ao site.</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.services.bangs">
+        </label>
+        <label class="setting">
+          <span class="text"><span class="k-type-panel">Ruído contra fingerprinting</span><span class="k-type-caption hint">Embaralha de leve o que os sites usam pra te identificar (canvas, áudio, fontes).</span></span>
+          <input class="k-switch" type="checkbox" data-pref="helium.noise.enabled">
+        </label>
+        <div class="setting">
+          <span class="text"><span class="k-type-panel">uBlock Origin</span><span class="k-type-caption hint">Listas, regras e sites liberados.</span></span>
+          <button id="ublock-dashboard" class="k-button k-button--tonal k-type-button" type="button">Abrir painel</button>
+        </div>
+      </section>
+
+      <section class="card" id="containers" data-title="Grupos" data-nav-icon="boxes" hidden>
+        <h2 class="k-type-section">Grupos</h2>
+        <p class="k-type-caption hint">Páginas salvas que ficam recolhíveis na barra lateral. Guarde uma aba pelo menu de contexto dela; as páginas abrem na sessão do espaço atual. Logins separados ficam por espaço: cada um tem a sua sessão, e o primeiro usa a principal. Clique no ícone ou na cor para trocar.</p>
+        <div id="container-settings"></div>
+        <form id="container-new" class="setting container-new">
+          <input name="name" class="k-text-field k-type-label" placeholder="Novo grupo" maxlength="32" autocomplete="off">
+          <button class="k-button k-button--tonal k-type-button" type="submit">Criar</button>
+        </form>
+      </section>
+
+      <section class="card" id="atalhos" data-title="Atalhos" data-nav-icon="keyboard" hidden>
+        <h2 class="k-type-section">Atalhos</h2>
+        <p class="k-type-caption hint">Valem antes da página e dos atalhos do Chromium. Clique na tecla para gravar outra; Esc cancela, Backspace deixa sem atalho.</p>
+        <div id="shortcut-settings"></div>
+        <div class="setting shortcuts-footer">
+          <span class="text"></span>
+          <button id="shortcuts-reset" class="k-button k-button--text k-type-button">Restaurar todos</button>
+        </div>
+      </section>
+
+      <section class="card" id="extensoes" data-title="Extensões" data-nav-icon="puzzle">
+        <h2 class="k-type-section">Extensões</h2>
+        <p class="k-type-caption hint" id="extensions-hint" hidden>Fixadas aparecem no topo da barra lateral. As outras ficam no botão de extensões ao lado.</p>
+        <div id="extension-settings"></div>
+        <button class="setting setting--link" type="button" data-open="chrome://extensions">
+          <span class="text"><span class="k-type-panel">Gerenciar extensões</span><span class="k-type-caption hint">Instalar, ligar, desligar e dar acesso aos sites.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="perfil" data-title="Perfil e dados" data-nav-icon="user">
+        <h2 class="k-type-section">Perfil e dados</h2>
+        <div class="setting" id="profiles-setting" hidden>
+          <span class="text"><span class="k-type-panel">Perfis</span><span class="k-type-caption hint">Cada perfil abre janelas próprias, com dados separados.</span></span>
+          <button id="profiles" class="k-button k-button--tonal k-type-button" type="button">Abrir perfis</button>
+        </div>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/importData">
+          <span class="text"><span class="k-type-panel">Importar favoritos e configurações</span><span class="k-type-caption hint">De outro navegador ou de um arquivo HTML.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/defaultBrowser">
+          <span class="text"><span class="k-type-panel">Navegador padrão</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/reset">
+          <span class="text"><span class="k-type-panel">Redefinir o navegador</span><span class="k-type-caption hint">Volta as configurações do Chromium ao padrão. As do Log Pose ficam.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+
+      <section class="card" id="sobre" data-title="Sobre o Log Pose" data-nav-icon="info">
+        <h2 class="k-type-section">Sobre o Log Pose</h2>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/help">
+          <span class="text"><span class="k-type-panel">Versão</span><span class="k-type-caption hint" id="version"></span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+        <button class="setting setting--link" type="button" data-open="chrome://settings/accessibility">
+          <span class="text"><span class="k-type-panel">Acessibilidade</span><span class="k-type-caption hint">Destaque do foco, legendas e navegação com cursor.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+        <button class="setting setting--link" type="button" data-open="chrome://settings">
+          <span class="text"><span class="k-type-panel">Todas as configurações do Chromium</span><span class="k-type-caption hint">O que não tem aqui: fontes, proxy, sistema e o resto.</span></span>
+          <span class="k-icon" data-icon="external-link"></span>
+        </button>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

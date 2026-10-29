@@ -1,0 +1,15 @@
+Painel lateral à esquerda por padrão, onde fica a barra lateral do Log Pose.
+Adaptado de Flecha (MIT), https://github.com/lucianodiisouza/flecha-browser
+chromium/patches/0003-side-panel-on-the-left.patch
+
+--- a/chrome/browser/ui/side_panel/side_panel_prefs.cc
++++ b/chrome/browser/ui/side_panel/side_panel_prefs.cc
+@@ -36,7 +36,7 @@
+   // TODO(dljames): Add enum values kAlternateSide / kDefaultSide that will
+   // replace false and true respectively.
+   registry->RegisterBooleanPref(prefs::kSidePanelHorizontalAlignment,
+-                                !base::i18n::IsRTL());
++                                base::i18n::IsRTL());
+   registry->RegisterBooleanPref(prefs::kGoogleSearchSidePanelEnabled, true);
+   registry->RegisterDictionaryPref(prefs::kSidePanelIdToWidth);
+ 

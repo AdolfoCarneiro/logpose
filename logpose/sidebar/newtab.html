@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="icon-128.png">
+  <title>Nova aba</title>
+  <link rel="stylesheet" href="kurobe/kurobe.css">
+  <link rel="stylesheet" href="kurobe/components.css">
+  <link rel="stylesheet" href="newtab.css">
+  <style id="logpose-theme"></style>
+</head>
+<body class="k-type-body">
+  <main class="feed">
+    <header class="hello">
+      <div class="hello__text">
+        <h1 id="greeting" class="hello__greeting"></h1>
+        <p id="date" class="hello__date k-type-panel"></p>
+      </div>
+      <div id="now" class="now" hidden>
+        <span id="now-icon" class="k-icon now__icon"></span>
+        <span class="now__text">
+          <span id="now-temp" class="now__temp"></span>
+          <span id="now-label" class="k-type-caption now__label"></span>
+        </span>
+      </div>
+    </header>
+
+    <button id="search" class="search k-state k-type-label" type="button">
+      <span class="k-icon" data-icon="search"></span>
+      <span class="search__text">Buscar ou digitar endereço</span>
+      <span id="keys" class="keys"></span>
+    </button>
+
+    <nav id="shortcuts" class="shortcuts" aria-label="Atalhos"></nav>
+
+    <section id="row" class="row">
+      <article id="weather" class="card weather" hidden>
+        <header class="card__head">
+          <span class="k-icon" data-icon="map-pin"></span>
+          <h2 id="weather-title" class="k-type-panel">Tempo</h2>
+        </header>
+        <p id="weather-empty" class="k-type-caption hint" hidden>Escolha a cidade no Ciel (<code>ciel-weather-location</code>) pra ver a previsão.</p>
+        <ol id="hours" class="hours"></ol>
+      </article>
+
+      <article id="tasks" class="card tasks" hidden>
+        <header class="card__head">
+          <span class="k-icon" data-icon="list-todo"></span>
+          <h2 class="k-type-panel">Tarefas</h2>
+          <button id="tasks-clear" class="k-button k-button--text k-type-button" type="button" hidden>Limpar concluídas</button>
+        </header>
+        <form id="task-form" class="task-form">
+          <input id="task-input" class="k-text-field k-type-label" placeholder="Nova tarefa" autocomplete="off" maxlength="200">
+          <button class="task-add k-icon-button k-state" type="submit" title="Adicionar" data-icon="plus"></button>
+        </form>
+        <p id="tasks-empty" class="k-type-caption hint">Nada pendente.</p>
+        <ul id="task-list" class="task-list"></ul>
+      </article>
+    </section>
+
+    <section id="news" class="news" hidden>
+      <header class="news__head">
+        <h2 class="section-title">Notícias</h2>
+        <button id="news-refresh" class="k-icon-button k-state" type="button" title="Atualizar" data-icon="rotate-cw"></button>
+      </header>
+      <div id="news-state" class="news__state"></div>
+      <div id="news-list" class="news__list"></div>
+    </section>
+  </main>
+  <script type="module" src="newtab.js"></script>
+</body>
+</html>

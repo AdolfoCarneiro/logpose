@@ -1,0 +1,572 @@
+API privada chrome.logposePrivate, só para a barra lateral do Log Pose: ações das extensões (ícone com badge e popup ancorado no ícone da barra) e comandos do navegador (instalar como app, imprimir, procurar, zoom...). Registro do IDL adaptado do flechaPrivate do Flecha (MIT).
+
+--- /dev/null
++++ b/chrome/common/extensions/api/logpose_private.idl
+@@ -0,0 +1,56 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++// Use the <code>chrome.logposePrivate</code> API to give Log Pose's sidebar what
++// the native toolbar and app menu did: the extensions' actions and the
++// browser's own commands. Only Log Pose's sidebar may use it.
++namespace logposePrivate {
++  // An extension's action, as the toolbar would show it on the active tab.
++  dictionary ExtensionAction {
++    DOMString id;
++    DOMString name;
++    // The action's icon with its badge, as a PNG data URL.
++    DOMString icon;
++  };
++
++  // Where the action was clicked, in the calling page's CSS pixels.
++  dictionary Anchor {
++    double x;
++    double y;
++    double width;
++    double height;
++  };
++
++  callback ExtensionActionsCallback = void(ExtensionAction[] actions);
++  callback CommandsCallback = void(DOMString[] commands);
++  callback DoneCallback = void();
++
++  interface Functions {
++    // The extensions with an action.
++    static void getExtensionActions(
++        long windowId,
++        ExtensionActionsCallback callback);
++
++    // Runs an extension's action as a click on its toolbar button would: its
++    // popup opens next to <code>anchor</code>.
++    static void runExtensionAction(
++        long windowId,
++        DOMString id,
++        Anchor anchor,
++        optional DoneCallback callback);
++
++    // The browser commands (see executeCommand) the window can run now.
++    static void getEnabledCommands(
++        long windowId,
++        CommandsCallback callback);
++
++    // Runs a browser command in the window: installPwa, createShortcut,
++    // openInApp, print, find, zoomIn, zoomOut, zoomReset, savePage,
++    // viewSource, devTools, taskManager or clearBrowsingData.
++    static void executeCommand(
++        long windowId,
++        DOMString command,
++        optional DoneCallback callback);
++  };
++};
+--- a/chrome/common/extensions/api/api_sources.gni
++++ b/chrome/common/extensions/api/api_sources.gni
+@@ -90,6 +90,7 @@
+     "indigo_private.webidl",
+     "language_settings_private.webidl",
+     "passwords_private.webidl",
++    "logpose_private.idl",
+     "resources_private.idl",
+     "safe_browsing_private.idl",
+     "settings_private.idl",
+--- a/chrome/common/extensions/api/_api_features.json
++++ b/chrome/common/extensions/api/_api_features.json
+@@ -589,6 +589,10 @@
+     "dependencies": ["permission:identity"],
+     "contexts": ["privileged_extension"]
+   },
++  "logposePrivate": {
++    "dependencies": ["permission:logposePrivate"],
++    "contexts": ["privileged_extension"]
++  },
+   "indigoPrivate": {
+     "dependencies": ["permission:indigoPrivate"],
+     "contexts": [
+--- a/chrome/common/extensions/api/_permission_features.json
++++ b/chrome/common/extensions/api/_permission_features.json
+@@ -511,6 +511,11 @@
+   "identity.email": {
+     "channel": "stable",
+     "extension_types": ["extension", "platform_app"]
++  },
++  "logposePrivate": {
++    "channel": "stable",
++    "extension_types": ["extension"],
++    "allowlist": ["2E76815F710A158780761A7A6262260BD23BC275"]
+   },
+   "indigoPrivate": {
+     "channel": "stable",
+--- a/extensions/common/mojom/api_permission_id.mojom
++++ b/extensions/common/mojom/api_permission_id.mojom
+@@ -299,6 +299,7 @@
+   kBluetoothPeripheral = 272,
+   kPublicSuffix = 273,
+   kEnterpriseWebrtc = 274,
++  kLogPosePrivate = 275,
+ 
+   // Add new entries at the end of the enum and be sure to update the
+   // "ExtensionPermission3" enum in
+--- a/chrome/common/extensions/permissions/chrome_api_permissions.cc
++++ b/chrome/common/extensions/permissions/chrome_api_permissions.cc
+@@ -182,6 +182,8 @@
+      APIPermissionInfo::kFlagCannotBeOptional},
+     {APIPermissionID::kPdfViewerPrivate, "pdfViewerPrivate"},
+     {APIPermissionID::kIndigoPrivate, "indigoPrivate"},
++    {APIPermissionID::kLogPosePrivate, "logposePrivate",
++     APIPermissionInfo::kFlagCannotBeOptional},
+     {APIPermissionID::kProxyOverrideRulesPrivate, "proxyOverrideRulesPrivate",
+      APIPermissionInfo::kFlagCannotBeOptional},
+     {APIPermissionID::kResourcesPrivate, "resourcesPrivate",
+--- a/chrome/browser/extensions/api/BUILD.gn
++++ b/chrome/browser/extensions/api/BUILD.gn
+@@ -115,6 +115,7 @@
+     public_deps += [
+       "//chrome/browser/extensions/api/contextual_tasks_private",
+       "//chrome/browser/extensions/api/indigo_private",
++      "//chrome/browser/extensions/api/logpose_private",
+     ]
+   }
+ }
+--- /dev/null
++++ b/chrome/browser/extensions/api/logpose_private/BUILD.gn
+@@ -0,0 +1,29 @@
++# Copyright 2026 The Log Pose Authors
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
++assert(!is_android)
++
++source_set("logpose_private") {
++  sources = [
++    "logpose_private_api.cc",
++    "logpose_private_api.h",
++  ]
++
++  deps = [
++    "//base",
++    "//chrome/app:command_ids",
++    "//chrome/browser/extensions",
++    "//chrome/browser/profiles",
++    "//chrome/browser/ui",
++    "//chrome/browser/ui:browser_window_header",
++    "//chrome/browser/ui/extensions",
++    "//chrome/browser/ui/toolbar",
++    "//chrome/common/extensions/api",
++    "//components/tabs:public",
++    "//content/public/browser",
++    "//extensions/browser",
++    "//ui/base",
++    "//ui/gfx",
++  ]
++}
+--- /dev/null
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
+@@ -0,0 +1,50 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_EXTENSIONS_API_LOGPOSE_PRIVATE_LOGPOSE_PRIVATE_API_H_
++#define CHROME_BROWSER_EXTENSIONS_API_LOGPOSE_PRIVATE_LOGPOSE_PRIVATE_API_H_
++
++#include "extensions/browser/extension_function.h"
++
++namespace extensions {
++
++class LogPosePrivateGetExtensionActionsFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.getExtensionActions", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateGetExtensionActionsFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateRunExtensionActionFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.runExtensionAction", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateRunExtensionActionFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateGetEnabledCommandsFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.getEnabledCommands", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateGetEnabledCommandsFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateExecuteCommandFunction() override = default;
++  ResponseAction Run() override;
++};
++
++}  // namespace extensions
++
++#endif  // CHROME_BROWSER_EXTENSIONS_API_LOGPOSE_PRIVATE_LOGPOSE_PRIVATE_API_H_
+--- /dev/null
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
+@@ -0,0 +1,200 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/extensions/api/logpose_private/logpose_private_api.h"
++
++#include <array>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "base/base64.h"
++#include "base/strings/utf_string_conversions.h"
++#include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/extensions/extension_tab_util.h"
++#include "chrome/browser/extensions/window_controller.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/tab_list/tab_list_interface.h"
++#include "chrome/browser/ui/browser_commands.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/extensions/extensions_container.h"
++#include "chrome/browser/ui/extensions/logpose_popup_anchor.h"
++#include "chrome/browser/ui/toolbar/toolbar_action_view_model.h"
++#include "chrome/browser/ui/toolbar/toolbar_actions_model.h"
++#include "chrome/common/extensions/api/logpose_private.h"
++#include "components/tabs/public/tab_interface.h"
++#include "content/public/browser/web_contents.h"
++#include "ui/base/models/image_model.h"
++#include "ui/gfx/codec/png_codec.h"
++#include "ui/gfx/geometry/rect_conversions.h"
++#include "ui/gfx/geometry/rect_f.h"
++#include "ui/gfx/image/image_skia.h"
++#include "ui/gfx/image/image_skia_rep.h"
++
++namespace extensions {
++
++namespace {
++
++namespace logpose_private = api::logpose_private;
++
++constexpr int kIconSize = 28;
++constexpr float kIconScale = 2.0f;
++constexpr char kNoActionError[] = "No extension action with id *.";
++constexpr char kNoCommandError[] = "Unknown or disabled command *.";
++
++struct Command {
++  const char* name;
++  int id;
++};
++
++constexpr auto kCommands = std::to_array<Command>({
++    {"installPwa", IDC_INSTALL_PWA},
++    {"createShortcut", IDC_CREATE_SHORTCUT},
++    {"openInApp", IDC_OPEN_IN_PWA_WINDOW},
++    {"print", IDC_PRINT},
++    {"find", IDC_FIND},
++    {"zoomIn", IDC_ZOOM_PLUS},
++    {"zoomOut", IDC_ZOOM_MINUS},
++    {"zoomReset", IDC_ZOOM_NORMAL},
++    {"savePage", IDC_SAVE_PAGE},
++    {"viewSource", IDC_VIEW_SOURCE},
++    {"devTools", IDC_DEV_TOOLS},
++    {"taskManager", IDC_TASK_MANAGER},
++    {"clearBrowsingData", IDC_CLEAR_BROWSING_DATA},
++});
++
++BrowserWindowInterface* BrowserForWindow(ExtensionFunction* function,
++                                         int window_id,
++                                         std::string* error) {
++  WindowController* controller = ExtensionTabUtil::GetControllerInProfileWithId(
++      Profile::FromBrowserContext(function->browser_context()), window_id,
++      function->include_incognito_information(), error);
++  return controller ? controller->GetBrowserWindowInterface() : nullptr;
++}
++
++content::WebContents* ActiveContents(BrowserWindowInterface* browser) {
++  tabs::TabInterface* tab = TabListInterface::From(browser)->GetActiveTab();
++  return tab ? tab->GetContents() : nullptr;
++}
++
++std::string IconDataUrl(ToolbarActionViewModel* action,
++                        content::WebContents* contents) {
++  ui::ImageModel model =
++      action->GetIcon(contents, gfx::Size(kIconSize, kIconSize));
++  if (model.IsEmpty()) {
++    return std::string();
++  }
++  gfx::ImageSkia image = model.Rasterize(&contents->GetColorProvider());
++  std::optional<std::vector<uint8_t>> png = gfx::PNGCodec::EncodeBGRASkBitmap(
++      image.GetRepresentation(kIconScale).GetBitmap(),
++      /*discard_transparency=*/false);
++  if (!png) {
++    return std::string();
++  }
++  return "data:image/png;base64," + base::Base64Encode(*png);
++}
++
++}  // namespace
++
++ExtensionFunction::ResponseAction
++LogPosePrivateGetExtensionActionsFunction::Run() {
++  auto params = logpose_private::GetExtensionActions::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  ExtensionsContainer* container = ExtensionsContainer::From(*browser);
++  content::WebContents* contents = ActiveContents(browser);
++  std::vector<logpose_private::ExtensionAction> actions;
++  if (container && contents) {
++    for (const auto& id :
++         ToolbarActionsModel::Get(browser->GetProfile())->action_ids()) {
++      ToolbarActionViewModel* action = container->GetActionForId(id);
++      if (!action) {
++        continue;
++      }
++      logpose_private::ExtensionAction entry;
++      entry.id = id;
++      entry.name = base::UTF16ToUTF8(action->GetActionName());
++      entry.icon = IconDataUrl(action, contents);
++      actions.push_back(std::move(entry));
++    }
++  }
++  return RespondNow(ArgumentList(
++      logpose_private::GetExtensionActions::Results::Create(actions)));
++}
++
++ExtensionFunction::ResponseAction
++LogPosePrivateRunExtensionActionFunction::Run() {
++  auto params = logpose_private::RunExtensionAction::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  ExtensionsContainer* container = ExtensionsContainer::From(*browser);
++  ToolbarActionViewModel* action =
++      container ? container->GetActionForId(params->id) : nullptr;
++  if (!action) {
++    return RespondNow(Error(kNoActionError, params->id));
++  }
++  if (content::WebContents* sender = GetSenderWebContents()) {
++    gfx::RectF anchor(params->anchor.x, params->anchor.y, params->anchor.width,
++                      params->anchor.height);
++    anchor.Offset(sender->GetContainerBounds().OffsetFromOrigin());
++    LogPoseSetPopupAnchor(browser, gfx::ToEnclosingRect(anchor));
++  }
++  action->ExecuteUserAction(
++      ToolbarActionViewModel::InvocationSource::kToolbarButton);
++  return RespondNow(NoArguments());
++}
++
++ExtensionFunction::ResponseAction
++LogPosePrivateGetEnabledCommandsFunction::Run() {
++  auto params = logpose_private::GetEnabledCommands::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  std::vector<std::string> enabled;
++  for (const Command& command : kCommands) {
++    if (chrome::IsCommandEnabled(browser, command.id)) {
++      enabled.push_back(command.name);
++    }
++  }
++  return RespondNow(ArgumentList(
++      logpose_private::GetEnabledCommands::Results::Create(enabled)));
++}
++
++ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
++  auto params = logpose_private::ExecuteCommand::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  for (const Command& command : kCommands) {
++    if (params->command == command.name &&
++        chrome::ExecuteCommand(browser, command.id)) {
++      return RespondNow(NoArguments());
++    }
++  }
++  return RespondNow(Error(kNoCommandError, params->command));
++}
++
++}  // namespace extensions
+--- a/chrome/browser/ui/extensions/BUILD.gn
++++ b/chrome/browser/ui/extensions/BUILD.gn
+@@ -54,6 +54,7 @@
+     "extensions_overrides/simple_overrides.h",
+     "extensions_toolbar_view_model.h",
+     "icon_with_badge_image_source.h",
++    "logpose_popup_anchor.h",
+     "reload_page_dialog_controller.h",
+     "search_override_stack.h",
+     "settings_api_bubble_helpers.h",
+@@ -173,6 +174,7 @@
+     "extension_uninstall_dialog_impl.cc",
+     "extensions_container.cc",
+     "extensions_menu_view_model.cc",
++    "logpose_popup_anchor.cc",
+     "extensions_overrides/simple_overrides.cc",
+     "extensions_toolbar_view_model.cc",
+     "icon_with_badge_image_source.cc",
+--- /dev/null
++++ b/chrome/browser/ui/extensions/logpose_popup_anchor.h
+@@ -0,0 +1,20 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_EXTENSIONS_LOGPOSE_POPUP_ANCHOR_H_
++#define CHROME_BROWSER_UI_EXTENSIONS_LOGPOSE_POPUP_ANCHOR_H_
++
++#include <optional>
++
++#include "ui/gfx/geometry/rect.h"
++
++class BrowserWindowInterface;
++
++void LogPoseSetPopupAnchor(const BrowserWindowInterface* browser,
++                         const gfx::Rect& screen_bounds);
++
++std::optional<gfx::Rect> LogPosePopupAnchor(
++    const BrowserWindowInterface* browser);
++
++#endif  // CHROME_BROWSER_UI_EXTENSIONS_LOGPOSE_POPUP_ANCHOR_H_
+--- /dev/null
++++ b/chrome/browser/ui/extensions/logpose_popup_anchor.cc
+@@ -0,0 +1,34 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/extensions/logpose_popup_anchor.h"
++
++#include "base/containers/flat_map.h"
++#include "base/no_destructor.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "components/sessions/core/session_id.h"
++
++namespace {
++
++base::flat_map<SessionID::id_type, gfx::Rect>& Anchors() {
++  static base::NoDestructor<base::flat_map<SessionID::id_type, gfx::Rect>>
++      anchors;
++  return *anchors;
++}
++
++}  // namespace
++
++void LogPoseSetPopupAnchor(const BrowserWindowInterface* browser,
++                         const gfx::Rect& screen_bounds) {
++  Anchors()[browser->GetSessionID().id()] = screen_bounds;
++}
++
++std::optional<gfx::Rect> LogPosePopupAnchor(
++    const BrowserWindowInterface* browser) {
++  auto it = Anchors().find(browser->GetSessionID().id());
++  if (it == Anchors().end()) {
++    return std::nullopt;
++  }
++  return it->second;
++}
+--- a/chrome/browser/ui/views/extensions/extension_action_delegate_desktop.cc
++++ b/chrome/browser/ui/views/extensions/extension_action_delegate_desktop.cc
+@@ -8,15 +8,55 @@
+ 
+ #include "base/check.h"
+ #include "base/check_deref.h"
++#include "base/command_line.h"
+ #include "chrome/browser/extensions/extension_view_host.h"
+ #include "chrome/browser/extensions/extension_view_host_factory.h"
+ #include "chrome/browser/ui/extensions/accelerator_priority.h"
+ #include "chrome/browser/ui/extensions/extension_action_view_model.h"
++#include "chrome/browser/ui/extensions/logpose_popup_anchor.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/extensions/extension_popup.h"
+ #include "chrome/browser/ui/views/extensions/extensions_container_views.h"
+ #include "extensions/common/api/extension_action/action_info.h"
+ #include "extensions/common/command.h"
+ #include "ui/views/view.h"
++
++namespace {
++
++constexpr int kLogPosePopupAnchorId = 0x52414e47;
++
++views::View* LogPosePopupAnchorView(BrowserWindowInterface* browser) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "logpose-native-chrome") ||
++      browser->GetType() != BrowserWindowInterface::Type::TYPE_NORMAL) {
++    return nullptr;
++  }
++  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
++  if (!browser_view) {
++    return nullptr;
++  }
++  gfx::Rect bounds;
++  if (std::optional<gfx::Rect> anchor = LogPosePopupAnchor(browser)) {
++    bounds = *anchor;
++  } else {
++    gfx::Rect contents =
++        browser_view->contents_container()->GetBoundsInScreen();
++    bounds = gfx::Rect(contents.x() - 1, contents.y() + 8, 1, 1);
++  }
++  gfx::Point origin = bounds.origin();
++  views::View::ConvertPointFromScreen(browser_view, &origin);
++  bounds.set_origin(origin);
++  views::View* view = browser_view->GetViewByID(kLogPosePopupAnchorId);
++  if (!view) {
++    view = browser_view->AddChildView(std::make_unique<views::View>());
++    view->SetID(kLogPosePopupAnchorId);
++    view->SetCanProcessEventsWithinSubtree(false);
++  }
++  view->SetBoundsRect(bounds);
++  return view;
++}
++
++}  // namespace
+ 
+ using extensions::ActionInfo;
+ 
+@@ -89,10 +129,14 @@
+   views::BubbleBorder::Arrow arrow =
+       extensions_container_views_ ? extensions_container_views_->GetPopupArrow()
+                                   : views::BubbleBorder::TOP_RIGHT;
+-  ExtensionPopup::ShowPopup(
+-      browser_, std::move(host),
+-      extensions_container_views_->GetReferenceButtonForPopup(model_->GetId()),
+-      arrow, show_action, std::move(callback));
++  views::BubbleAnchor anchor =
++      extensions_container_views_->GetReferenceButtonForPopup(model_->GetId());
++  if (views::View* logpose_anchor = LogPosePopupAnchorView(browser_)) {
++    anchor = views::BubbleAnchor(logpose_anchor);
++    arrow = views::BubbleBorder::TOP_LEFT;
++  }
++  ExtensionPopup::ShowPopup(browser_, std::move(host), anchor, arrow,
++                            show_action, std::move(callback));
+ 
+   extensions_container_views_->OnPopupShown(model_->GetId(), by_user);
+ }

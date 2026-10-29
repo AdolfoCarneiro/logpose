@@ -1,0 +1,381 @@
+Containers: abas com cookies, logins e dados de sites próprios (uma partição de armazenamento fixa por aba, em <perfil>/Storage/ext/logpose-container/), abertas pela barra lateral (logposePrivate.createTab). Links, pop-ups e janelas abertos por uma aba de container herdam o container, e a coleta de partições não apaga essas pastas. Ideia e pontos de hook do patch 0034 do Flecha (MIT).
+
+--- a/chrome/common/extensions/api/logpose_private.idl
++++ b/chrome/common/extensions/api/logpose_private.idl
+@@ -22,7 +22,27 @@
+     double height;
+   };
+ 
++  // A tab opened by createTab().
++  dictionary CreateTabOptions {
++    long windowId;
++    // The container: its cookies, logins and site data are its own. "" is
++    // the profile's own storage.
++    DOMString container;
++    // The page (default: the new tab page).
++    DOMString? url;
++    long? index;
++    boolean? active;
++    boolean? pinned;
++  };
++
++  dictionary TabContainer {
++    long tabId;
++    DOMString container;
++  };
++
+   callback ExtensionActionsCallback = void(ExtensionAction[] actions);
++  callback TabIdCallback = void(long tabId);
++  callback TabContainersCallback = void(TabContainer[] tabs);
+   callback CommandsCallback = void(DOMString[] commands);
+   callback DoneCallback = void();
+ 
+@@ -52,5 +72,20 @@
+         long windowId,
+         DOMString command,
+         optional DoneCallback callback);
++
++    // Opens a tab in a container. The tab keeps the container across
++    // navigations, and the tabs and windows it opens inherit it.
++    static void createTab(CreateTabOptions options, TabIdCallback callback);
++
++    // The window's tabs that are in a container.
++    static void getTabContainers(
++        long windowId,
++        TabContainersCallback callback);
++
++    // Signs out of everything in a container: removes its cookies, site
++    // storage and cache.
++    static void clearContainer(
++        DOMString container,
++        optional DoneCallback callback);
+   };
+ };
+--- a/chrome/browser/extensions/api/logpose_private/BUILD.gn
++++ b/chrome/browser/extensions/api/logpose_private/BUILD.gn
+@@ -22,6 +22,7 @@
+     "//chrome/common/extensions/api",
+     "//components/tabs:public",
+     "//content/public/browser",
++    "//services/network/public/mojom",
+     "//extensions/browser",
+     "//ui/base",
+     "//ui/gfx",
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
+@@ -45,6 +45,37 @@
+   ResponseAction Run() override;
+ };
+ 
++class LogPosePrivateCreateTabFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.createTab", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateCreateTabFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateGetTabContainersFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.getTabContainers", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateGetTabContainersFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateClearContainerFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.clearContainer", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateClearContainerFunction() override = default;
++  ResponseAction Run() override;
++
++ private:
++  void OnCleared();
++  int pending_ = 0;
++};
++
+ }  // namespace extensions
+ 
+ #endif  // CHROME_BROWSER_EXTENSIONS_API_LOGPOSE_PRIVATE_LOGPOSE_PRIVATE_API_H_
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
+@@ -15,16 +15,25 @@
+ #include "chrome/browser/extensions/extension_tab_util.h"
+ #include "chrome/browser/extensions/window_controller.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/tab_list/tab_list_interface.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/extensions/extensions_container.h"
+ #include "chrome/browser/ui/extensions/logpose_popup_anchor.h"
++#include "chrome/browser/ui/tabs/tab_enums.h"
++#include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/toolbar/toolbar_action_view_model.h"
+ #include "chrome/browser/ui/toolbar/toolbar_actions_model.h"
+ #include "chrome/common/extensions/api/logpose_private.h"
++#include "chrome/common/webui_url_constants.h"
+ #include "components/tabs/public/tab_interface.h"
++#include "content/public/browser/navigation_controller.h"
++#include "content/public/browser/storage_partition.h"
+ #include "content/public/browser/web_contents.h"
++#include "services/network/public/mojom/clear_data_filter.mojom.h"
++#include "services/network/public/mojom/cookie_manager.mojom.h"
++#include "services/network/public/mojom/network_context.mojom.h"
+ #include "ui/base/models/image_model.h"
+ #include "ui/gfx/codec/png_codec.h"
+ #include "ui/gfx/geometry/rect_conversions.h"
+@@ -42,6 +51,8 @@
+ constexpr float kIconScale = 2.0f;
+ constexpr char kNoActionError[] = "No extension action with id *.";
+ constexpr char kNoCommandError[] = "Unknown or disabled command *.";
++constexpr char kBadUrlError[] = "Invalid url *.";
++constexpr char kNoContainerError[] = "Only a container can be cleared.";
+ 
+ struct Command {
+   const char* name;
+@@ -197,4 +208,107 @@
+   return RespondNow(Error(kNoCommandError, params->command));
+ }
+ 
++ExtensionFunction::ResponseAction LogPosePrivateCreateTabFunction::Run() {
++  auto params = logpose_private::CreateTab::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++  const logpose_private::CreateTabOptions& options = params->options;
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, options.window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  GURL url(chrome::kChromeUINewTabURL);
++  if (options.url && !options.url->empty()) {
++    url = GURL(*options.url);
++    if (!url.is_valid()) {
++      return RespondNow(Error(kBadUrlError, *options.url));
++    }
++  }
++  content::BrowserContext* context = browser->GetProfile();
++  scoped_refptr<content::SiteInstance> site_instance =
++      options.container.empty()
++          ? content::SiteInstance::CreateForURL(context, url)
++          : content::SiteInstance::CreateForFixedStoragePartition(
++                context, url,
++                LogPoseContainerPartition(context, options.container));
++  const bool active = options.active.value_or(true);
++  content::WebContents::CreateParams create_params(context,
++                                                    std::move(site_instance));
++  create_params.initially_hidden = !active;
++  std::unique_ptr<content::WebContents> contents =
++      content::WebContents::Create(create_params);
++  content::WebContents* raw = contents.get();
++  contents->GetController().LoadURL(url, content::Referrer(),
++                                    ui::PAGE_TRANSITION_AUTO_TOPLEVEL,
++                                    std::string());
++  int add_types = active ? AddTabTypes::ADD_ACTIVE : AddTabTypes::ADD_NONE;
++  if (options.pinned.value_or(false)) {
++    add_types |= AddTabTypes::ADD_PINNED;
++  }
++  browser->GetTabStripModel()->AddWebContents(
++      std::move(contents), options.index.value_or(TabStripModel::kNoTab),
++      ui::PAGE_TRANSITION_AUTO_TOPLEVEL, add_types);
++  return RespondNow(WithArguments(ExtensionTabUtil::GetTabId(raw)));
++}
++
++ExtensionFunction::ResponseAction LogPosePrivateGetTabContainersFunction::Run() {
++  auto params = logpose_private::GetTabContainers::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  std::vector<logpose_private::TabContainer> tabs;
++  TabStripModel* model = browser->GetTabStripModel();
++  for (int i = 0; i < model->count(); ++i) {
++    content::WebContents* contents = model->GetWebContentsAt(i);
++    std::string container = LogPoseContainerOf(contents);
++    if (container.empty()) {
++      continue;
++    }
++    logpose_private::TabContainer entry;
++    entry.tab_id = ExtensionTabUtil::GetTabId(contents);
++    entry.container = std::move(container);
++    tabs.push_back(std::move(entry));
++  }
++  return RespondNow(
++      ArgumentList(logpose_private::GetTabContainers::Results::Create(tabs)));
++}
++
++ExtensionFunction::ResponseAction LogPosePrivateClearContainerFunction::Run() {
++  auto params = logpose_private::ClearContainer::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++  if (params->container.empty()) {
++    return RespondNow(Error(kNoContainerError));
++  }
++  content::StoragePartition* partition = browser_context()->GetStoragePartition(
++      LogPoseContainerPartition(browser_context(), params->container));
++  auto cookies = network::mojom::CookieDeletionFilter::New();
++  cookies->session_control =
++      network::mojom::CookieDeletionSessionControl::IGNORE_CONTROL;
++  pending_ = 2;
++  partition->ClearData(
++      content::StoragePartition::REMOVE_DATA_MASK_ALL,
++      /*filter_builder=*/nullptr,
++      content::StoragePartition::StorageKeyPolicyMatcherFunction(),
++      std::move(cookies), /*perform_storage_cleanup=*/true, base::Time(),
++      base::Time::Max(),
++      base::BindOnce(&LogPosePrivateClearContainerFunction::OnCleared, this));
++  partition->GetNetworkContext()->ClearHttpCache(
++      base::Time(), base::Time::Max(), /*filter=*/nullptr,
++      base::BindOnce(&LogPosePrivateClearContainerFunction::OnCleared, this));
++  return RespondLater();
++}
++
++void LogPosePrivateClearContainerFunction::OnCleared() {
++  if (--pending_ == 0) {
++    Respond(NoArguments());
++  }
++}
++
+ }  // namespace extensions
+--- /dev/null
++++ b/chrome/browser/logpose/logpose_containers.h
+@@ -0,0 +1,70 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_LOGPOSE_LOGPOSE_CONTAINERS_H_
++#define CHROME_BROWSER_LOGPOSE_LOGPOSE_CONTAINERS_H_
++
++#include <string>
++
++#include "base/files/file_path.h"
++#include "base/memory/scoped_refptr.h"
++#include "content/public/browser/browser_context.h"
++#include "content/public/browser/security_principal.h"
++#include "content/public/browser/site_instance.h"
++#include "content/public/browser/storage_partition_config.h"
++#include "content/public/browser/web_contents.h"
++#include "url/gurl.h"
++
++inline constexpr char kLogPoseContainerPartitionDomain[] = "logpose-container";
++
++inline content::StoragePartitionConfig LogPoseContainerPartition(
++    content::BrowserContext* context,
++    const std::string& name) {
++  return content::StoragePartitionConfig::Create(
++      context, kLogPoseContainerPartitionDomain, name,
++      context->IsOffTheRecord());
++}
++
++inline bool IsLogPoseContainerPartition(
++    const content::StoragePartitionConfig& config) {
++  return !config.is_default() &&
++         config.partition_domain() == kLogPoseContainerPartitionDomain;
++}
++
++inline std::string LogPoseContainerOf(content::WebContents* contents) {
++  if (!contents) {
++    return std::string();
++  }
++  const content::StoragePartitionConfig& config =
++      contents->GetSiteInstance()
++          ->GetSecurityPrincipal()
++          .GetStoragePartitionConfig();
++  return IsLogPoseContainerPartition(config) ? config.partition_name()
++                                           : std::string();
++}
++
++inline scoped_refptr<content::SiteInstance> LogPoseContainerSiteInstanceFor(
++    content::WebContents* source,
++    const GURL& url) {
++  if (!source) {
++    return nullptr;
++  }
++  const content::StoragePartitionConfig& config =
++      source->GetSiteInstance()
++          ->GetSecurityPrincipal()
++          .GetStoragePartitionConfig();
++  if (!IsLogPoseContainerPartition(config)) {
++    return nullptr;
++  }
++  return content::SiteInstance::CreateForFixedStoragePartition(
++      source->GetBrowserContext(), url, config);
++}
++
++inline base::FilePath LogPoseContainerPartitionsPath() {
++  return base::FilePath(FILE_PATH_LITERAL("Storage"))
++      .Append(FILE_PATH_LITERAL("ext"))
++      .AppendASCII(kLogPoseContainerPartitionDomain);
++}
++
++#endif  // CHROME_BROWSER_LOGPOSE_LOGPOSE_CONTAINERS_H_
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -24,6 +24,7 @@
+ #include "chrome/browser/browser_about_handler.h"
+ #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
+ #include "chrome/browser/platform_util.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/prefs/incognito_mode_prefs.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/renderer_host/chrome_navigation_ui_data.h"
+@@ -573,6 +574,19 @@
+       params.opener ? params.opener->GetSiteInstance()
+                     : tab_util::GetSiteInstanceForNewTab(
+                           params.browser->GetProfile(), url);
++  if (!params.opener && params.initiator_frame_token) {
++    content::RenderFrameHost* initiator =
++        content::RenderFrameHost::FromFrameToken(
++            content::GlobalRenderFrameHostToken(
++                params.initiator_process_id, *params.initiator_frame_token));
++    if (scoped_refptr<content::SiteInstance> container =
++            LogPoseContainerSiteInstanceFor(
++                initiator ? content::WebContents::FromRenderFrameHost(initiator)
++                          : nullptr,
++                url)) {
++      initial_site_instance_for_new_contents = std::move(container);
++    }
++  }
+ 
+   WebContents::CreateParams create_params(
+       params.browser->GetProfile(), initial_site_instance_for_new_contents);
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -5779,6 +5779,9 @@
+       // as long as they preserve the guest's StoragePartition.
+       site_instance =
+           SiteInstance::CreateForGuest(GetBrowserContext(), partition_config);
++    } else if (source_site_instance->IsFixedStoragePartition()) {
++      site_instance = SiteInstance::CreateForFixedStoragePartition(
++          GetBrowserContext(), params.target_url, partition_config);
+     } else {
+       site_instance = SiteInstance::Create(GetBrowserContext());
+     }
+--- a/chrome/browser/web_applications/commands/garbage_collect_storage_partitions_command.cc
++++ b/chrome/browser/web_applications/commands/garbage_collect_storage_partitions_command.cc
+@@ -15,6 +15,7 @@
+ #include "base/memory/weak_ptr.h"
+ #include "base/values.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/web_applications/extensions_manager.h"
+ #include "chrome/browser/web_applications/locks/all_apps_lock.h"
+ #include "chrome/browser/web_applications/web_app_isolation_delegate.h"
+@@ -73,6 +74,7 @@
+ 
+   // Get all paths from Web App system.
+   allowlist.merge(lock_->isolation_delegate().GetIsolatedStoragePaths());
++  allowlist.insert(profile_->GetPath().Append(LogPoseContainerPartitionsPath()));
+ 
+   base::ListValue* debug_paths =
+       GetMutableDebugValue().EnsureList("allow_list_paths");

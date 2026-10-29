@@ -1,0 +1,257 @@
+O "Restaurar páginas?" do Chromium sai de cena: a barra lateral do Log Pose restaura a sessão sozinha, sem aviso. A janela guarda a oferta (com a trava de sessão que o balão segurava, senão o Chromium para de salvar a sessão) até a barra responder por logposePrivate.resolveCrashedSession ou a janela fechar.
+
+--- /dev/null
++++ b/chrome/browser/ui/extensions/logpose_crashed_session.h
+@@ -0,0 +1,16 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_BROWSER_UI_EXTENSIONS_LOGPOSE_CRASHED_SESSION_H_
++#define CHROME_BROWSER_UI_EXTENSIONS_LOGPOSE_CRASHED_SESSION_H_
++
++class BrowserWindowInterface;
++
++void LogPoseOfferCrashedSession(BrowserWindowInterface* browser);
++
++bool LogPoseHasCrashedSession(const BrowserWindowInterface* browser);
++
++void LogPoseResolveCrashedSession(BrowserWindowInterface* browser, bool restore);
++
++#endif  // CHROME_BROWSER_UI_EXTENSIONS_LOGPOSE_CRASHED_SESSION_H_
+--- /dev/null
++++ b/chrome/browser/ui/extensions/logpose_crashed_session.cc
+@@ -0,0 +1,60 @@
++// Copyright 2026 The Log Pose Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/extensions/logpose_crashed_session.h"
++
++#include <memory>
++#include <utility>
++
++#include "base/callback_list.h"
++#include "base/containers/flat_map.h"
++#include "base/functional/bind.h"
++#include "base/no_destructor.h"
++#include "chrome/browser/sessions/exit_type_service.h"
++#include "chrome/browser/sessions/session_restore.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "components/sessions/core/session_id.h"
++
++namespace {
++
++struct Offer {
++  std::unique_ptr<ExitTypeService::CrashedLock> lock;
++  base::CallbackListSubscription closed;
++};
++
++base::flat_map<SessionID::id_type, Offer>& Offers() {
++  static base::NoDestructor<base::flat_map<SessionID::id_type, Offer>> offers;
++  return *offers;
++}
++
++}  // namespace
++
++void LogPoseOfferCrashedSession(BrowserWindowInterface* browser) {
++  ExitTypeService* service =
++      ExitTypeService::GetInstanceForProfile(browser->GetProfile());
++  Offer& offer = Offers()[browser->GetSessionID().id()];
++  offer.lock = service ? service->CreateCrashedLock() : nullptr;
++  offer.closed = browser->RegisterBrowserDidClose(
++      base::BindRepeating([](BrowserWindowInterface* closed) {
++        Offers().erase(closed->GetSessionID().id());
++      }));
++}
++
++bool LogPoseHasCrashedSession(const BrowserWindowInterface* browser) {
++  return Offers().contains(browser->GetSessionID().id());
++}
++
++void LogPoseResolveCrashedSession(BrowserWindowInterface* browser,
++                                bool restore) {
++  auto it = Offers().find(browser->GetSessionID().id());
++  if (it == Offers().end()) {
++    return;
++  }
++  std::unique_ptr<ExitTypeService::CrashedLock> lock =
++      std::move(it->second.lock);
++  Offers().erase(it);
++  if (restore) {
++    SessionRestore::RestoreSessionAfterCrash(browser);
++  }
++}
+--- a/chrome/browser/ui/extensions/BUILD.gn
++++ b/chrome/browser/ui/extensions/BUILD.gn
+@@ -54,6 +54,7 @@
+     "extensions_overrides/simple_overrides.h",
+     "extensions_toolbar_view_model.h",
+     "icon_with_badge_image_source.h",
++    "logpose_crashed_session.h",
+     "logpose_popup_anchor.h",
+     "reload_page_dialog_controller.h",
+     "search_override_stack.h",
+@@ -174,6 +175,7 @@
+     "extension_uninstall_dialog_impl.cc",
+     "extensions_container.cc",
+     "extensions_menu_view_model.cc",
++    "logpose_crashed_session.cc",
+     "logpose_popup_anchor.cc",
+     "extensions_overrides/simple_overrides.cc",
+     "extensions_toolbar_view_model.cc",
+--- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view.cc
+@@ -15,6 +15,8 @@
+ #include "base/memory/raw_ptr.h"
+ #include "base/metrics/histogram_macros.h"
+ #include "base/scoped_observation.h"
++#include "base/command_line.h"
++#include "base/values.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/lifetime/browser_shutdown.h"
+@@ -27,6 +29,8 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/bubble_anchor_util.h"
++#include "chrome/browser/logpose/logpose_sidebar.h"
++#include "chrome/browser/ui/extensions/logpose_crashed_session.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
+ #include "chrome/browser/ui/views/chrome_typography.h"
+@@ -42,6 +46,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/browser_context.h"
+ #include "content/public/browser/browser_thread.h"
++#include "extensions/browser/event_router.h"
+ #include "ui/base/buildflags.h"
+ #include "ui/base/interaction/element_identifier.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -285,6 +290,21 @@
+     return nullptr;
+   }
+ 
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "logpose-native-chrome") &&
++      browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
++    LogPoseOfferCrashedSession(browser);
++    base::ListValue args;
++    args.Append("session-crashed");
++    extensions::EventRouter::Get(browser->GetProfile())
++        ->DispatchEventToExtension(
++            kLogPoseSidebarExtensionId,
++            std::make_unique<extensions::Event>(
++                extensions::events::COMMANDS_ON_COMMAND, "commands.onCommand",
++                std::move(args)));
++    return nullptr;
++  }
++
+   auto* control = browser_view->toolbar_button_provider()->GetAppMenuControl();
+   views::BubbleAnchor anchor =
+       control ? control->GetAnchor() : views::BubbleAnchor();
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
+@@ -39,6 +39,24 @@
+   ResponseAction Run() override;
+ };
+ 
++class LogPosePrivateGetCrashedSessionFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.getCrashedSession", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateGetCrashedSessionFunction() override = default;
++  ResponseAction Run() override;
++};
++
++class LogPosePrivateResolveCrashedSessionFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.resolveCrashedSession", UNKNOWN)
++
++ protected:
++  ~LogPosePrivateResolveCrashedSessionFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class LogPosePrivateExecuteCommandFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("logposePrivate.executeCommand", UNKNOWN)
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
+@@ -21,6 +21,7 @@
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/extensions/extensions_container.h"
++#include "chrome/browser/ui/extensions/logpose_crashed_session.h"
+ #include "chrome/browser/ui/extensions/logpose_popup_anchor.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+@@ -193,6 +194,36 @@
+       logpose_private::GetEnabledCommands::Results::Create(enabled)));
+ }
+ 
++ExtensionFunction::ResponseAction LogPosePrivateGetCrashedSessionFunction::Run() {
++  auto params = logpose_private::GetCrashedSession::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  return RespondNow(
++      ArgumentList(logpose_private::GetCrashedSession::Results::Create(
++          LogPoseHasCrashedSession(browser))));
++}
++
++ExtensionFunction::ResponseAction
++LogPosePrivateResolveCrashedSessionFunction::Run() {
++  auto params = logpose_private::ResolveCrashedSession::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  LogPoseResolveCrashedSession(browser, params->restore);
++  return RespondNow(NoArguments());
++}
++
+ ExtensionFunction::ResponseAction LogPosePrivateExecuteCommandFunction::Run() {
+   auto params = logpose_private::ExecuteCommand::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
+--- a/chrome/common/extensions/api/logpose_private.idl
++++ b/chrome/common/extensions/api/logpose_private.idl
+@@ -52,6 +52,7 @@
+   callback TabIdCallback = void(long tabId);
+   callback TabContainersCallback = void(TabContainer[] tabs);
+   callback CommandsCallback = void(DOMString[] commands);
++  callback CrashedSessionCallback = void(boolean offered);
+   callback DoneCallback = void();
+ 
+   interface Functions {
+@@ -73,6 +74,20 @@
+         long windowId,
+         CommandsCallback callback);
+ 
++    // Whether the window offers to restore the session that ended in a crash,
++    // in place of Chromium's "Restore pages?" bubble. The session is kept
++    // until resolveCrashedSession() or the window closes.
++    static void getCrashedSession(
++        long windowId,
++        CrashedSessionCallback callback);
++
++    // Answers the offer: reopens the crashed session in the window, or lets
++    // it go.
++    static void resolveCrashedSession(
++        long windowId,
++        boolean restore,
++        optional DoneCallback callback);
++
+     // Runs a browser command in the window: newTab, installPwa, createShortcut,
+     // openInApp, print, find, zoomIn, zoomOut, zoomReset, savePage,
+     // viewSource, devTools, taskManager or clearBrowsingData.
