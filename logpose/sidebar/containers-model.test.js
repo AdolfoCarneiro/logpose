@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   loadContainers, createContainer, updateContainer, deleteContainer, membership, containerSnapshot, lostTabs, slug, DEFAULT_CONTAINERS,
-  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle,
+  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle, nextGroupName,
 } from "./containers-model.js";
 
 test("sem nada salvo vêm Trabalho e Pessoal; lista salva vazia continua vazia", () => {
@@ -84,4 +84,9 @@ test("a página do grupo mostra o nome dado, o salvo ou o do favorito antes da U
   assert.equal(pageTitle(page, { bookmark: "Wiki", live: "W" }), "Wiki");
   assert.equal(pageTitle({ ...page, title: "Minha wiki" }, { bookmark: "Wiki", live: "W" }), "Minha wiki");
   assert.equal(pageTitle({ ...page, title: "Minha wiki" }, { custom: "Renomeada" }), "Renomeada");
+});
+
+test("nome padrão do grupo é o menor número livre", () => {
+  assert.equal(nextGroupName([]), "Grupo 1");
+  assert.equal(nextGroupName([{ name: "Grupo 1" }, { name: "Grupo 3" }]), "Grupo 2");
 });

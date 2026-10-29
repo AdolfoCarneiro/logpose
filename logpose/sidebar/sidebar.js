@@ -7,7 +7,7 @@ import {
 } from "./spaces-model.js";
 import { glyph } from "./kurobe/icons.mjs";
 import { createTabList } from "./tab-list.js";
-import { ISLAND_COLORS, ISLAND_ORDER, COLOR_NAMES, nextColor, islandLabel, neighborOutside, dropTarget, strayTabs } from "./islands-model.js";
+import { ISLAND_COLORS, ISLAND_ORDER, COLOR_NAMES, groupColorOf, nextColor, islandLabel, neighborOutside, dropTarget, strayTabs } from "./islands-model.js";
 import { showMenu } from "./context-menu.js";
 import { setupFavorites } from "./favorites.js";
 import { animate, pop, kick, spin } from "./motion.js";
@@ -21,6 +21,7 @@ import { setupContainerEditor } from "./container-editor.js";
 import { dropTab, joinWindow } from "./split-drop.js";
 import { windowAt, chromeWindowFor, zonesFor } from "./drag-model.js";
 import { iconChoices } from "./icons-model.js";
+import { nextGroupName } from "./containers-model.js";
 import { setupDownloads } from "./downloads.js";
 import { setupPins } from "./pins.js";
 import { setupPlayer } from "./player.js";
@@ -181,6 +182,7 @@ async function islandMenu(groupId, x, y) {
     { icon: "pencil", label: "Renomear", action: () => tabList.renameIsland(groupId) },
     { swatches: ISLAND_ORDER.map((c) => ({ value: c, color: ISLAND_COLORS[c], selected: c === island.color, title: COLOR_NAMES[c] })), pick: (color) => chrome.tabGroups.update(groupId, { color }).catch(() => {}) },
     { icon: "plus", label: "Nova aba na ilha", action: () => newTabInIsland(groupId) },
+    ...(containers.available && !incognito ? [{ icon: "save", label: "Guardar como grupo", action: async () => groups.createFrom({ name: island.title?.trim() || nextGroupName(groups.list()), color: groupColorOf(island.color) }, await islandTabIds(groupId)) }] : []),
     { icon: "ungroup", label: "Desfazer ilha", action: async () => chrome.tabs.ungroup(await islandTabIds(groupId)).catch(() => {}) },
     "divider",
     { icon: "x", label: "Fechar as abas da ilha", danger: true, action: async () => closeTabs(await islandTabIds(groupId)) },

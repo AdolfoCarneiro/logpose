@@ -29,6 +29,13 @@ export function createContainer(list, { name, color, icon }) {
   return [...list, { id, name: clean, color: color ?? CONTAINER_COLORS[list.length % CONTAINER_COLORS.length], icon: icon ?? CONTAINER_ICONS[0] }];
 }
 
+export function nextGroupName(list) {
+  const names = new Set(list.map((c) => c.name));
+  let n = 1;
+  while (names.has(`Grupo ${n}`)) n++;
+  return `Grupo ${n}`;
+}
+
 export function updateContainer(list, id, patch) {
   return list.map((c) => {
     if (c.id !== id) return c;

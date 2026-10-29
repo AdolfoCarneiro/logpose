@@ -5,7 +5,7 @@ import { animate, pop } from "./motion.js";
 import { call } from "./logpose-private.js";
 import { faviconOf } from "./tabs-model.js";
 import { pinId, drifted, prune, tabOf, pinSnapshot } from "./pins-model.js";
-import { loadContainers, pagesOf, addPage, removePage, updatePage, findPage, toggleGroup, pageIds, restorePages, pageTitle } from "./containers-model.js";
+import { loadContainers, createContainer, pagesOf, addPage, removePage, updatePage, findPage, toggleGroup, pageIds, restorePages, pageTitle } from "./containers-model.js";
 
 function icon(name) {
   return Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(name) });
@@ -114,6 +114,14 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
   async function adopt(tabId, containerId) {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (tab) await saveTab(tab, containerId);
+  }
+
+  async function createFrom({ name, color }, tabIds) {
+    const next = createContainer(containers, { name, color });
+    const id = next.at(-1).id;
+    await save(next);
+    for (const tabId of tabIds) await adopt(tabId, id);
+    return id;
   }
 
   async function forget(page, tab) {
@@ -288,7 +296,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
   });
 
   return {
-    load, persist, render, liveIds, saveTab, adopt,
+    load, persist, render, liveIds, saveTab, adopt, createFrom,
     list: () => containers,
     pageOfTab: (tabId) => (live[tabId] ? findPage(containers, live[tabId]) : null),
   };

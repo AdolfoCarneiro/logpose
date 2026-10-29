@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ISLAND_ORDER, nextColor, islandLabel, islandEdges, visibleItems, neighborOutside, dropTarget, strayTabs } from "./islands-model.js";
+import { CONTAINER_COLORS } from "./containers-model.js";
+import { ISLAND_ORDER, groupColorOf, nextColor, islandLabel, islandEdges, visibleItems, neighborOutside, dropTarget, strayTabs } from "./islands-model.js";
 
 test("próxima cor pula as usadas", () => {
   assert.equal(nextColor([]), "blue");
@@ -64,4 +65,9 @@ test("aba de outro espaço na ilha é intrusa", () => {
 test("aba nova do mesmo espaço na ilha não é intrusa", () => {
   const tabs = [{ id: 1, groupId: 7 }, { id: 2, groupId: 7 }];
   assert.deepEqual(strayTabs(tabs, () => "a"), []);
+});
+
+test("cor do grupo a partir da ilha", () => {
+  assert.equal(groupColorOf("green"), "#7cc2a8");
+  assert.equal(groupColorOf("grey"), CONTAINER_COLORS[0]);
 });

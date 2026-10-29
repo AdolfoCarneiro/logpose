@@ -1,3 +1,5 @@
+import { CONTAINER_COLORS } from "./containers-model.js";
+
 export const ISLAND_COLORS = {
   blue: "#71b1ec", green: "#7cc2a8", yellow: "#d9c08a", orange: "#d49a78", red: "#d8737a",
   purple: "#b59ad4", cyan: "#7cc4cf", pink: "#d98cb3", grey: "#a4a8b0",
@@ -62,4 +64,8 @@ export function strayTabs(tabs, spaceOf) {
     strays.push(...members.filter((t) => spaceOf(t.id) !== home).map((t) => t.id));
   }
   return strays;
+}
+
+export function groupColorOf(color) {
+  return CONTAINER_COLORS.includes(ISLAND_COLORS[color]) ? ISLAND_COLORS[color] : CONTAINER_COLORS[0];
 }
