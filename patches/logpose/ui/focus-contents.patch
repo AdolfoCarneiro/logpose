@@ -1,0 +1,12 @@
+logposePrivate.executeCommand("focusContents") põe o foco do teclado na página: a nova aba do Log Pose foca o campo de busca dela, e sem isso o teclado ficava na barra lateral ou na barra de endereço escondida.
+
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
+@@ -122,6 +122,7 @@
+     {"createShortcut", IDC_CREATE_SHORTCUT},
+     {"openInApp", IDC_OPEN_IN_PWA_WINDOW},
+     {"print", IDC_PRINT},
++    {"focusContents", IDC_FOCUS_WEB_CONTENTS_PANE},
+     {"find", IDC_FIND},
+     {"zoomIn", IDC_ZOOM_PLUS},
+     {"zoomOut", IDC_ZOOM_MINUS},

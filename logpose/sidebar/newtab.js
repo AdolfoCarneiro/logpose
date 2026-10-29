@@ -56,7 +56,10 @@ async function search(seed = "") {
 const keys = current(stored.shortcuts).find((s) => s.command === "openLocation")?.keys;
 $("keys").replaceChildren(...label(keys).map((k) => el("kbd", "", k)));
 // o campo de busca da página fica focado; o que for digitado nele vai pro spotlight
+// o Chromium deixa o teclado na barra lateral ou na barra de endereço escondida: a aba ativa
+// puxa o foco pra página antes de focar o campo
 const searchInput = $("search-input");
+if (logposePrivate && tab?.active) await call("executeCommand", tab.windowId, "focusContents").catch(() => {});
 searchInput.focus();
 searchInput.addEventListener("input", () => {
   const text = searchInput.value;
