@@ -2,7 +2,7 @@ import os
 import sys
 import tomllib
 
-DEFAULT_OPACITY = 85
+DEFAULT_OPACITY = 82  # a do Konsole
 
 STATE = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
 THEME = os.path.join(STATE, "logpose", "theme.css")

@@ -35,12 +35,12 @@ test("URL inválida ou vazia não quebra", () => {
   assert.equal(displayUrl("nao é url", false), "nao é url");
 });
 
-test("opacidade do material: padrão 85, aceita 0 a 100 inteiro", () => {
-  assert.equal(loadSettings(undefined).materialOpacity, 85);
+test("opacidade do material: padrão 82, aceita 0 a 100 inteiro", () => {
+  assert.equal(loadSettings(undefined).materialOpacity, 82);
   assert.equal(loadSettings({ materialOpacity: 40 }).materialOpacity, 40);
-  assert.equal(loadSettings({ materialOpacity: 140 }).materialOpacity, 85);
-  assert.equal(loadSettings({ materialOpacity: -1 }).materialOpacity, 85);
-  assert.equal(loadSettings({ materialOpacity: 50.5 }).materialOpacity, 85);
+  assert.equal(loadSettings({ materialOpacity: 140 }).materialOpacity, 82);
+  assert.equal(loadSettings({ materialOpacity: -1 }).materialOpacity, 82);
+  assert.equal(loadSettings({ materialOpacity: 50.5 }).materialOpacity, 82);
 });
 
 test("dormir e arquivar: padrões e só as escolhas válidas", () => {

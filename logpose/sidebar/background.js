@@ -92,15 +92,19 @@ async function acceptServicesSchema() {
   if (consent?.value && schema && schema.value < 1) await chrome.settingsPrivate.setPref("helium.services.schema_version", 1).catch(() => {});
 }
 
-// a aba que abre com o navegador nasce antes da extensão e fica com a nova aba do Chromium;
-// leva ela pra nova aba do Log Pose, uma vez por sessão (o storage.session zera ao fechar o navegador)
-async function fixEarlyNewTabs() {
-  if ((await chrome.storage.session.get("earlyNewTabs")).earlyNewTabs) return;
-  await chrome.storage.session.set({ earlyNewTabs: true });
-  const tabs = await chrome.tabs.query({});
-  for (const tab of tabs) {
-    if (/^chrome:\/\/newtab\/?$/.test(tab.url || tab.pendingUrl || "")) {
+// as abas que abrem com o navegador nascem antes da extensão: a nova aba fica com a do Chromium e
+// as páginas do Log Pose (o onboarding) ficam bloqueadas. Uma vez por sessão (o storage.session zera
+// ao fechar o navegador), leva a nova aba pra do Log Pose e recarrega as páginas dele.
+async function fixEarlyTabs() {
+  if ((await chrome.storage.session.get("earlyTabs")).earlyTabs) return;
+  await chrome.storage.session.set({ earlyTabs: true });
+  const own = chrome.runtime.getURL("");
+  for (const tab of await chrome.tabs.query({})) {
+    const url = tab.url || tab.pendingUrl || "";
+    if (/^chrome:\/\/newtab\/?$/.test(url)) {
       chrome.tabs.update(tab.id, { url: chrome.runtime.getURL("newtab.html") }).catch(() => {});
+    } else if (url.startsWith(own)) {
+      chrome.tabs.reload(tab.id).catch(() => {});
     }
   }
 }
@@ -108,7 +112,7 @@ async function fixEarlyNewTabs() {
 applyShortcuts();
 applyLinks();
 acceptServicesSchema();
-fixEarlyNewTabs();
+fixEarlyTabs();
 chrome.runtime.onStartup.addListener(() => {
   applyShortcuts();
   applyLinks();
