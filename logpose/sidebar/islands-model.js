@@ -32,9 +32,9 @@ export function visibleItems(items, collapsed) {
   return items.filter((i) => i.group == null || !collapsed.has(i.group));
 }
 
-export function neighborOutside(items, groupId, activeId) {
+export function neighborOutside(items, groupId, activeId, collapsed = new Set()) {
   const at = items.findIndex((i) => i.id === activeId);
-  const outside = (i) => i.group !== groupId;
+  const outside = (i) => i.group !== groupId && !collapsed.has(i.group);
   return items.slice(at + 1).find(outside)?.id ?? items.slice(0, Math.max(at, 0)).findLast(outside)?.id ?? null;
 }
 
@@ -46,6 +46,7 @@ export function dropTarget(items, from, to) {
   const below = order[to + 1];
   if (above?.group != null && above.group === below?.group) return { join: above.group };
   if (item.group != null && (above?.group === item.group || below?.group === item.group)) return { join: item.group };
+  if (below?.group != null) return { join: below.group };
   return { join: null };
 }
 

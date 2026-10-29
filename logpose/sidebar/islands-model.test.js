@@ -71,3 +71,14 @@ test("cor do grupo a partir da ilha", () => {
   assert.equal(groupColorOf("green"), "#7cc2a8");
   assert.equal(groupColorOf("grey"), CONTAINER_COLORS[0]);
 });
+
+test("soltar logo acima da primeira aba da ilha entra, até em ilha de uma aba", () => {
+  const items = [{ id: 1, group: null }, { id: 2, group: 7 }, { id: 3, group: null }];
+  assert.deepEqual(dropTarget(items, 2, 1), { join: 7 });
+});
+
+test("vizinha fora da ilha pula ilhas recolhidas", () => {
+  const items = [{ id: 1, group: 5 }, { id: 2, group: 7 }, { id: 3, group: 7 }];
+  assert.equal(neighborOutside(items, 7, 2, new Set([5])), null);
+  assert.equal(neighborOutside([...items, { id: 4, group: null }], 7, 2, new Set([5])), 4);
+});

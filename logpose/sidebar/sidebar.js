@@ -195,7 +195,8 @@ async function toggleIsland(groupId) {
   if (!island.collapsed) {
     const active = shownItems.find((i) => i.active);
     if (active?.group === groupId) {
-      const neighbor = neighborOutside(shownItems, groupId, active.id);
+      const collapsed = new Set(islandList.filter((g) => g.collapsed).map((g) => g.id));
+      const neighbor = neighborOutside(shownItems, groupId, active.id, collapsed);
       if (neighbor != null) await chrome.tabs.update(neighbor, { active: true });
       else await blankTab(activeSpace(spaces, windowId).id, true);
     }
