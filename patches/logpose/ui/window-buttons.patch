@@ -1,4 +1,4 @@
-Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, como nos outros apps do KDE: o cartão da página desce até abaixo deles, e a faixa acima do cartão é da moldura (botões, e o resto arrasta a janela). A barra lateral fica de fora.
+Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, numa faixa fina, como bolinhas no estilo do tema Utterly Round do KWin. O cartão da página desce até abaixo deles, e a faixa acima do cartão é da moldura (botões, e o resto arrasta a janela). A barra lateral fica de fora.
 
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
@@ -48,16 +48,112 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  #include "base/trace_event/trace_event.h"
  #include "build/build_config.h"
  #include "build/buildflag.h"
-@@ -601,6 +602,12 @@
+@@ -55,6 +56,7 @@
+ #include "ui/views/vector_icons.h"
+ #include "ui/views/views_delegate.h"
+ #include "ui/views/window/frame_background.h"
++#include "ui/views/animation/ink_drop.h"
+ #include "ui/views/window/frame_caption_button.h"
+ #include "ui/views/window/vector_icons/vector_icons.h"
+ #include "ui/views/window/window_shape.h"
+@@ -71,6 +73,70 @@
+ 
+ namespace {
+ 
++bool LogPoseCaptionButtons() {
++  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
++      "logpose-native-chrome");
++}
++
++// Botões da janela do Log Pose como os do tema Utterly Round do KWin: bolinhas
++// laranja, verde e vermelha, com o símbolo ao passar o mouse, e cinza-claras
++// com a janela inativa.
++class LogPoseCaptionButton : public views::FrameCaptionButton {
++ public:
++  using views::FrameCaptionButton::FrameCaptionButton;
++
++  void PaintButtonContents(gfx::Canvas* canvas) override {
++    const bool hot = GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
++    SkColor color;
++    switch (GetIcon()) {
++      case views::CAPTION_BUTTON_ICON_MINIMIZE:
++        color = SkColorSetRGB(0xf6, 0x74, 0x00);
++        break;
++      case views::CAPTION_BUTTON_ICON_CLOSE:
++        color = SkColorSetRGB(0xff, 0x2a, 0x2a);
++        break;
++      default:
++        color = SkColorSetRGB(0x27, 0xae, 0x60);
++        break;
++    }
++    if (!GetPaintAsActive() && !hot) {
++      color = SkColorSetRGB(0xef, 0xf0, 0xf1);
++    }
++    const gfx::PointF center = gfx::RectF(GetContentsBounds()).CenterPoint();
++    cc::PaintFlags dot;
++    dot.setAntiAlias(true);
++    dot.setColor(color);
++    canvas->DrawCircle(center, 7.5f, dot);
++    if (!hot) {
++      return;
++    }
++    cc::PaintFlags glyph;
++    glyph.setAntiAlias(true);
++    glyph.setColor(SkColorSetARGB(0xf0, 0xff, 0xff, 0xff));
++    glyph.setStyle(cc::PaintFlags::kStroke_Style);
++    glyph.setStrokeWidth(1.6f);
++    glyph.setStrokeCap(cc::PaintFlags::kRound_Cap);
++    constexpr float d = 3.2f;
++    switch (GetIcon()) {
++      case views::CAPTION_BUTTON_ICON_MINIMIZE:
++        canvas->DrawLine(center + gfx::Vector2dF(-d, 0),
++                         center + gfx::Vector2dF(d, 0), glyph);
++        break;
++      case views::CAPTION_BUTTON_ICON_CLOSE:
++        canvas->DrawLine(center + gfx::Vector2dF(-d, -d),
++                         center + gfx::Vector2dF(d, d), glyph);
++        canvas->DrawLine(center + gfx::Vector2dF(-d, d),
++                         center + gfx::Vector2dF(d, -d), glyph);
++        break;
++      default:
++        canvas->DrawRect(gfx::RectF(center.x() - d, center.y() - d, 2 * d,
++                                    2 * d),
++                         glyph);
++        break;
++    }
++  }
++};
++
+ constexpr int kRoundedCaptionButtonSize = 16;
+ 
+ class CaptionButtonBackgroundImageSource : public gfx::CanvasImageSource {
+@@ -601,6 +667,11 @@
    const auto info = GetClientFrameElementInfo();
    const auto frame_height = FrameBorderInsets(false).top();
    const auto top_height = layout_->NonClientTopHeight(false);
 +  // Log Pose: sem abas nem toolbar nativas, a área de cima é a faixa dos
 +  // botões da janela, da altura da linha de cima da barra lateral.
-+  if (is_tabbed && !base::CommandLine::ForCurrentProcess()->HasSwitch(
-+                       "logpose-native-chrome")) {
-+    return frame_height + 36;
++  if (is_tabbed && LogPoseCaptionButtons()) {
++    return frame_height + 26;
 +  }
    return std::max(
        frame_height + info.toolbar_minimum_height,
        top_height + info.tabstrip_preferred_height -
+@@ -766,8 +837,15 @@
+     views::CaptionButtonIcon icon_type,
+     int ht_component,
+     const gfx::VectorIcon& icon_image) {
+-  views::FrameCaptionButton* button = new views::FrameCaptionButton(
+-      views::Button::PressedCallback(), icon_type, ht_component);
++  views::FrameCaptionButton* button =
++      LogPoseCaptionButtons() && GetBrowserView()->GetIsNormalType()
++          ? new LogPoseCaptionButton(views::Button::PressedCallback(),
++                                     icon_type, ht_component)
++          : new views::FrameCaptionButton(views::Button::PressedCallback(),
++                                          icon_type, ht_component);
++  if (LogPoseCaptionButtons() && GetBrowserView()->GetIsNormalType()) {
++    views::InkDrop::Get(button)->SetMode(views::InkDropHost::InkDropMode::OFF);
++  }
+   button->SetImage(button->GetIcon(), views::FrameCaptionButton::Animate::kNo,
+                    icon_image,
+                    features::IsRoundedIconsEnabled()
