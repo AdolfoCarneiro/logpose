@@ -48,11 +48,10 @@ def read_opacity(path):
     return max(0, min(100, value))
 
 
+# vidro fosco como o do Konsole: o fundo do tema puro, sem puxar pro destaque; a transparência
+# e o blur fazem o resto
 def frame_color(colors):
-    bg = colors["background"]
-    low = mix(bg, colors["foreground"], 0.06)
-    container = mix(bg, colors["accent"], 0.26)
-    return mix(low, container, 0.35)
+    return colors["background"]
 
 
 def base(colors):

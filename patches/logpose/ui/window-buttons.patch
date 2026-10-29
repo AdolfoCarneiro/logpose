@@ -34,7 +34,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
      logpose_contents_bounds.Inset(gfx::Insets::TLBR(
 -        logpose_little ? kLogPoseLittleBarHeight : 8,
 +        logpose_little ? kLogPoseLittleBarHeight
-+                       : std::max(8, caption_height + 6),
++                       : std::max(8, caption_height),
          panel_shown && !panel_right ? 0 : 8, 8, panel_right ? 0 : 8));
    }
    auto& contents_layout =
@@ -64,7 +64,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  #include "ui/views/window/frame_caption_button.h"
  #include "ui/views/window/vector_icons/vector_icons.h"
  #include "ui/views/window/window_shape.h"
-@@ -71,6 +74,124 @@
+@@ -71,6 +74,128 @@
  
  namespace {
  
@@ -150,7 +150,11 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +    if (!GetPaintAsActive() && !hot) {
 +      color = kButtonBackground;
 +    }
-+    const gfx::PointF center = gfx::RectF(GetContentsBounds()).CenterPoint();
++    // a bolinha fica 8 px antes da borda direita do botão: a última alinha
++    // com a borda do cartão da página e o espaço entre elas é o do tema
++    const gfx::RectF contents(GetContentsBounds());
++    const gfx::PointF center(contents.right() - 8 - kRadius,
++                             contents.CenterPoint().y());
 +    cc::PaintFlags dot;
 +    dot.setAntiAlias(true);
 +    dot.setColor(color);
@@ -189,19 +193,19 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  constexpr int kRoundedCaptionButtonSize = 16;
  
  class CaptionButtonBackgroundImageSource : public gfx::CanvasImageSource {
-@@ -601,6 +722,11 @@
+@@ -601,6 +726,11 @@
    const auto info = GetClientFrameElementInfo();
    const auto frame_height = FrameBorderInsets(false).top();
    const auto top_height = layout_->NonClientTopHeight(false);
 +  // Log Pose: sem abas nem toolbar nativas, a área de cima é a faixa dos
 +  // botões da janela, da altura da linha de cima da barra lateral.
 +  if (is_tabbed && LogPoseCaptionButtons()) {
-+    return frame_height + 26;
++    return frame_height + 22;
 +  }
    return std::max(
        frame_height + info.toolbar_minimum_height,
        top_height + info.tabstrip_preferred_height -
-@@ -766,8 +892,17 @@
+@@ -766,8 +896,17 @@
      views::CaptionButtonIcon icon_type,
      int ht_component,
      const gfx::VectorIcon& icon_image) {
@@ -221,3 +225,21 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
    button->SetImage(button->GetIcon(), views::FrameCaptionButton::Animate::kNo,
                     icon_image,
                     features::IsRoundedIconsEnabled()
+--- a/chrome/browser/ui/views/frame/opaque_browser_frame_view_layout.cc
++++ b/chrome/browser/ui/views/frame/opaque_browser_frame_view_layout.cc
+@@ -448,7 +448,14 @@
+   // to the screen left, for left-aligned buttons) to obey Fitts' Law.
+   const bool is_frame_condensed = delegate_->IsFrameCondensed();
+ 
+-  const int button_width = views::GetCaptionButtonWidth();
++  // Log Pose: sem abas nem toolbar, os botões são as bolinhas do tema, a 8 px
++  // uma da outra como no KWin.
++  const bool logpose_buttons =
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "logpose-native-chrome") &&
++      !delegate_->IsTabStripVisible() && !delegate_->IsToolbarVisible();
++  const int button_width =
++      logpose_buttons ? 23 : views::GetCaptionButtonWidth();
+ 
+   gfx::Size button_size = button->GetPreferredSize();
+   if (delegate_->GetFrameButtonStyle() ==

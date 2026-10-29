@@ -64,10 +64,8 @@ class ToCss(unittest.TestCase):
 class Frame(unittest.TestCase):
     COLORS = {"background": "#1b1f28", "foreground": "#c6ccdb", "accent": "#71b1ec"}
 
-    def test_frame_color_is_tinted_low_surface(self):
-        low = logpose_theme.mix("#1b1f28", "#c6ccdb", 0.06)
-        container = logpose_theme.mix("#1b1f28", "#71b1ec", 0.26)
-        self.assertEqual(logpose_theme.frame_color(self.COLORS), logpose_theme.mix(low, container, 0.35))
+    def test_frame_color_is_plain_background(self):
+        self.assertEqual(logpose_theme.frame_color(self.COLORS), "#1b1f28")
 
     def test_css_exposes_frame(self):
         css = logpose_theme.to_css(self.COLORS)
