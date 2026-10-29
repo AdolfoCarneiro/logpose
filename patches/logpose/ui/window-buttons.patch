@@ -64,7 +64,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  #include "ui/views/window/frame_caption_button.h"
  #include "ui/views/window/vector_icons/vector_icons.h"
  #include "ui/views/window/window_shape.h"
-@@ -71,6 +74,123 @@
+@@ -71,6 +74,124 @@
  
  namespace {
  
@@ -73,10 +73,11 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +      "logpose-native-chrome");
 +}
 +
-+// Botões da janela do Log Pose como os do tema Utterly Round do KWin: bolinhas
-+// laranja, verde e vermelha, com o símbolo do tema ao passar o mouse, e
-+// cinza-claras com a janela inativa. Os símbolos são os caminhos dos SVGs do
-+// tema, no círculo de raio 1 centrado na origem.
++// Botões da janela do Log Pose como os do tema Utterly Round do KWin com o
++// esquema de cores do sistema: bolinhas nas cores neutra, positiva e negativa,
++// com o símbolo do tema ao passar o mouse e da cor do fundo dos botões, que
++// também pinta as bolinhas com a janela inativa. Os símbolos são os caminhos
++// dos SVGs do tema, no círculo de raio 1 centrado na origem.
 +void LogPoseMaximizeGlyph(SkPathBuilder& p) {
 +  p.moveTo(-0.2674f, -0.5000f);
 +  p.lineTo(0.3504f, -0.5000f);
@@ -132,7 +133,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +
 +  void PaintButtonContents(gfx::Canvas* canvas) override {
 +    constexpr float kRadius = 7.5f;
-+    constexpr SkColor kGlyph = SkColorSetRGB(0xef, 0xf0, 0xf1);
++    constexpr SkColor kButtonBackground = SkColorSetRGB(0x00, 0x00, 0x00);
 +    const bool hot = GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
 +    SkColor color;
 +    switch (GetIcon()) {
@@ -140,14 +141,14 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +        color = SkColorSetRGB(0xf6, 0x74, 0x00);
 +        break;
 +      case views::CAPTION_BUTTON_ICON_CLOSE:
-+        color = SkColorSetRGB(0xff, 0x2a, 0x2a);
++        color = SkColorSetRGB(0xda, 0x44, 0x53);
 +        break;
 +      default:
 +        color = SkColorSetRGB(0x27, 0xae, 0x60);
 +        break;
 +    }
 +    if (!GetPaintAsActive() && !hot) {
-+      color = kGlyph;
++      color = kButtonBackground;
 +    }
 +    const gfx::PointF center = gfx::RectF(GetContentsBounds()).CenterPoint();
 +    cc::PaintFlags dot;
@@ -159,7 +160,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +    }
 +    cc::PaintFlags glyph;
 +    glyph.setAntiAlias(true);
-+    glyph.setColor(kGlyph);
++    glyph.setColor(kButtonBackground);
 +    if (GetIcon() == views::CAPTION_BUTTON_ICON_MINIMIZE) {
 +      glyph.setStyle(cc::PaintFlags::kStroke_Style);
 +      glyph.setStrokeWidth(0.2654f * kRadius);
@@ -188,7 +189,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  constexpr int kRoundedCaptionButtonSize = 16;
  
  class CaptionButtonBackgroundImageSource : public gfx::CanvasImageSource {
-@@ -601,6 +721,11 @@
+@@ -601,6 +722,11 @@
    const auto info = GetClientFrameElementInfo();
    const auto frame_height = FrameBorderInsets(false).top();
    const auto top_height = layout_->NonClientTopHeight(false);
@@ -200,7 +201,7 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
    return std::max(
        frame_height + info.toolbar_minimum_height,
        top_height + info.tabstrip_preferred_height -
-@@ -766,8 +891,17 @@
+@@ -766,8 +892,17 @@
      views::CaptionButtonIcon icon_type,
      int ht_component,
      const gfx::VectorIcon& icon_image) {
