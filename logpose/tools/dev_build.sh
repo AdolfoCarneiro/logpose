@@ -71,7 +71,8 @@ logpose_dev_patches() {
 
     local -a series=() applied=()
     mapfile -t series < <(grep -v '^\s*#' "$QUILT_SERIES" | sed -e 's/ #.*//' -e '/^\s*$/d')
-    mapfile -t applied < <(quilt applied 2>/dev/null || true)
+    # o `quilt applied` mostra o caminho absoluto; o .pc guarda o nome como está na série
+    mapfile -t applied < <(cat .pc/applied-patches 2>/dev/null || true)
 
     local i first=-1
     for i in "${!applied[@]}"; do
