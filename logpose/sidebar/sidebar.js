@@ -7,6 +7,7 @@ import {
 } from "./spaces-model.js";
 import { glyph } from "./kurobe/icons.mjs";
 import { createTabList } from "./tab-list.js";
+import { ISLAND_COLORS, ISLAND_ORDER, COLOR_NAMES, nextColor, islandLabel, neighborOutside, dropTarget, strayTabs } from "./islands-model.js";
 import { showMenu } from "./context-menu.js";
 import { setupFavorites } from "./favorites.js";
 import { animate, pop, kick, spin } from "./motion.js";
@@ -51,6 +52,8 @@ let rightAligned = false;
 let leaveTimer;
 let ready = false;
 let snapshotTimer;
+let islandList = [];
+let shownItems = [];
 const containers = setupContainers({ windowId: () => windowId });
 const pins = setupPins({
   section: document.getElementById("pins"),
@@ -137,6 +140,81 @@ async function activeTab() {
   return tab;
 }
 
+function islandEntries(ids, tabs) {
+  const own = new Set(tabs.map((t) => t.groupId).filter((g) => g > 0));
+  const done = (run) => async () => {
+    tabList.clearSelection();
+    await run().catch(() => {});
+  };
+  const here = islandList.filter((g) => shownItems.some((i) => i.group === g.id) && !(own.size === 1 && own.has(g.id)));
+  return [
+    "divider",
+    { heading: "Ilhas" },
+    own.size
+      ? { icon: "ungroup", label: "Tirar da ilha", action: done(() => chrome.tabs.ungroup(ids)) }
+      : { icon: "group", label: "Nova ilha", action: done(async () => {
+        const id = await chrome.tabs.group({ tabIds: ids, createProperties: { windowId } });
+        await chrome.tabGroups.update(id, { color: nextColor(islandList) });
+      }) },
+    ...here.map((g) => ({
+      icon: "circle-dot",
+      label: g.title?.trim() ? `Adicionar a ${islandLabel(g)}` : `Adicionar à ${islandLabel(g).toLowerCase()}`,
+      action: done(() => chrome.tabs.group({ groupId: g.id, tabIds: ids })),
+    })),
+  ];
+}
+
+function islandTabIds(groupId) {
+  return chrome.tabs.query({ windowId }).then((tabs) => tabs.filter((t) => t.groupId === groupId).map((t) => t.id));
+}
+
+async function newTabInIsland(groupId) {
+  const id = await blankTab(activeSpace(spaces, windowId).id, true);
+  await chrome.tabs.group({ groupId, tabIds: [id] }).catch(() => {});
+  if (logposePrivate) call("executeCommand", windowId, "openLocation").catch(() => {});
+}
+
+async function islandMenu(groupId, x, y) {
+  const island = await chrome.tabGroups.get(groupId).catch(() => null);
+  if (!island) return;
+  showMenu([
+    { icon: "pencil", label: "Renomear", action: () => tabList.renameIsland(groupId) },
+    { swatches: ISLAND_ORDER.map((c) => ({ value: c, color: ISLAND_COLORS[c], selected: c === island.color, title: COLOR_NAMES[c] })), pick: (color) => chrome.tabGroups.update(groupId, { color }).catch(() => {}) },
+    { icon: "plus", label: "Nova aba na ilha", action: () => newTabInIsland(groupId) },
+    { icon: "ungroup", label: "Desfazer ilha", action: async () => chrome.tabs.ungroup(await islandTabIds(groupId)).catch(() => {}) },
+    "divider",
+    { icon: "x", label: "Fechar as abas da ilha", danger: true, action: async () => closeTabs(await islandTabIds(groupId)) },
+  ], x, y);
+}
+
+async function toggleIsland(groupId) {
+  const island = await chrome.tabGroups.get(groupId).catch(() => null);
+  if (!island) return;
+  if (!island.collapsed) {
+    const active = shownItems.find((i) => i.active);
+    if (active?.group === groupId) {
+      const neighbor = neighborOutside(shownItems, groupId, active.id);
+      if (neighbor != null) await chrome.tabs.update(neighbor, { active: true });
+      else await blankTab(activeSpace(spaces, windowId).id, true);
+    }
+  }
+  await chrome.tabGroups.update(groupId, { collapsed: !island.collapsed }).catch(() => {});
+}
+
+async function moveIntoIsland(id, target, drop) {
+  const { index } = await chrome.tabs.get(target.id);
+  await chrome.tabs.move(id, { index });
+  const { join } = dropTarget(drop.items, drop.from, drop.to);
+  if (join != null) await chrome.tabs.group({ groupId: join, tabIds: [id] }).catch(() => {});
+  else if (drop.items[drop.from].group != null || (await chrome.tabs.get(id)).groupId > 0) await chrome.tabs.ungroup(id).catch(() => {});
+}
+
+async function evictStrays() {
+  if (!ready) return;
+  const strays = strayTabs(await chrome.tabs.query({ windowId }), (id) => spaceOfTab(spaces, id, windowId));
+  if (strays.length) await chrome.tabs.ungroup(strays).catch(() => {});
+}
+
 function groupEntries(ids) {
   if (!containers.available || incognito) return [];
   const save = (groupId) => async () => {
@@ -193,6 +271,7 @@ async function tabsMenu(ids, x, y) {
     { icon: "link", label: "Copiar links", action: () => navigator.clipboard.writeText(tabs.map((t) => t.url).join("\n")) },
     { icon: "rotate-cw", label: "Recarregar", action: () => { for (const t of tabs) chrome.tabs.reload(t.id); } },
     { icon: "moon", label: "Dormir", action: () => { tabList.clearSelection(); for (const t of tabs) if (!t.active && !t.discarded) chrome.tabs.discard(t.id).catch(() => {}); } },
+    ...islandEntries(ids, tabs),
     ...groupEntries(ids),
     ...spaceEntries(ids),
     "divider",
@@ -200,8 +279,10 @@ async function tabsMenu(ids, x, y) {
   ], x, y);
 }
 
-function tabMenu(item, x, y, selection) {
+async function tabMenu(item, x, y, selection) {
   if (selection?.length > 1) return tabsMenu(selection, x, y);
+  const tab = await chrome.tabs.get(item.id).catch(() => null);
+  if (!tab) return;
   showMenu([
     { icon: "pin", label: "Fixar", action: async () => pins.pinTab(await chrome.tabs.get(item.id)) },
     { icon: "external-link", label: "Destacar em janela", action: () => chrome.windows.create({ tabId: item.id }) },
@@ -213,6 +294,7 @@ function tabMenu(item, x, y, selection) {
     ...(item.active || item.asleep ? [] : [{ icon: "moon", label: "Dormir", action: () => chrome.tabs.discard(item.id).catch(() => {}) }]),
     ...(item.audio === "muted" ? [{ icon: "volume-2", label: "Ativar som", action: () => chrome.tabs.update(item.id, { muted: false }) }] : []),
     ...(item.audio === "playing" ? [{ icon: "volume-x", label: "Silenciar", action: () => chrome.tabs.update(item.id, { muted: true }) }] : []),
+    ...islandEntries([item.id], [tab]),
     ...groupEntries([item.id]),
     ...spaceEntries([item.id]),
     "divider",
@@ -242,6 +324,7 @@ async function closeAround(tabId, pick) {
 async function moveTabsToSpace(ids, spaceId) {
   tabList.clearSelection();
   const current = activeSpace(spaces, windowId).id;
+  await chrome.tabs.ungroup(ids).catch(() => {});
   for (const id of ids) spaces = assignTab(spaces, await intoSession(id, spaceId), spaceId);
   await saveSpaces();
   const active = await activeTab();
@@ -406,10 +489,10 @@ const tabList = createTabList({
     drop: async (id) => pins.pinTab(await chrome.tabs.get(id)),
   },
   pageDrop: logposePrivate ? setupPageDrop() : null,
-  onMove: async (id, target) => {
-    const { index } = await chrome.tabs.get(target.id);
-    await chrome.tabs.move(id, { index });
-  },
+  onMove: moveIntoIsland,
+  onIslandToggle: toggleIsland,
+  onIslandRename: (id, title) => chrome.tabGroups.update(id, { title }).catch(() => {}),
+  onIslandMenu: islandMenu,
 });
 
 function showAddress() {
@@ -491,7 +574,10 @@ async function paint() {
   pins.render(new Map(all.map((t) => [t.id, t])), active?.id);
   if (incognito) document.getElementById("groups").hidden = true;
   else groups.render(new Map(all.map((t) => [t.id, t])), active?.id);
-  tabList.render(items.filter((i) => !i.pinned));
+  islandList = await chrome.tabGroups.query({ windowId }).catch(() => []);
+  shownItems = items.filter((i) => !i.pinned);
+  const islands = new Map(islandList.filter((g) => shownItems.some((i) => i.group === g.id)).map((g) => [g.id, { title: g.title ?? "", color: g.color, collapsed: g.collapsed, count: shownItems.filter((i) => i.group === g.id).length }]));
+  tabList.render(shownItems, islands);
   activeUrl = active?.url || active?.pendingUrl || "";
   activeTabId = active?.id ?? null;
   showAddress();
@@ -786,8 +872,13 @@ document.addEventListener("wheel", (e) => {
 
 chrome.tabs.onCreated.addListener(async (tab) => {
   if (ready && tab.windowId === windowId && !spaces.tabSpace[tab.id]) await moveTabToSpace(tab.id, activeSpace(spaces, windowId).id);
+  if (tab.windowId === windowId && tab.groupId > 0) await evictStrays();
   render();
 });
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (tab.windowId === windowId && "groupId" in info) evictStrays();
+});
+for (const ev of ["onCreated", "onUpdated", "onRemoved", "onMoved"]) chrome.tabGroups[ev].addListener(() => render());
 chrome.tabs.onRemoved.addListener(async (tabId, info) => {
   if (!ready) return;
   spaces = forgetTab(spaces, tabId);

@@ -91,6 +91,7 @@ export function setupPins({ section, grid, windowId, spaceId, assign, container,
   }
 
   async function pinTab(tab, { parentId = null, space = spaceId() } = {}) {
+    if (tab.groupId > 0) await chrome.tabs.ungroup(tab.id).catch(() => {});
     const id = pinId("pin");
     await saveLive({ ...live, [tab.id]: id });
     await savePins(addLink(tree(space), { id, url: tab.url || tab.pendingUrl, title: tab.title }, parentId), space);

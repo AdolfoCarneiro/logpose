@@ -104,6 +104,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
   }
 
   async function saveTab(tab, containerId) {
+    if (tab.groupId > 0) await chrome.tabs.ungroup(tab.id).catch(() => {});
     const id = pinId("cpage");
     await saveLive({ ...live, [tab.id]: id });
     const url = tab.url || tab.pendingUrl || "";
