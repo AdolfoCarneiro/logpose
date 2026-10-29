@@ -64,10 +64,13 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  #include "ui/views/window/frame_caption_button.h"
  #include "ui/views/window/vector_icons/vector_icons.h"
  #include "ui/views/window/window_shape.h"
-@@ -71,6 +74,128 @@
+@@ -71,6 +74,132 @@
  
  namespace {
  
++// a borda colorida que o KWin (Rounded Corners) desenha por dentro da janela
++constexpr int kLogPoseWindowOutline = 2;
++
 +bool LogPoseCaptionButtons() {
 +  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
 +      "logpose-native-chrome");
@@ -154,7 +157,8 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
 +    // com a borda do cartão da página e o espaço entre elas é o do tema
 +    const gfx::RectF contents(GetContentsBounds());
 +    const gfx::PointF center(contents.right() - 8 - kRadius,
-+                             contents.CenterPoint().y());
++                             contents.CenterPoint().y() +
++                                 kLogPoseWindowOutline / 2.0f);
 +    cc::PaintFlags dot;
 +    dot.setAntiAlias(true);
 +    dot.setColor(color);
@@ -193,19 +197,19 @@ Botões de minimizar, maximizar e fechar da moldura no canto de cima da janela, 
  constexpr int kRoundedCaptionButtonSize = 16;
  
  class CaptionButtonBackgroundImageSource : public gfx::CanvasImageSource {
-@@ -601,6 +726,11 @@
+@@ -601,6 +730,11 @@
    const auto info = GetClientFrameElementInfo();
    const auto frame_height = FrameBorderInsets(false).top();
    const auto top_height = layout_->NonClientTopHeight(false);
 +  // Log Pose: sem abas nem toolbar nativas, a área de cima é a faixa dos
 +  // botões da janela, da altura da linha de cima da barra lateral.
 +  if (is_tabbed && LogPoseCaptionButtons()) {
-+    return frame_height + 22;
++    return frame_height + 22 + kLogPoseWindowOutline;
 +  }
    return std::max(
        frame_height + info.toolbar_minimum_height,
        top_height + info.tabstrip_preferred_height -
-@@ -766,8 +896,17 @@
+@@ -766,8 +900,17 @@
      views::CaptionButtonIcon icon_type,
      int ht_component,
      const gfx::VectorIcon& icon_image) {
