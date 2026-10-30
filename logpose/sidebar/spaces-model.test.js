@@ -169,19 +169,21 @@ test("restaurar casa abas novas pela URL, uma vez cada", () => {
   assert.equal(s.tabSpace[9], "trabalho");
 });
 
-test("cada espaço tem sessão própria; o primeiro usa a principal e o container antigo vira a sessão", async () => {
+test("cada espaço tem sessão própria, o primeiro também; o container antigo vira a sessão", async () => {
   const { withSessions, sessionOf, sessionOfSpace } = await import("./spaces-model.js");
   const old = { ...initialState(), spaces: [{ id: "pessoal", name: "Pessoal", container: "pessoal" }, { id: "job", name: "Job", container: "trabalho" }, { id: "estudos", name: "Estudos" }], active: { 1: "job", 2: "pessoal" } };
   const state = withSessions(old);
-  assert.deepEqual(state.spaces.map((s) => s.session), ["", "trabalho", "estudos"]);
+  assert.deepEqual(state.spaces.map((s) => s.session), ["pessoal", "trabalho", "estudos"]);
   assert.equal(state.spaces.some((s) => "container" in s), false);
   assert.equal(sessionOf(state, 1), "trabalho");
-  assert.equal(sessionOf(state, 2), "");
+  assert.equal(sessionOf(state, 2), "pessoal");
+  const before = { ...initialState(), spaces: [{ id: "casa", name: "Casa", session: "" }, { id: "job", name: "Job", session: "job" }] };
+  assert.deepEqual(withSessions(before).spaces.map((s) => s.session), ["casa", "job"]);
   assert.equal(sessionOfSpace(state, "estudos"), "estudos");
   const next = createSpace(state, { name: "Casa", icon: "house", color: null });
   assert.equal(next.spaces.at(-1).session, "casa");
   assert.equal(withSessions(next).spaces.at(-1).session, "casa");
-  assert.equal(initialState().spaces[0].session, "");
+  assert.equal(initialState().spaces[0].session, "pessoal");
 });
 
 test("aba reaberta leva espaço, nome e o posto de última aba pro id novo", () => {

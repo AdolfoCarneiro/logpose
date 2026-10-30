@@ -49,7 +49,6 @@ let menuSpaceId = null;
 let lastWheel = 0;
 let sidebarMode = "docked";
 let incognito = false;
-let fullscreenCollapsed = false;
 let rightAligned = false;
 let leaveTimer;
 let ready = false;
@@ -1036,6 +1035,10 @@ function paintSidebarMode(mode) {
   label.previousElementSibling.textContent = glyph(mode === "docked" ? "panel-left-close" : "panel-left-open");
 }
 
+async function rememberSidebar() {
+  await chrome.storage.local.set({ sidebarCollapsed: sidebarMode === "collapsed" });
+}
+
 async function toggleSidebar() {
   const collapse = sidebarMode === "docked";
   await chrome.storage.local.set({ sidebarCollapsed: collapse });
@@ -1059,22 +1062,6 @@ document.documentElement.addEventListener("mouseenter", () => {
   clearTimeout(leaveTimer);
   if (sidebarMode === "collapsed") setSidebarMode("floating");
 });
-
-async function syncFullscreen() {
-  const win = await chrome.windows.get(windowId).catch(() => null);
-  if (!win) return;
-  const full = win.state === "fullscreen";
-  if (full && sidebarMode === "docked") {
-    fullscreenCollapsed = true;
-    await setSidebarMode("collapsed");
-  } else if (!full && fullscreenCollapsed) {
-    fullscreenCollapsed = false;
-    const { sidebarCollapsed } = await chrome.storage.local.get("sidebarCollapsed");
-    await setSidebarMode(sidebarCollapsed ? "collapsed" : "docked");
-  }
-}
-
-chrome.windows.onBoundsChanged.addListener((win) => { if (win.id === windowId) syncFullscreen(); });
 
 async function splitWithPrevious() {
   const tabs = await chrome.tabs.query({ windowId });
@@ -1100,7 +1087,7 @@ const SHORTCUT_ACTIONS = {
   copyMarkdown: async () => chrome.runtime.sendMessage({ type: "copy-link", format: "copyMarkdown", tabId: (await activeTab())?.id }),
   pinTab: async () => pins.toggleTab(await activeTab()),
   splitView: splitWithPrevious,
-  toggleSidebar,
+  toggleSidebar: rememberSidebar,
   spaceNext: () => switchSpace(neighborSpace(spaces, activeSpace(spaces, windowId).id, 1), 1),
   spacePrevious: () => switchSpace(neighborSpace(spaces, activeSpace(spaces, windowId).id, -1), -1),
   clearToday,

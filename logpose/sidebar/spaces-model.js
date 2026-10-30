@@ -1,6 +1,6 @@
 export function initialState() {
   return {
-    spaces: [{ id: "pessoal", name: "Pessoal", icon: "house", color: null, session: "" }],
+    spaces: [{ id: "pessoal", name: "Pessoal", icon: "house", color: null, session: "pessoal" }],
     tabSpace: {},
     tabTitle: {},
     active: {},
@@ -176,7 +176,8 @@ export function reopenedSpace(state, tabs, shot) {
 export function withSessions(state) {
   return {
     ...state,
-    spaces: state.spaces.map(({ container, ...space }, i) => (typeof space.session === "string" ? space : { ...space, session: i === 0 ? "" : container || space.id })),
+    // nenhum espaço usa os cookies do perfil: o que vazar pra eles não cai em espaço nenhum
+    spaces: state.spaces.map(({ container, ...space }) => (typeof space.session === "string" && space.session ? space : { ...space, session: container || space.id })),
   };
 }
 
