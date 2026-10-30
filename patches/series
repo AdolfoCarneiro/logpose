@@ -63,3 +63,4 @@ logpose/ui/google-default.patch
 logpose/ui/background-blur.patch
 logpose/ui/window-buttons.patch
 logpose/ui/focus-contents.patch
+logpose/ui/container-restore.patch

@@ -3,7 +3,7 @@ import { showMenu } from "./context-menu.js";
 import { pop } from "./motion.js";
 import { call } from "./logpose-private.js";
 import {
-  pinId, find, parentOf, links, addLink, addFolder, remove, rename, setUrl, toggle, move, place, drifted, prune, tabOf, pinSnapshot, restoreLive,
+  pinId, find, parentOf, links, addLink, addFolder, remove, rename, setUrl, toggle, move, place, drifted, prune, tabOf, pinSnapshot, restoreLive, rekey,
 } from "./pins-model.js";
 
 function faviconFor(url) {
@@ -320,5 +320,5 @@ export function setupPins({ section, grid, windowId, spaceId, assign, container,
     }
   });
 
-  return { load, save, render, liveIds, pinTab, toggleTab, newFolder, contains: (x, y) => Boolean(document.elementFromPoint(x, y)?.closest("#pins")) };
+  return { load, save, render, liveIds, pinTab, rekey: (from, to) => saveLive(rekey(live, from, to)), toggleTab, newFolder, contains: (x, y) => Boolean(document.elementFromPoint(x, y)?.closest("#pins")) };
 }

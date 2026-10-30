@@ -52,25 +52,6 @@ export function membership(entries) {
   return new Map((entries ?? []).filter((e) => e.container).map((e) => [e.tabId, e.container]));
 }
 
-export function containerSnapshot(tabs, members) {
-  return [...tabs].sort((a, b) => a.index - b.index).map((t) => ({ url: t.url || t.pendingUrl || "", container: members.get(t.id) ?? "" }));
-}
-
-export function lostTabs(shot, tabs, members, known) {
-  const pending = [...(shot ?? [])];
-  const lost = [];
-  for (const tab of [...tabs].sort((a, b) => a.index - b.index)) {
-    const url = tab.url || tab.pendingUrl || "";
-    const i = pending.findIndex((entry) => entry.url === url);
-    if (i < 0) continue;
-    const { container } = pending[i];
-    pending.splice(i, 1);
-    if (!container || members.has(tab.id) || !known.some((c) => c.id === container)) continue;
-    lost.push({ tabId: tab.id, url, index: tab.index, active: tab.active, pinned: tab.pinned, container });
-  }
-  return lost;
-}
-
 export function pagesOf(container) {
   return Array.isArray(container?.pages) ? container.pages : [];
 }
@@ -129,10 +110,39 @@ export function restorePages(tabs, shot, list) {
   return live;
 }
 
+function reopenable(tab, newTabUrl) {
+  const url = tab.url || tab.pendingUrl || "";
+  return url === "" || /^https?:/.test(url) || /^chrome:\/\/newtab\/?$/.test(url) || (newTabUrl !== "" && url.startsWith(newTabUrl));
+}
+
 // aba nova que nasceu fora da sessão do espaço (aba vazia aberta pelo
 // Chromium, link vindo de outro app): tem que ser reaberta dentro dela
 export function strayTab(tab, session, tabSession, newTabUrl = "") {
-  if (!session || tabSession) return false;
-  const url = tab.url || tab.pendingUrl || "";
-  return url === "" || /^https?:/.test(url) || /^chrome:\/\/newtab\/?$/.test(url) || (newTabUrl !== "" && url.startsWith(newTabUrl));
+  return Boolean(session) && !tabSession && reopenable(tab, newTabUrl);
+}
+
+// aba que está num espaço mas noutra sessão (restaurada pelo Chromium,
+// acordada do sono, vinda da janelinha): se a sessão dela é a de outro
+// espaço, ela é desse espaço; senão é reaberta na sessão do espaço dela
+export function sessionFixes(tabs, { sessionOfTab, spaceOf, spaces, newTabUrl = "" }) {
+  const move = [];
+  const reopen = [];
+  for (const tab of tabs) {
+    const space = spaces.find((s) => s.id === spaceOf(tab.id));
+    const session = sessionOfTab(tab.id);
+    if (!space || session === (space.session ?? "")) continue;
+    const home = session && spaces.find((s) => s.session === session);
+    if (home) move.push({ id: tab.id, space: home.id });
+    else if (reopenable(tab, newTabUrl)) reopen.push({ tab, session: space.session ?? "" });
+  }
+  return { move, reopen };
+}
+
+// divisões de tela que perdem uma aba ao reabrir: desfazer antes e refazer depois
+export function splitsOf(tabs, ids) {
+  const splits = new Map();
+  for (const tab of [...tabs].sort((a, b) => a.index - b.index)) {
+    if (tab.splitViewId > 0) splits.set(tab.splitViewId, [...(splits.get(tab.splitViewId) ?? []), tab.id]);
+  }
+  return [...splits].filter(([, members]) => members.some((id) => ids.has(id))).map(([split, members]) => ({ split, tabs: members }));
 }

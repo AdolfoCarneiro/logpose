@@ -3,7 +3,7 @@ import { loadSettings, displayUrl } from "./settings-model.js";
 import {
   initialState, createSpace, renameSpace, deleteSpace, assignTab, forgetTab,
   visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore, spaceOfTab, sessionOf, sessionOfSpace, withSessions,
-  storeSnapshot, pickSnapshot, forgetSnapshot, reopenedSpace, setTitle,
+  storeSnapshot, pickSnapshot, forgetSnapshot, reopenedSpace, setTitle, rekeyTab,
 } from "./spaces-model.js";
 import { glyph } from "./kurobe/icons.mjs";
 import { createTabList } from "./tab-list.js";
@@ -21,7 +21,7 @@ import { setupContainerEditor } from "./container-editor.js";
 import { dropTab, joinWindow } from "./split-drop.js";
 import { windowAt, chromeWindowFor, zonesFor, partnerFor } from "./drag-model.js";
 import { iconChoices } from "./icons-model.js";
-import { nextGroupName, strayTab } from "./containers-model.js";
+import { nextGroupName, strayTab, sessionFixes, splitsOf } from "./containers-model.js";
 import { setupDownloads } from "./downloads.js";
 import { setupPins } from "./pins.js";
 import { setupPlayer } from "./player.js";
@@ -112,8 +112,7 @@ function queueSnapshot() {
 async function saveSpaces() {
   const { spaces: list, active, lastTab, tabSpace, tabTitle } = spaces;
   await chrome.storage.local.set({ spaces: { spaces: list, active, lastTab, tabSpace, tabTitle } });
-  const tabs = await saveSnapshot();
-  await containers.save(tabs);
+  await saveSnapshot();
   await pins.save();
   await groups.persist();
 }
@@ -134,7 +133,51 @@ async function intoSession(tabId, spaceId) {
   if (containers.sessionOfTab(tabId) === session) return tabId;
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   if (!tab || !/^https?:/.test(tab.url || tab.pendingUrl || "")) return tabId;
-  return containers.reopen(tab, session);
+  return reseat(tab, session);
+}
+
+const reseating = new Set();
+const reseated = new Set();
+
+// reabre a aba na sessão certa; espaço, nome, ilha e fixada passam pro id novo
+async function reseat(tab, session) {
+  if (reseating.has(tab.id)) return tab.id;
+  reseating.add(tab.id);
+  try {
+    const id = await containers.reopen(tab, session);
+    reseated.add(id);
+    spaces = rekeyTab(spaces, tab.id, id);
+    await pins.rekey(tab.id, id);
+    await groups.rekey(tab.id, id);
+    if (tab.groupId > 0) await chrome.tabs.group({ groupId: tab.groupId, tabIds: [id] }).catch(() => {});
+    return id;
+  } finally {
+    reseating.delete(tab.id);
+  }
+}
+
+// aba do espaço fora da sessão dele (restaurada, acordada do sono, vinda da
+// janelinha): vai pro espaço da sessão dela ou é reaberta na sessão certa
+async function fixSessions(tabs) {
+  if (!containers.available || incognito) return 0;
+  await containers.load();
+  const { move, reopen } = sessionFixes(tabs.filter((t) => !reseated.has(t.id) && !reseating.has(t.id)), {
+    sessionOfTab: (id) => containers.sessionOfTab(id),
+    spaceOf: (id) => spaceOfTab(spaces, id, windowId),
+    spaces: spaces.spaces,
+    newTabUrl: chrome.runtime.getURL("newtab.html"),
+  });
+  for (const { id, space } of move) {
+    spaces = assignTab(spaces, id, space);
+    if (tabs.find((t) => t.id === id)?.active) spaces = setActive(spaces, windowId, space);
+  }
+  const splits = splitsOf(tabs, new Set(reopen.map((r) => r.tab.id)));
+  for (const { split } of splits) await chrome.tabs.unsplit(split).catch(() => {});
+  const ids = new Map();
+  for (const { tab, session } of reopen) ids.set(tab.id, await reseat(tab, session).catch(() => tab.id));
+  for (const { tabs: pair } of splits) await chrome.tabs.createSplit(pair.map((id) => ids.get(id) ?? id)).catch(() => {});
+  if (move.length || reopen.length) await saveSpaces();
+  return reopen.length;
 }
 
 async function activeTab() {
@@ -332,7 +375,10 @@ async function moveTabsToSpace(ids, spaceId) {
   tabList.clearSelection();
   const current = activeSpace(spaces, windowId).id;
   await chrome.tabs.ungroup(ids).catch(() => {});
-  for (const id of ids) spaces = assignTab(spaces, await intoSession(id, spaceId), spaceId);
+  for (const id of ids) {
+    const moved = await intoSession(id, spaceId);
+    spaces = assignTab(spaces, moved, spaceId);
+  }
   await saveSpaces();
   const active = await activeTab();
   if (active && spaceOfTab(spaces, active.id, windowId) !== current) {
@@ -697,7 +743,10 @@ for (const item of spaceMenu.querySelectorAll("[data-space-action]")) {
       const moving = Object.entries(spaces.tabSpace).filter(([, id]) => id === space.id).map(([id]) => Number(id));
       spaces = deleteSpace(spaces, space.id);
       const fallback = spaces.spaces[0].id;
-      for (const id of moving) spaces = assignTab(spaces, await intoSession(id, fallback), fallback);
+      for (const id of moving) {
+        const moved = await intoSession(id, fallback);
+        spaces = assignTab(spaces, moved, fallback);
+      }
       await saveSpaces();
       render();
     }
@@ -746,7 +795,7 @@ async function straysFromSession(tab) {
   if (!session) return false;
   await containers.load();
   if (!strayTab(tab, session, containers.sessionOfTab(tab.id), chrome.runtime.getURL("newtab.html"))) return false;
-  const id = await containers.reopen(tab, session);
+  const id = await reseat(tab, session);
   if (!spaces.tabSpace[id]) await moveTabToSpace(id, activeSpace(spaces, windowId).id);
   return true;
 }
@@ -943,6 +992,10 @@ chrome.tabs.onMoved.addListener((tabId, info) => {
   if (info.windowId === windowId) queueSnapshot();
 });
 chrome.tabs.onActivated.addListener(async ({ tabId, windowId: w }) => {
+  if (ready && w === windowId && spaces.tabSpace[tabId]) {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (tab && await fixSessions([tab])) return render();
+  }
   if (ready && w === windowId) {
     const space = spaceOfTab(spaces, tabId, windowId);
     if (space !== activeSpace(spaces, windowId).id) {
@@ -951,6 +1004,13 @@ chrome.tabs.onActivated.addListener(async ({ tabId, windowId: w }) => {
     }
   }
   render();
+});
+// aba que chega de outra janela (a janelinha abre links nos cookies do perfil)
+chrome.tabs.onAttached.addListener(async (tabId, { newWindowId }) => {
+  if (!ready || newWindowId !== windowId) return;
+  if (!spaces.tabSpace[tabId]) await moveTabToSpace(tabId, activeSpace(spaces, windowId).id);
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (tab) await fixSessions([tab]);
 });
 for (const ev of ["onUpdated", "onMoved", "onAttached", "onDetached"]) chrome.tabs[ev].addListener(() => render());
 
@@ -1130,12 +1190,10 @@ if (!windowTabs.some((t) => spaces.tabSpace[t.id])) {
 for (const tab of windowTabs) {
   if (!spaces.tabSpace[tab.id]) spaces = assignTab(spaces, tab.id, activeSpace(spaces, windowId).id);
 }
-for (const { from, to } of await containers.heal(windowTabs)) {
-  spaces = assignTab(spaces, to, spaceOfTab(spaces, from, windowId));
-}
 await pins.load(await chrome.tabs.query({ windowId }));
 await containers.load();
 await groups.load(await chrome.tabs.query({ windowId }));
+await fixSessions(await chrome.tabs.query({ windowId }));
 for (const tab of await chrome.tabs.query({ windowId, pinned: true })) {
   await chrome.tabs.update(tab.id, { pinned: false });
   await pins.pinTab(tab, { space: spaceOfTab(spaces, tab.id, windowId) });
@@ -1146,7 +1204,7 @@ for (const tab of await chrome.tabs.query({ windowId })) {
 }
 await saveSpaces();
 for (const tab of windowTabs) {
-  if (/^chrome:\/\/newtab\/?$/.test(tab.url || "") && tab.title !== "Nova aba") chrome.tabs.update(tab.id, { url: "chrome://newtab/" });
+  if (/^chrome:\/\/newtab\/?$/.test(tab.url || "") && tab.title !== "Nova aba") chrome.tabs.update(tab.id, { url: "chrome://newtab/" }).catch(() => {});
 }
 applySettings();
 restoreCrashedSession();

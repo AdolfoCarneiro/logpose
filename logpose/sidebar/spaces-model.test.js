@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, createSpace, renameSpace, deleteSpace, assignTab, forgetTab,
-  spaceOfTab, visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore,
+  spaceOfTab, visibleTabs, setActive, activeSpace, neighborSpace, rememberTab, updateSpace, snapshot, restore, rekeyTab, setTitle,
 } from "./spaces-model.js";
 
 const tabs = [
@@ -182,4 +182,12 @@ test("cada espaço tem sessão própria; o primeiro usa a principal e o containe
   assert.equal(next.spaces.at(-1).session, "casa");
   assert.equal(withSessions(next).spaces.at(-1).session, "casa");
   assert.equal(initialState().spaces[0].session, "");
+});
+
+test("aba reaberta leva espaço, nome e o posto de última aba pro id novo", () => {
+  let s = assignTab(initialState(), 4, "pessoal");
+  s = setTitle(rememberTab(s, "pessoal", 4), 4, "Caixa");
+  s = rekeyTab(s, 4, 9);
+  assert.deepEqual([s.tabSpace, s.tabTitle, s.lastTab], [{ 9: "pessoal" }, { 9: "Caixa" }, { pessoal: 9 }]);
+  assert.deepEqual(rekeyTab(s, 1, 2).tabSpace, { 9: "pessoal" });
 });

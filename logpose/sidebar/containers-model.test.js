@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  loadContainers, createContainer, updateContainer, deleteContainer, membership, containerSnapshot, lostTabs, slug, DEFAULT_CONTAINERS,
-  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle, nextGroupName, strayTab,
+  loadContainers, createContainer, updateContainer, deleteContainer, membership, slug, DEFAULT_CONTAINERS,
+  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle, nextGroupName, strayTab, sessionFixes, splitsOf,
 } from "./containers-model.js";
 
 test("sem nada salvo vêm Trabalho e Pessoal; lista salva vazia continua vazia", () => {
@@ -24,32 +24,6 @@ test("editar mantém o id e ignora nome vazio; apagar remove", () => {
   const edited = updateContainer(list, "trabalho", { name: "", color: "#000000", id: "outro" });
   assert.deepEqual(edited[0], { id: "trabalho", name: "Trabalho", color: "#000000", icon: "briefcase" });
   assert.deepEqual(deleteContainer(list, "trabalho").map((c) => c.id), ["pessoal"]);
-});
-
-test("snapshot guarda todas as abas na ordem, com o container ou vazio", () => {
-  const members = membership([{ tabId: 1, container: "trabalho" }, { tabId: 2, container: "" }]);
-  const tabs = [{ id: 2, index: 1, url: "https://github.com/" }, { id: 1, index: 0, url: "https://mail.google.com/" }];
-  assert.deepEqual(containerSnapshot(tabs, members), [
-    { url: "https://mail.google.com/", container: "trabalho" },
-    { url: "https://github.com/", container: "" },
-  ]);
-});
-
-test("depois de reiniciar, reconhece pela ordem quem estava no container, mesmo com URL repetida", () => {
-  const shot = [
-    { url: "https://mail.google.com/", container: "" },
-    { url: "https://mail.google.com/", container: "trabalho" },
-    { url: "https://x.com/", container: "apagado" },
-  ];
-  const tabs = [
-    { id: 9, index: 2, url: "https://x.com/", active: false, pinned: false },
-    { id: 7, index: 0, url: "https://mail.google.com/", active: true, pinned: false },
-    { id: 8, index: 1, url: "https://mail.google.com/", active: false, pinned: true },
-  ];
-  assert.deepEqual(lostTabs(shot, tabs, new Map(), DEFAULT_CONTAINERS), [
-    { tabId: 8, url: "https://mail.google.com/", index: 1, active: false, pinned: true, container: "trabalho" },
-  ]);
-  assert.deepEqual(lostTabs(shot, tabs, new Map([[8, "trabalho"]]), DEFAULT_CONTAINERS), []);
 });
 
 test("o container guarda páginas como as fixadas", () => {
@@ -101,4 +75,28 @@ test("aba nova nos cookies do perfil é reaberta na sessão do espaço", () => {
   assert.equal(strayTab({ url: "https://claude.ai/" }, "trabalho", "outro", ntp), false);
   assert.equal(strayTab({ url: "https://claude.ai/" }, "", "", ntp), false);
   assert.equal(strayTab({ url: "chrome://settings/" }, "trabalho", "", ntp), false);
+});
+
+test("aba fora da sessão do espaço: vai pro espaço da sessão dela ou é reaberta", () => {
+  const spaces = [{ id: "pessoal", session: "" }, { id: "gow", session: "gow" }, { id: "casa", session: "casa" }];
+  const where = { 1: "gow", 2: "gow", 3: "pessoal", 4: "pessoal", 5: "casa", 6: "gow", 7: "gow" };
+  const members = membership([{ tabId: 2, container: "gow" }, { tabId: 3, container: "casa" }, { tabId: 4, container: "velho" }, { tabId: 7, container: "velho" }]);
+  const tabs = [
+    { id: 1, url: "https://claude.ai/new" },
+    { id: 2, url: "https://claude.ai/new" },
+    { id: 3, url: "chrome://settings/" },
+    { id: 4, url: "https://x.com/" },
+    { id: 5, url: "chrome://settings/" },
+    { id: 6, url: "chrome-extension://abc/newtab.html" },
+    { id: 7, url: "https://mail.com/" },
+  ];
+  const fixes = sessionFixes(tabs, { sessionOfTab: (id) => members.get(id) ?? "", spaceOf: (id) => where[id], spaces, newTabUrl: "chrome-extension://abc/newtab.html" });
+  assert.deepEqual(fixes.move, [{ id: 3, space: "casa" }]);
+  assert.deepEqual(fixes.reopen.map((r) => [r.tab.id, r.session]), [[1, "gow"], [4, ""], [6, "gow"], [7, "gow"]]);
+});
+
+test("reabrir uma aba dividida desfaz e refaz a divisão inteira", () => {
+  const tabs = [{ id: 3, index: 3, splitViewId: 5 }, { id: 2, index: 2, splitViewId: 5 }, { id: 4, index: 4, splitViewId: 6 }, { id: 8, index: 5, splitViewId: 6 }, { id: 9, index: 6 }];
+  assert.deepEqual(splitsOf(tabs, new Set([3, 9])), [{ split: 5, tabs: [2, 3] }]);
+  assert.deepEqual(splitsOf(tabs, new Set([9])), []);
 });

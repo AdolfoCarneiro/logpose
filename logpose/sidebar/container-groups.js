@@ -4,7 +4,7 @@ import { showMenu } from "./context-menu.js";
 import { animate, pop } from "./motion.js";
 import { call } from "./logpose-private.js";
 import { faviconOf } from "./tabs-model.js";
-import { pinId, drifted, prune, tabOf, pinSnapshot } from "./pins-model.js";
+import { pinId, drifted, prune, tabOf, pinSnapshot, rekey } from "./pins-model.js";
 import { loadContainers, createContainer, updateContainer, CONTAINER_COLORS, CONTAINER_ICONS, pagesOf, addPage, removePage, updatePage, findPage, toggleGroup, pageIds, restorePages, pageTitle } from "./containers-model.js";
 
 function icon(name) {
@@ -368,6 +368,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
 
   return {
     load, persist, render, liveIds, saveTab, adopt, createFrom, renameGroup,
+    rekey: (from, to) => saveLive(rekey(live, from, to)),
     list: () => containers,
     pageOfTab: (tabId) => (live[tabId] ? findPage(containers, live[tabId]) : null),
   };

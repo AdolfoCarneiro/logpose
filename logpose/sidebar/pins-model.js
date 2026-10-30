@@ -106,6 +106,12 @@ export function prune(live, tabIds, nodeIds) {
   return Object.fromEntries(Object.entries(live).filter(([tab, node]) => tabIds.has(Number(tab)) && nodeIds.has(node)));
 }
 
+export function rekey(live, from, to) {
+  if (!(from in live)) return live;
+  const { [from]: node, ...rest } = live;
+  return { ...rest, [to]: node };
+}
+
 export function tabOf(live, nodeId) {
   const entry = Object.entries(live).find(([, node]) => node === nodeId);
   return entry ? Number(entry[0]) : null;

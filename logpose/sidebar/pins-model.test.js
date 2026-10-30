@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pinId, find, parentOf, links, addLink, addFolder, remove, rename, setUrl, toggle, move, place, drifted, prune, tabOf, pinSnapshot, restoreLive } from "./pins-model.js";
+import { pinId, find, parentOf, links, addLink, addFolder, remove, rename, setUrl, toggle, move, place, drifted, prune, tabOf, pinSnapshot, restoreLive, rekey } from "./pins-model.js";
 
 const tree = [
   { id: "f1", kind: "folder", title: "Trabalho", open: true, children: [
@@ -88,4 +88,10 @@ test("soltar num cartão ocupa o lugar dele, pra frente ou pra trás", () => {
   assert.deepEqual(find(place(tree, "l3", "l2"), "f1").children.map((c) => c.id), ["l1", "l3", "l2"]);
   const folder = addFolder(tree, { id: "f2", title: "Leitura" });
   assert.equal(place(folder, "f2", "l1"), folder);
+});
+
+test("aba reaberta continua sendo a da fixada", () => {
+  assert.deepEqual(rekey({ 4: "pin-a", 5: "pin-b" }, 4, 9), { 5: "pin-b", 9: "pin-a" });
+  const live = { 5: "pin-b" };
+  assert.equal(rekey(live, 4, 9), live);
 });

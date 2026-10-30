@@ -54,6 +54,18 @@ export function forgetTab(state, tabId) {
   return { ...state, tabSpace, tabTitle };
 }
 
+// a aba foi reaberta com outro id: espaço, nome e "última aba" vão junto
+export function rekeyTab(state, from, to) {
+  const tabSpace = { ...state.tabSpace };
+  const tabTitle = { ...state.tabTitle };
+  if (from in tabSpace) tabSpace[to] = tabSpace[from];
+  if (from in tabTitle) tabTitle[to] = tabTitle[from];
+  delete tabSpace[from];
+  delete tabTitle[from];
+  const lastTab = Object.fromEntries(Object.entries(state.lastTab).map(([space, id]) => [space, id === from ? to : id]));
+  return { ...state, tabSpace, tabTitle, lastTab };
+}
+
 export function setTitle(state, tabId, title) {
   const tabTitle = { ...state.tabTitle };
   const clean = (title ?? "").trim();

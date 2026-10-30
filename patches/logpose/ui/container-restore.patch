@@ -1,0 +1,158 @@
+Containers sobrevivem a restaurar a sessão, reabrir aba fechada e dormir: a aba guarda o container nos dados extras da sessão (como o app id) e volta nele; a aba dormida renasce no mesmo container; e uma aba de container não faz prerender, que nasceria nos cookies do perfil. Sem isso tudo isso voltava nos cookies do perfil e o login de um espaço vazava pro outro.
+
+--- a/chrome/browser/logpose/logpose_containers.h
++++ b/chrome/browser/logpose/logpose_containers.h
+@@ -61,6 +61,21 @@
+       source->GetBrowserContext(), url, config);
+ }
+ 
++// The container of a tab, kept with the tab in the session so that session
++// restore and reopening a closed tab bring it back in it.
++inline constexpr char kLogPoseContainerExtraDataKey[] = "logpose_container";
++
++inline scoped_refptr<content::SiteInstance> LogPoseContainerSiteInstance(
++    content::BrowserContext* context,
++    const std::string& name,
++    const GURL& url) {
++  if (name.empty()) {
++    return nullptr;
++  }
++  return content::SiteInstance::CreateForFixedStoragePartition(
++      context, url, LogPoseContainerPartition(context, name));
++}
++
+ inline base::FilePath LogPoseContainerPartitionsPath() {
+   return base::FilePath(FILE_PATH_LITERAL("Storage"))
+       .Append(FILE_PATH_LITERAL("ext"))
+--- a/chrome/browser/sessions/session_service_base.cc
++++ b/chrome/browser/sessions/session_service_base.cc
+@@ -21,6 +21,7 @@
+ #include "build/build_config.h"
+ #include "chrome/browser/apps/app_service/web_contents_app_id_utils.h"
+ #include "chrome/browser/browser_process.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/session_service_base_observer.h"
+ #include "chrome/browser/sessions/session_service_log.h"
+@@ -285,6 +286,12 @@
+     SetTabExtensionAppID(session_tab_helper->window_id(),
+                          session_tab_helper->session_id(), app_id);
+   }
++  if (std::string container = LogPoseContainerOf(contents);
++      !container.empty()) {
++    ScheduleCommand(sessions::CreateAddTabExtraDataCommand(
++        session_tab_helper->session_id(), kLogPoseContainerExtraDataKey,
++        container));
++  }
+ 
+   // Record the association between the SessionStorageNamespaceHandle and the
+   // tab.
+@@ -640,6 +647,11 @@
+     command_storage_manager()->AppendRebuildCommand(
+         sessions::CreateSetTabExtensionAppIDCommand(session_id, app_id));
+   }
++  if (std::string container = LogPoseContainerOf(tab); !container.empty()) {
++    command_storage_manager()->AppendRebuildCommand(
++        sessions::CreateAddTabExtraDataCommand(
++            session_id, kLogPoseContainerExtraDataKey, container));
++  }
+ 
+   for (int i = min_index; i < max_index; ++i) {
+     NavigationEntry* entry = (i == pending_index)
+--- a/chrome/browser/ui/browser_tabrestore.cc
++++ b/chrome/browser/ui/browser_tabrestore.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/browser_tabrestore.h"
+ 
++#include <algorithm>
+ #include <map>
+ #include <memory>
+ #include <utility>
+@@ -12,6 +13,7 @@
+ #include "build/build_config.h"
+ #include "chrome/browser/apps/app_service/web_contents_app_id_utils.h"
+ #include "chrome/browser/glic/glic_tab_restore_helper.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/session_restore.h"
+ #include "chrome/browser/sessions/session_service_base.h"
+@@ -72,6 +74,14 @@
+       content::CreateMapWithDefaultSessionStorageNamespace(
+           browser->GetProfile(), session_storage_namespace);
+   WebContents::CreateParams create_params(browser->GetProfile());
++  if (auto container = extra_data.find(kLogPoseContainerExtraDataKey);
++      container != extra_data.end() && !navigations.empty()) {
++    const size_t selected = static_cast<size_t>(std::clamp(
++        selected_navigation, 0, static_cast<int>(navigations.size()) - 1));
++    create_params.site_instance = LogPoseContainerSiteInstance(
++        browser->GetProfile(), container->second,
++        navigations[selected].virtual_url());
++  }
+   create_params.initially_hidden = initially_hidden;
+   create_params.desired_renderer_state =
+       WebContents::CreateParams::kNoRendererProcess;
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -16,6 +16,7 @@
+ #include "base/values.h"
+ #include "chrome/browser/apps/app_service/web_contents_app_id_utils.h"
+ #include "chrome/browser/glic/glic_tab_restore_helper.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/performance_manager/public/background_tab_loading_policy.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/session_service_utils.h"
+@@ -206,6 +207,11 @@
+ 
+   glic::PopulateGlicExtraData(tab_strip_model_->GetTabAtIndex(index),
+                               &extra_data);
++  std::string container =
++      LogPoseContainerOf(tab_strip_model_->GetWebContentsAt(index));
++  if (!container.empty()) {
++    extra_data[kLogPoseContainerExtraDataKey] = std::move(container);
++  }
+ 
+   return extra_data;
+ }
+--- a/chrome/browser/resource_coordinator/tab_lifecycle_unit.cc
++++ b/chrome/browser/resource_coordinator/tab_lifecycle_unit.cc
+@@ -18,6 +18,7 @@
+ #include "base/process/process_metrics.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/devtools/devtools_window.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
+ #include "chrome/browser/media/webrtc/media_stream_capture_indicator.h"
+ #include "chrome/browser/performance_manager/public/user_tuning/user_performance_tuning_manager.h"
+@@ -272,6 +273,9 @@
+     uint64_t tab_memory_footprint_estimate) {
+   content::WebContents* const old_contents = web_contents();
+   content::WebContents::CreateParams create_params(tab_strip_model_->profile());
++  // A container tab wakes up in its container, not in the profile's storage.
++  create_params.site_instance = LogPoseContainerSiteInstanceFor(
++      old_contents, old_contents->GetLastCommittedURL());
+   // TODO(fdoray): Consider setting |initially_hidden| to true when the tab is
+   // OCCLUDED. Will require checking that the tab reload correctly when it
+   // becomes VISIBLE.
+--- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
++++ b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
+@@ -23,6 +23,7 @@
+ #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
+ #include "chrome/browser/preloading/preloading_prefs.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/logpose/logpose_containers.h"
+ #include "chrome/browser/logpose/logpose_links.h"
+ #include "chrome/browser/repost_form_warning_controller.h"
+ #include "chrome/browser/search/search.h"
+@@ -536,6 +537,11 @@
+ BrowserWebContentsDelegate::IsPrerender2Supported(
+     content::WebContents& web_contents,
+     content::PreloadingTriggerType trigger_type) {
++  // A prerendered page starts in the profile's storage: activating it would
++  // take a container tab out of its container.
++  if (!LogPoseContainerOf(&web_contents).empty()) {
++    return content::PreloadingEligibility::kPreloadingUnsupportedByWebContents;
++  }
+   Profile* profile =
+       Profile::FromBrowserContext(web_contents.GetBrowserContext());
+   return prefetch::IsSomePreloadingEnabled(*profile->GetPrefs());
