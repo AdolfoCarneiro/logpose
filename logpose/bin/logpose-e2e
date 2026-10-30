@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Testes no navegador compilado, sem mexer na tela: o Log Pose abre num X virtual (Xvfb) com um
+# perfil descartável, as teclas e o mouse vão pelo xdotool e o resto pelo CDP (logpose/e2e/e2e.mjs)
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+binary="${LOGPOSE_BINARY:-$root/build/src/out/Default/logpose}"
+[ -x "$binary" ] || { echo "sem $binary: compile antes" >&2; exit 1; }
+for tool in Xvfb xdotool node curl; do
+  command -v "$tool" >/dev/null || { echo "precisa do $tool" >&2; exit 1; }
+done
+
+export DISPLAY="${LOGPOSE_E2E_DISPLAY:-:93}"
+export LOGPOSE_DEBUG_PORT="${LOGPOSE_DEBUG_PORT:-9334}"
+profile="${XDG_RUNTIME_DIR:-/tmp}/logpose-e2e"
+pids=()
+
+cleanup() {
+  kill "${pids[@]}" 2>/dev/null || true
+  wait 2>/dev/null || true
+  rm -rf "$profile"
+}
+trap cleanup EXIT
+
+Xvfb "$DISPLAY" -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 &
+pids+=($!)
+timeout 10 bash -c 'until xdotool getdisplaygeometry >/dev/null 2>&1; do sleep 0.2; done'
+# sem gerenciador de janelas o X não troca o estado da janela: F11 e a tela cheia do vídeo
+# só passam com um (ex.: LOGPOSE_E2E_WM=openbox)
+if [ -n "${LOGPOSE_E2E_WM:-}" ]; then
+  $LOGPOSE_E2E_WM >/dev/null 2>&1 &
+  pids+=($!)
+  sleep 1
+fi
+
+rm -rf "$profile"
+mkdir -p "$profile"
+LANGUAGE="${LOGPOSE_LANGUAGE:-pt_BR}" "$binary" --ozone-platform=x11 --user-data-dir="$profile" --no-first-run \
+  --password-store=basic --logpose-sidebar-dir="$root/logpose/sidebar" --remote-debugging-port="$LOGPOSE_DEBUG_PORT" \
+  --window-position=0,0 --window-size=1920,1080 "https://example.com/?e2e" >"${LOGPOSE_LOG:-/dev/null}" 2>&1 &
+pids+=($!)
+timeout 30 bash -c "until curl -s localhost:$LOGPOSE_DEBUG_PORT/json/list | grep -q sidebar.html; do sleep 1; done"
+timeout 30 bash -c "until curl -s localhost:$LOGPOSE_DEBUG_PORT/json/list | grep -qF 'example.com/?e2e'; do sleep 1; done"
+sleep 4
+xdotool key Escape
+node "$root/logpose/e2e/e2e.mjs"
