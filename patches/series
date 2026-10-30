@@ -59,6 +59,9 @@ logpose/ui/container-session-cookies.patch
 logpose/ui/spotlight-suggestions.patch
 logpose/ui/split-view.patch
 logpose/ui/escape-exits-fullscreen.patch
+logpose/ui/private-search-engine.patch
+logpose/ui/back-forward-hint.patch
+logpose/ui/collapsed-sidebar-keys.patch
 logpose/ui/google-default.patch
 logpose/ui/background-blur.patch
 logpose/ui/window-buttons.patch
