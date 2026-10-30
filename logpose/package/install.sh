@@ -66,8 +66,9 @@ for size in 16 22 24 32 48 64 128 256 512; do
   mkdir -p "$data/icons/hicolor/${size}x${size}/apps"
   cp "$here/icons/icon-$size.png" "$data/icons/hicolor/${size}x${size}/apps/logpose.png"
 done
-mkdir -p "$data/icons/hicolor/scalable/apps"
-cp "$here/icons/icon.svg" "$data/icons/hicolor/scalable/apps/logpose.svg"
+# Sem scalable/: o icon.svg só embrulha um PNG, e o Qt reduz esse <image> sem suavizar
+# (fica serrilhado na barra). Com só os PNGs ele escolhe o tamanho mais perto e suaviza.
+rm -f "$data/icons/hicolor/scalable/apps/logpose.svg"
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "$data/icons/hicolor" || true
 command -v update-desktop-database >/dev/null && update-desktop-database -q "$data/applications" || true
 
