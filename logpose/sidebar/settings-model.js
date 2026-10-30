@@ -13,6 +13,7 @@ export const DEFAULTS = Object.freeze({
   newtabCards: true,
   newtabMarket: true,
   marketTickers: "",
+  privateSearchEngine: "",
 });
 
 const CHOICES = {
@@ -60,4 +61,17 @@ export function displayUrl(url, full) {
   } catch {
     return url;
   }
+}
+
+const MAIN_LANGUAGES = { "pt-BR": ["pt-BR", "pt"], "en-US": ["en-US", "en"] };
+
+export function mainLanguage(accept) {
+  const top = String(accept ?? "").split(",")[0]?.trim() ?? "";
+  return Object.keys(MAIN_LANGUAGES).find((code) => MAIN_LANGUAGES[code].includes(top)) ?? top;
+}
+
+export function withMainLanguage(accept, code) {
+  const first = MAIN_LANGUAGES[code] ?? [code];
+  const rest = String(accept ?? "").split(",").map((l) => l.trim()).filter((l) => l && !first.includes(l));
+  return [...first, ...rest].join(",");
 }

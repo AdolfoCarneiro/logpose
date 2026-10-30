@@ -19,12 +19,13 @@ import { setupContainers } from "./containers.js";
 import { setupContainerGroups } from "./container-groups.js";
 import { setupContainerEditor } from "./container-editor.js";
 import { dropTab, joinWindow } from "./split-drop.js";
-import { windowAt, chromeWindowFor, zonesFor } from "./drag-model.js";
+import { windowAt, chromeWindowFor, zonesFor, partnerFor } from "./drag-model.js";
 import { iconChoices } from "./icons-model.js";
 import { nextGroupName, strayTab } from "./containers-model.js";
 import { setupDownloads } from "./downloads.js";
 import { setupPins } from "./pins.js";
 import { setupPlayer } from "./player.js";
+import { setupPopups } from "./popups.js";
 import { available as logposePrivate, call } from "./logpose-private.js";
 
 const SPACE_COLORS = [null, "#71b1ec", "#7cc2a8", "#d9c08a", "#d49a78", "#d8737a", "#b59ad4"];
@@ -346,7 +347,6 @@ async function restoreClosed(count) {
   for (let i = 0; i < count; i++) await chrome.sessions.restore().catch(() => {});
 }
 
-
 async function loadBookmarkTitles() {
   const titles = new Map();
   const walk = (nodes) => {
@@ -407,7 +407,8 @@ function setupPageDrop() {
     ]);
     const windows = all.filter((w) => w.incognito === incognito).map((w) => {
       const active = w.tabs.find((t) => t.active) ?? null;
-      return { id: w.id, title: active?.title ?? "", active };
+      const own = w.id === windowId && dragged ? partnerFor(dragged, visibleTabs(spaces, w.tabs, windowId)) : null;
+      return { id: w.id, title: active?.title ?? "", active, own };
     });
     return { id, dragged, windows, target: null, zone: "", zones: "" };
   }
@@ -418,7 +419,7 @@ function setupPageDrop() {
     if (found && !over) return null;
     const other = over && chromeWindowFor(over, drag.windows);
     if (other && other.id !== windowId) return { window: other.id, x: found.x - over.x, y: found.y - over.y, partner: other.active };
-    return { window: windowId, x, y, partner: drag.windows.find((w) => w.id === windowId)?.active ?? null };
+    return { window: windowId, x, y, partner: drag.windows.find((w) => w.id === windowId)?.own ?? null };
   }
 
   async function update(x, y) {
@@ -710,7 +711,8 @@ address.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
   const nav = toNavigation(address.value);
   const tab = await activeTab();
-  const resolved = nav.kind === "search" && logposePrivate ? await call("resolveInput", windowId, nav.text).catch(() => null) : null;
+  const engine = incognito ? settings.privateSearchEngine : "";
+  const resolved = nav.kind === "search" && logposePrivate ? await call("resolveInput", windowId, nav.text, ...(engine ? [engine] : [])).catch(() => null) : null;
   if (nav.kind === "url") chrome.tabs.update(tab.id, { url: nav.url });
   else if (resolved) chrome.tabs.update(tab.id, { url: resolved.url });
   else chrome.search.query({ text: nav.text, tabId: tab.id });
@@ -799,13 +801,41 @@ async function archiveTabs(tabs, reason) {
   await chrome.tabs.remove(tabs.map((t) => t.id));
 }
 
-async function clearToday() {
+async function clearableTabs() {
   const kept = keptIds();
-  const tabs = visibleTabs(spaces, await chrome.tabs.query({ windowId, pinned: false, active: false }), windowId).filter((t) => !kept.has(t.id));
+  return visibleTabs(spaces, await chrome.tabs.query({ windowId, pinned: false, active: false }), windowId).filter((t) => !kept.has(t.id));
+}
+
+async function clearToday() {
+  const tabs = await clearableTabs();
   if (tabs.length) archiveTabs(tabs, "clear");
 }
 
-document.getElementById("clear-today").onclick = clearToday;
+const clearButton = document.getElementById("clear-today");
+let clearArmed = 0;
+
+function disarmClear() {
+  clearTimeout(clearArmed);
+  clearArmed = 0;
+  clearButton.classList.remove("clear--armed");
+  clearButton.lastChild.textContent = "Limpar";
+  clearButton.querySelector(".k-icon").textContent = glyph("arrow-down");
+}
+
+clearButton.onclick = async () => {
+  if (clearArmed) {
+    disarmClear();
+    return clearToday();
+  }
+  const count = (await clearableTabs()).length;
+  if (!count) return;
+  clearButton.classList.add("clear--armed");
+  clearButton.lastChild.textContent = count === 1 ? "Fechar 1 aba?" : `Fechar ${count} abas?`;
+  clearButton.querySelector(".k-icon").textContent = glyph("x");
+  pop(clearButton);
+  clearArmed = setTimeout(disarmClear, 3000);
+};
+clearButton.onmouseleave = () => { if (clearArmed) disarmClear(); };
 
 const archivePanel = setupArchive({ popover: document.getElementById("archive-popover"), reopen });
 
@@ -859,6 +889,8 @@ const extensions = setupExtensions({
   popover: document.getElementById("extensions-popover"),
   windowId: () => windowId,
 });
+
+setupPopups();
 
 const player = setupPlayer({
   root: document.getElementById("player"),
@@ -1118,4 +1150,7 @@ for (const tab of windowTabs) {
 }
 applySettings();
 restoreCrashedSession();
-if ((await chrome.storage.local.get("sidebarCollapsed")).sidebarCollapsed) setSidebarMode("collapsed");
+if ((await chrome.storage.local.get("sidebarCollapsed")).sidebarCollapsed) {
+  paintSidebarMode("collapsed");
+  setSidebarMode("collapsed");
+}
