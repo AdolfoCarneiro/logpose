@@ -21,7 +21,7 @@ import { setupContainerEditor } from "./container-editor.js";
 import { dropTab, joinWindow } from "./split-drop.js";
 import { windowAt, chromeWindowFor, zonesFor } from "./drag-model.js";
 import { iconChoices } from "./icons-model.js";
-import { nextGroupName } from "./containers-model.js";
+import { nextGroupName, strayTab } from "./containers-model.js";
 import { setupDownloads } from "./downloads.js";
 import { setupPins } from "./pins.js";
 import { setupPlayer } from "./player.js";
@@ -337,7 +337,7 @@ async function moveTabsToSpace(ids, spaceId) {
   if (active && spaceOfTab(spaces, active.id, windowId) !== current) {
     const rest = visibleTabs(spaces, await chrome.tabs.query({ windowId }), windowId);
     if (rest.length) await chrome.tabs.update(rest[0].id, { active: true });
-    else await chrome.tabs.create({ windowId });
+    else await blankTab(current, true);
   }
   render();
 }
@@ -603,7 +603,7 @@ async function switchSpace(spaceId, direction = 0) {
   const visible = visibleTabs(spaces, tabs, windowId);
   const target = visible.find((t) => t.id === spaces.lastTab[spaceId]) ?? visible[0];
   if (target) await chrome.tabs.update(target.id, { active: true });
-  else await chrome.tabs.create({ windowId });
+  else await blankTab(spaceId, true);
   if (direction) animate(content, [{ opacity: 0, transform: `translateX(${direction * 36}px)` }, { opacity: 1, transform: "none" }], "spatial-default");
   render();
 }
@@ -735,6 +735,18 @@ let groupTab = null;
 async function blankTab(spaceId, active) {
   const session = containers.available && !incognito ? sessionOfSpace(spaces, spaceId) : "";
   return session ? containers.open({ container: session, active }) : (await chrome.tabs.create({ windowId, active })).id;
+}
+
+// aba aberta por fora da barra (Chromium, outro app) cai nos cookies do
+// perfil; num espaço com sessão própria ela é reaberta dentro da sessão
+async function straysFromSession(tab) {
+  const session = currentSession();
+  if (!session) return false;
+  await containers.load();
+  if (!strayTab(tab, session, containers.sessionOfTab(tab.id), chrome.runtime.getURL("newtab.html"))) return false;
+  const id = await containers.reopen(tab, session);
+  if (!spaces.tabSpace[id]) await moveTabToSpace(id, activeSpace(spaces, windowId).id);
+  return true;
 }
 
 async function newTabInGroup(groupId) {
@@ -877,6 +889,7 @@ document.addEventListener("wheel", (e) => {
 }, { passive: true });
 
 chrome.tabs.onCreated.addListener(async (tab) => {
+  if (ready && tab.windowId === windowId && !spaces.tabSpace[tab.id] && await straysFromSession(tab)) return;
   if (ready && tab.windowId === windowId && !spaces.tabSpace[tab.id]) await moveTabToSpace(tab.id, activeSpace(spaces, windowId).id);
   if (tab.windowId === windowId && tab.groupId > 0) await evictStrays();
   render();

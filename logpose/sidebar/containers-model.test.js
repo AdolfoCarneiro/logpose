@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   loadContainers, createContainer, updateContainer, deleteContainer, membership, containerSnapshot, lostTabs, slug, DEFAULT_CONTAINERS,
-  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle, nextGroupName,
+  addPage, removePage, updatePage, findPage, toggleGroup, pageIds, pagesOf, restorePages, pageTitle, nextGroupName, strayTab,
 } from "./containers-model.js";
 
 test("sem nada salvo vêm Trabalho e Pessoal; lista salva vazia continua vazia", () => {
@@ -89,4 +89,16 @@ test("a página do grupo mostra o nome dado, o salvo ou o do favorito antes da U
 test("nome padrão do grupo é o menor número livre", () => {
   assert.equal(nextGroupName([]), "Grupo 1");
   assert.equal(nextGroupName([{ name: "Grupo 1" }, { name: "Grupo 3" }]), "Grupo 2");
+});
+
+test("aba nova nos cookies do perfil é reaberta na sessão do espaço", () => {
+  const ntp = "chrome-extension://abc/newtab.html";
+  assert.equal(strayTab({ url: "", pendingUrl: "https://claude.ai/" }, "trabalho", "", ntp), true);
+  assert.equal(strayTab({ url: "chrome://newtab/" }, "trabalho", "", ntp), true);
+  assert.equal(strayTab({ url: `${ntp}#x` }, "trabalho", "", ntp), true);
+  assert.equal(strayTab({ url: "" }, "trabalho", "", ntp), true);
+  assert.equal(strayTab({ url: "https://claude.ai/" }, "trabalho", "trabalho", ntp), false);
+  assert.equal(strayTab({ url: "https://claude.ai/" }, "trabalho", "outro", ntp), false);
+  assert.equal(strayTab({ url: "https://claude.ai/" }, "", "", ntp), false);
+  assert.equal(strayTab({ url: "chrome://settings/" }, "trabalho", "", ntp), false);
 });

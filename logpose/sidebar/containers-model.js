@@ -128,3 +128,11 @@ export function restorePages(tabs, shot, list) {
   }
   return live;
 }
+
+// aba nova que nasceu fora da sessão do espaço (aba vazia aberta pelo
+// Chromium, link vindo de outro app): tem que ser reaberta dentro dela
+export function strayTab(tab, session, tabSession, newTabUrl = "") {
+  if (!session || tabSession) return false;
+  const url = tab.url || tab.pendingUrl || "";
+  return url === "" || /^https?:/.test(url) || /^chrome:\/\/newtab\/?$/.test(url) || (newTabUrl !== "" && url.startsWith(newTabUrl));
+}
