@@ -1,4 +1,4 @@
-import { glyph } from "./kurobe/icons.mjs";
+import { faviconImg } from "./favicon.js";
 
 function dayLabel(time, now = new Date()) {
   const day = new Date(time);
@@ -28,11 +28,7 @@ export function setupArchive({ popover, reopen }) {
       li.title = entry.url;
       const leading = document.createElement("span");
       leading.className = "k-list-item__leading";
-      const img = document.createElement("img");
-      img.alt = "";
-      img.src = entry.favIconUrl || "";
-      img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("globe") }));
-      leading.append(img);
+      leading.append(faviconImg(entry.favIconUrl, entry.url));
       const title = Object.assign(document.createElement("span"), { className: "k-list-item__label", textContent: entry.title });
       li.append(leading, title);
       li.onclick = async (e) => {

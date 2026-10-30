@@ -2,16 +2,10 @@ import { glyph } from "./kurobe/icons.mjs";
 import { showMenu } from "./context-menu.js";
 import { pop } from "./motion.js";
 import { call } from "./logpose-private.js";
+import { faviconImg } from "./favicon.js";
 import {
   pinId, find, parentOf, links, addLink, addFolder, remove, rename, setUrl, toggle, move, place, drifted, prune, tabOf, pinSnapshot, restoreLive, rekey,
 } from "./pins-model.js";
-
-function faviconFor(url) {
-  const src = new URL(chrome.runtime.getURL("/_favicon/"));
-  src.searchParams.set("pageUrl", url);
-  src.searchParams.set("size", "64");
-  return src.toString();
-}
 
 function icon(name) {
   return Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(name) });
@@ -192,9 +186,7 @@ export function setupPins({ section, grid, windowId, spaceId, assign, container,
     const li = document.createElement("li");
     li.className = "ess k-state" + (tab ? "" : " ess--closed") + (tab && tab.id === activeId ? " ess--active" : "");
     li.title = node.title;
-    const img = Object.assign(document.createElement("img"), { alt: "", src: tab?.favIconUrl || faviconFor(node.url) });
-    img.onerror = () => img.replaceWith(icon("globe"));
-    li.append(img);
+    li.append(faviconImg(tab?.favIconUrl, tab?.url || node.url, 64));
     if (tab && drifted(node.url, tab.url)) {
       const back = document.createElement("button");
       back.className = "ess-back k-state";

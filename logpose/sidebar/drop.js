@@ -1,4 +1,5 @@
 import { glyph } from "./kurobe/icons.mjs";
+import { faviconImg } from "./favicon.js";
 
 const ZONES = {
   left: ["panel-left", "Dividir à esquerda"],
@@ -12,18 +13,9 @@ const label = document.querySelector(".label");
 const pair = document.querySelector(".pair");
 const FIRST = new Set(["left", "top"]);
 
-function faviconFor(url) {
-  const src = new URL(chrome.runtime.getURL("/_favicon/"));
-  src.searchParams.set("pageUrl", url);
-  src.searchParams.set("size", "32");
-  return src.toString();
-}
-
 function chip(tab) {
   const el = Object.assign(document.createElement("span"), { className: "chip k-type-label" });
-  const img = Object.assign(document.createElement("img"), { alt: "", src: tab.favIconUrl || faviconFor(tab.url || tab.pendingUrl || "") });
-  img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("globe") }));
-  el.append(img, Object.assign(document.createElement("span"), { className: "chip__title", textContent: tab.title || tab.url || "" }));
+  el.append(faviconImg(tab.favIconUrl, tab.url || tab.pendingUrl || ""), Object.assign(document.createElement("span"), { className: "chip__title", textContent: tab.title || tab.url || "" }));
   return el;
 }
 

@@ -4,18 +4,12 @@ import { showMenu } from "./context-menu.js";
 import { animate, pop } from "./motion.js";
 import { call } from "./logpose-private.js";
 import { faviconOf } from "./tabs-model.js";
+import { faviconImg } from "./favicon.js";
 import { pinId, drifted, prune, tabOf, pinSnapshot, rekey } from "./pins-model.js";
 import { loadContainers, createContainer, updateContainer, CONTAINER_COLORS, CONTAINER_ICONS, pagesOf, addPage, removePage, updatePage, findPage, toggleGroup, pageIds, restorePages, pageTitle } from "./containers-model.js";
 
 function icon(name) {
   return Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph(name) });
-}
-
-function faviconFor(url) {
-  const src = new URL(chrome.runtime.getURL("/_favicon/"));
-  src.searchParams.set("pageUrl", url);
-  src.searchParams.set("size", "32");
-  return src.toString();
 }
 
 function iconButton(name, title, onclick) {
@@ -239,9 +233,7 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
       loader.setAttribute("size", "18");
       leading.append(loader);
     } else {
-      const img = Object.assign(document.createElement("img"), { alt: "", src: (tab && faviconOf(tab)) || faviconFor(page.url) });
-      img.onerror = () => img.replaceWith(icon("globe"));
-      leading.append(img);
+      leading.append(faviconImg(tab && faviconOf(tab), tab?.url || page.url));
     }
     const label = Object.assign(document.createElement("span"), { className: "k-list-item__label", textContent: title });
     label.ondblclick = (e) => { e.stopPropagation(); rename(li, page, tab); };

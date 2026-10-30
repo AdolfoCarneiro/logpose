@@ -2,6 +2,7 @@ import { glyph } from "./kurobe/icons.mjs";
 import "./kurobe/loading-indicator.mjs";
 import { animate, painted, reducedMotion, spring } from "./motion.js";
 import { call } from "./logpose-private.js";
+import { faviconImg } from "./favicon.js";
 import { windowFromHash, toolbarRect, pageLabel } from "./peek-model.js";
 
 const scrim = document.getElementById("scrim");
@@ -23,13 +24,6 @@ for (const el of document.querySelectorAll("[data-icon]")) {
   icon.textContent = glyph(el.dataset.icon);
 }
 
-function faviconFor(url) {
-  const src = new URL(chrome.runtime.getURL("/_favicon/"));
-  src.searchParams.set("pageUrl", url);
-  src.searchParams.set("size", "32");
-  return src.toString();
-}
-
 function place(rect, el) {
   el.style.left = `${rect.left ?? rect.x}px`;
   el.style.top = `${rect.top ?? rect.y}px`;
@@ -47,9 +41,7 @@ function paintLeading(peek) {
     leading.replaceChildren(loader);
     return;
   }
-  const img = Object.assign(document.createElement("img"), { alt: "", src: peek.favIconUrl || faviconFor(peek.url) });
-  img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("globe") }));
-  leading.replaceChildren(img);
+  leading.replaceChildren(faviconImg(peek.favIconUrl, peek.url));
 }
 
 function render(peek) {

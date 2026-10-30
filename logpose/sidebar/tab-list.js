@@ -2,15 +2,8 @@ import { glyph } from "./kurobe/icons.mjs";
 import "./kurobe/loading-indicator.mjs";
 import { measure, flip, enter, exit, pop } from "./motion.js";
 import { splitEdges } from "./tabs-model.js";
+import { faviconImg } from "./favicon.js";
 import { ISLAND_COLORS, islandEdges, visibleItems } from "./islands-model.js";
-
-function favicon(url) {
-  const img = document.createElement("img");
-  img.alt = "";
-  img.src = url || "";
-  img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("globe") }));
-  return img;
-}
 
 export function createTabList({ list, indicator, onActivate, onClose, onMute, onRename, onContextMenu, onMove, onIslandToggle, onIslandRename, onIslandMenu, dropZone, pageDrop }) {
   const rows = new Map();
@@ -158,7 +151,7 @@ export function createTabList({ list, indicator, onActivate, onClose, onMute, on
       loader.setAttribute("size", "18");
       leading.replaceChildren(loader);
     } else {
-      leading.replaceChildren(favicon(item.favIconUrl));
+      leading.replaceChildren(faviconImg(item.favIconUrl, item.url));
       pop(leading);
     }
   }

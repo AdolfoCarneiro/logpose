@@ -2,6 +2,7 @@ import { glyph } from "./kurobe/icons.mjs";
 import "./kurobe/loading-indicator.mjs";
 import { pop } from "./motion.js";
 import { call } from "./logpose-private.js";
+import { faviconImg } from "./favicon.js";
 import { windowFromHash, pageLabel } from "./peek-model.js";
 
 const leading = document.getElementById("leading");
@@ -14,13 +15,6 @@ let windowId = null;
 for (const el of document.querySelectorAll("[data-icon]")) {
   const icon = el.classList.contains("k-icon") ? el : el.appendChild(Object.assign(document.createElement("span"), { className: "k-icon" }));
   icon.textContent = glyph(el.dataset.icon);
-}
-
-function faviconFor(url) {
-  const src = new URL(chrome.runtime.getURL("/_favicon/"));
-  src.searchParams.set("pageUrl", url);
-  src.searchParams.set("size", "32");
-  return src.toString();
 }
 
 function paintLeading(tab) {
@@ -36,9 +30,7 @@ function paintLeading(tab) {
     leading.replaceChildren(loader);
     return;
   }
-  const img = Object.assign(document.createElement("img"), { alt: "", src: tab.favIconUrl || faviconFor(url) });
-  img.onerror = () => img.replaceWith(Object.assign(document.createElement("span"), { className: "k-icon", textContent: glyph("globe") }));
-  leading.replaceChildren(img);
+  leading.replaceChildren(faviconImg(tab.favIconUrl, url));
   if (wasLoading) pop(leading);
 }
 
