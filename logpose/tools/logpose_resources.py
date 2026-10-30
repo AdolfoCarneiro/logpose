@@ -38,10 +38,13 @@ MONO_LOGOS = [
 ]
 
 
-def render(svg, target):
+def render(source, target):
     size = subprocess.run(["magick", "identify", "-format", "%w %h", str(target)], check=True, capture_output=True, text=True).stdout
     width, height = size.split()
-    subprocess.run(["rsvg-convert", "-w", height, "-h", height, "-o", str(target), str(svg)], check=True)
+    if source.suffix == ".png":
+        subprocess.run(["magick", str(source), "-filter", "Lanczos", "-resize", f"{height}x{height}", "-strip", f"PNG32:{target}"], check=True)
+    else:
+        subprocess.run(["rsvg-convert", "-w", height, "-h", height, "-o", str(target), str(source)], check=True)
     if width != height:
         subprocess.run(["magick", str(target), "-background", "none", "-gravity", "west", "-extent", f"{width}x{height}", str(target)], check=True)
 
@@ -50,7 +53,7 @@ def main(src):
     if not (src / "OWNERS").exists():
         raise SystemExit("pasta do código do Chromium errada")
     for path in PNG_LOGOS:
-        render(BRANDING / "icon.svg", src / path)
+        render(BRANDING / "icon.png", src / path)
     for path in MONO_LOGOS:
         render(BRANDING / "icon-mono.svg", src / path)
     shutil.copy(BRANDING / "icon.svg", src / "chrome/app/theme/chromium/product_logo.svg")
