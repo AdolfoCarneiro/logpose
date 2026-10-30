@@ -91,7 +91,7 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 - **Atalhos configuráveis**, procurar na página num cartão, zoom em chip no endereço, informações do site pelo cadeado, captura de tela, QR code.
 - **Funciona com o 1Password**, Widevine (streaming) e PWAs.
 
-<img src="logpose/docs/img/newtab.webp" alt="Nova aba com saudação, busca, tempo e tarefas" width="100%">
+<img src="logpose/docs/img/newtab.webp" alt="Nova aba com saudação, busca e o mercado: indicadores, ações e FIIs com o gráfico do dia" width="100%">
 
 ## Atalhos
 
