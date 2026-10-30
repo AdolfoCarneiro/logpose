@@ -32,10 +32,10 @@ export function setupContainers({ windowId }) {
     return call("createTab", options);
   }
 
-  async function reopen(tab, container) {
-    const id = await open({ url: tab.url || tab.pendingUrl, container, index: tab.index, active: tab.active, pinned: tab.pinned });
-    await chrome.tabs.remove(tab.id);
-    return id;
+  // a aba velha só fecha depois do rekey: o onRemoved poda as fixadas e o
+  // espaço dela, e o rekey não acharia mais nada pra passar pro id novo
+  function reopen(tab, container) {
+    return open({ url: tab.url || tab.pendingUrl, container, index: tab.index, active: tab.active, pinned: tab.pinned });
   }
 
   return { available, load, of, sessionOfTab, list: () => list, open, reopen };

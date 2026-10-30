@@ -149,6 +149,7 @@ async function reseat(tab, session) {
     await pins.rekey(tab.id, id);
     await groups.rekey(tab.id, id);
     if (tab.groupId > 0) await chrome.tabs.group({ groupId: tab.groupId, tabIds: [id] }).catch(() => {});
+    await chrome.tabs.remove(tab.id).catch(() => {});
     return id;
   } finally {
     reseating.delete(tab.id);
