@@ -1013,13 +1013,27 @@ chrome.tabs.onAttached.addListener(async (tabId, { newWindowId }) => {
 });
 for (const ev of ["onUpdated", "onMoved", "onAttached", "onDetached"]) chrome.tabs[ev].addListener(() => render());
 
+// as abas da restauração chegam depois de a barra abrir; quem religa espaço,
+// fixada e grupo precisa esperar por elas, senão tudo cai no espaço ativo
 async function restoreCrashedSession() {
-  if (!logposePrivate || !(await call("getCrashedSession", windowId).catch(() => false))) return;
-  call("resolveCrashedSession", windowId, true).catch(() => {});
+  if (!logposePrivate || windowId == null || !(await call("getCrashedSession", windowId).catch(() => false))) return;
+  const before = await chrome.tabs.query({ windowId });
+  await call("resolveCrashedSession", windowId, true).catch(() => {});
+  let count = before.length;
+  for (let waited = 0, still = 0; waited < 60 && (count === before.length || still < 5); waited++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const now = (await chrome.tabs.query({ windowId })).length;
+    still = now === count ? still + 1 : 0;
+    count = now;
+  }
+  if (count === before.length) return;
+  const newTab = chrome.runtime.getURL("newtab.html");
+  const blank = before.filter((t) => [newTab, "chrome://newtab/"].includes(t.url || t.pendingUrl || ""));
+  await chrome.tabs.remove(blank.map((t) => t.id)).catch(() => {});
 }
 
 chrome.commands.onCommand.addListener((command) => {
-  if (command === "session-crashed") restoreCrashedSession();
+  if (command === "session-crashed" && ready) restoreCrashedSession();
 });
 
 async function setSidebarMode(mode) {
@@ -1153,6 +1167,7 @@ const currentWindow = await chrome.windows.getCurrent();
 windowId = currentWindow.id;
 incognito = currentWindow.incognito;
 document.body.classList.toggle("incognito", incognito);
+await restoreCrashedSession();
 settings = loadSettings((await chrome.storage.local.get("settings")).settings);
 const stored = await chrome.storage.local.get(["spaces", "spaceSnapshot"]);
 if (stored.spaces?.spaces?.length) spaces = withSessions({ ...initialState(), ...stored.spaces, tabSpace: stored.spaces.tabSpace ?? {}, tabTitle: stored.spaces.tabTitle ?? {} });
