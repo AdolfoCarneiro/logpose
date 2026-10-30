@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { greeting, parseNews, ago, weatherIcon, hourly, shortcuts, parseTickers, tickerLabel, quoteFromChart, money, points, percent } from "./newtab-model.js";
+import { greeting, parseNews, ago, weatherIcon, shortcuts, parseTickers, tickerLabel, quoteFromChart, assetName, sparkPath, money, points, percent } from "./newtab-model.js";
 
 test("a saudação segue a hora do dia", () => {
   assert.equal(greeting(6), "Bom dia");
@@ -33,12 +33,6 @@ test("o código do tempo vira ícone, de dia e de noite", () => {
   assert.equal(weatherIcon(95), "cloud-lightning");
 });
 
-test("a previsão por hora começa na hora atual", () => {
-  const forecast = { hourly: { time: ["2026-10-26T13:00", "2026-10-26T14:00", "2026-10-26T15:00"], temperature_2m: [24.4, 25.6, 26.1], weather_code: [0, 2, 3], is_day: [1, 1, 1] } };
-  const hours = hourly(forecast, Date.parse("2026-10-26T14:30"), 2);
-  assert.deepEqual(hours.map((h) => [h.hour, h.temp, h.code]), [[14, 26, 2], [15, 26, 3]]);
-});
-
 test("os atalhos juntam fixadas e mais visitados sem repetir", () => {
   const pinned = [{ url: "https://youtube.com/", title: "YouTube" }];
   const top = [{ url: "https://youtube.com", title: "YT" }, { url: "chrome://history", title: "x" }, { url: "https://github.com/", title: "" }];
@@ -58,11 +52,29 @@ test("as ações escritas viram tickers do Yahoo, B3 com .SA", () => {
 
 test("a cotação sai do chart do Yahoo com a variação do dia", () => {
   const chart = (meta) => ({ chart: { result: [{ meta }] } });
-  assert.deepEqual(quoteFromChart(chart({ symbol: "^BVSP", regularMarketPrice: 170433.92, regularMarketChangePercent: -0.335, currency: "BRL" })), { symbol: "^BVSP", price: 170433.92, change: -0.335, currency: "BRL" });
+  assert.deepEqual(quoteFromChart(chart({ symbol: "^BVSP", longName: "IBOVESPA", regularMarketPrice: 170433.92, regularMarketChangePercent: -0.335, currency: "BRL" })), { symbol: "^BVSP", name: "IBOVESPA", fund: false, price: 170433.92, change: -0.335, currency: "BRL", spark: [] });
   const q = quoteFromChart(chart({ symbol: "PETR4.SA", regularMarketPrice: 52.96, chartPreviousClose: 50, currency: "BRL" }));
   assert.ok(Math.abs(q.change - 5.92) < 1e-9);
   assert.equal(quoteFromChart({ chart: { result: null } }), null);
+  const fii = quoteFromChart({ chart: { result: [{ meta: { symbol: "MXRF11.SA", longName: "Maxi Renda Fundo De Investimento Imobiliaro - FII", shortName: "FII MAXI RENCI", regularMarketPrice: 8.89 }, indicators: { quote: [{ close: [8.9, null, 8.88, 8.89] }] } }] } });
+  assert.equal(fii.fund, true);
+  assert.equal(fii.name, "Maxi Renda");
+  assert.deepEqual(fii.spark, [8.9, 8.88, 8.89]);
   assert.equal(quoteFromChart(chart({ symbol: "X" })), null);
+});
+
+test("o nome do papel sai sem S.A. e sem o \"Fundo de Investimento Imobiliário\"", () => {
+  assert.equal(assetName("Engie Brasil Energia S.A."), "Engie Brasil Energia");
+  assert.equal(assetName("Cshg Logistica - Fundo De Investimento Imobiliario"), "Cshg Logistica");
+  assert.equal(assetName("Xp Malls Fundo Investimentos Imobiliarios"), "Xp Malls");
+  assert.equal(assetName("Kinea Renda Imobiliária Fundo de Investimento Imobiliário"), "Kinea Renda Imobiliária");
+  assert.equal(assetName(""), "");
+});
+
+test("o gráfico do dia ocupa a caixa toda", () => {
+  assert.equal(sparkPath([1, 3, 2], 100, 20), "M0 20L50 0L100 10");
+  assert.equal(sparkPath([5, 5], 10, 4), "M0 2L10 2");
+  assert.equal(sparkPath([5], 10, 4), "");
 });
 
 test("valores do mercado no jeito brasileiro", () => {

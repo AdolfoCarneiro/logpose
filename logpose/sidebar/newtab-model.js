@@ -67,18 +67,6 @@ export function weatherLabel(code) {
   return "Nublado";
 }
 
-export function hourly(forecast, now, count = 12) {
-  const times = forecast?.hourly?.time ?? [];
-  const start = times.findIndex((t) => Date.parse(t) + 3600000 > now);
-  if (start < 0) return [];
-  return times.slice(start, start + count).map((t, i) => ({
-    hour: new Date(Date.parse(t)).getHours(),
-    temp: Math.round(forecast.hourly.temperature_2m[start + i]),
-    code: forecast.hourly.weather_code[start + i],
-    day: Boolean(forecast.hourly.is_day?.[start + i] ?? 1),
-  }));
-}
-
 export function shortcuts(pinned, top, max = 10) {
   const seen = new Set();
   const out = [];
@@ -109,15 +97,33 @@ export function tickerLabel(symbol) {
   return symbol.replace(/\.SA$/, "");
 }
 
-// cotação do chart do Yahoo (range=1d): preço e variação do dia
+// "Engie Brasil Energia S.A." → "Engie Brasil Energia"; "Xp Log Fundo Investimento Imobiliario FII" → "Xp Log"
+export function assetName(longName) {
+  return String(longName ?? "").replace(/[\s-]*fundo\b.*$/i, "").replace(/,?\s+S\.?\/?A\.?$/i, "").trim();
+}
+
+// cotação do chart do Yahoo (range=1d): preço, variação do dia e os fechamentos do dia pro gráfico;
+// FII é o que o Yahoo chama de fundo no nome
 export function quoteFromChart(json) {
-  const meta = json?.chart?.result?.[0]?.meta;
+  const result = json?.chart?.result?.[0];
+  const meta = result?.meta;
   if (!meta || typeof meta.regularMarketPrice !== "number") return null;
   const previous = meta.chartPreviousClose ?? meta.previousClose;
   const change = typeof meta.regularMarketChangePercent === "number"
     ? meta.regularMarketChangePercent
     : previous ? (meta.regularMarketPrice / previous - 1) * 100 : null;
-  return { symbol: meta.symbol, price: meta.regularMarketPrice, change, currency: meta.currency || "BRL" };
+  const fund = /\bfundo\b/i.test(meta.longName ?? "") || /^FII\b/.test(meta.shortName ?? "");
+  const spark = (result.indicators?.quote?.[0]?.close ?? []).filter((v) => typeof v === "number");
+  return { symbol: meta.symbol, name: assetName(meta.longName), fund, price: meta.regularMarketPrice, change, currency: meta.currency || "BRL", spark };
+}
+
+// caminho SVG da linha dos valores numa caixa w × h (o maior em cima); menos de 2 pontos, nada
+export function sparkPath(values, w, h) {
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const span = Math.max(...values) - min;
+  const round = (n) => Math.round(n * 10) / 10;
+  return values.map((v, i) => `${i ? "L" : "M"}${round((i / (values.length - 1)) * w)} ${round(span ? h - ((v - min) / span) * h : h / 2)}`).join("");
 }
 
 export function money(value, currency = "BRL") {

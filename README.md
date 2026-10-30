@@ -41,7 +41,7 @@ O Chromium guarda abas numa faixa no topo, configurações em dois lugares e tra
 
 **Spotlight**
 
-Ctrl+T e Ctrl+L abrem uma busca única: no topo a busca, o site que você já visita completado e as sugestões do buscador; embaixo, Abas, Favoritos e Histórico em seções. Aliases como `a`, `f`, `h` e `yt` restringem a busca. A aba nova abre com a página inicial (saudação, tempo, tarefas, mercado e notícias); é só começar a digitar pra buscar.
+Ctrl+T e Ctrl+L abrem uma busca única: no topo a busca, o site que você já visita completado e as sugestões do buscador; embaixo, Abas, Favoritos e Histórico em seções. Aliases como `a`, `f`, `h` e `yt` restringem a busca. A aba nova abre com a página inicial (saudação, tempo, mercado e notícias); é só começar a digitar pra buscar.
 
 
 </td>
@@ -84,7 +84,7 @@ Ctrl+clique e Shift+clique marcam abas; o menu vale pra todas: fechar, mover de 
 - **Ilhas**: botão direito numa aba, "Nova ilha", e as abas ficam juntas na lista com uma cor; nome e cor se troca no cabeçalho. Fechou as abas, a ilha some.
 - **Grupos**: abas salvas num grupo recolhível na barra, que voltam ao reabrir. "Novo grupo" no menu da aba cria na hora; nome, cor e ícone se trocam no cabeçalho.
 - **Mini player**: o que toca em outra aba aparece no pé da barra, com tocar/pausar, próxima e picture-in-picture.
-- **Nova aba** com saudação, tempo, atalhos, tarefas e notícias.
+- **Nova aba** com saudação, tempo, atalhos, mercado (indicadores, ações e FIIs) e notícias.
 - **Tema do sistema**: segue as cores do denden e a transparência do material, no claro e no escuro.
 - **Janela pequena**: links vindos de outros apps abrem numa janela compacta; "Abrir no Log Pose" leva pra janela principal.
 - **Volta de onde parou**: abas, espaços e nomes de aba voltam ao reabrir, até depois de uma falha.

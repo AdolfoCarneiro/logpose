@@ -33,40 +33,30 @@
 
     <nav id="shortcuts" class="shortcuts" aria-label="Atalhos"></nav>
 
-    <section id="row" class="row">
-      <article id="weather" class="card weather" hidden>
-        <header class="card__head">
-          <span class="k-icon" data-icon="map-pin"></span>
-          <h2 id="weather-title" class="k-type-panel">Tempo</h2>
-        </header>
-        <p id="weather-empty" class="k-type-caption hint" hidden>Escolha a cidade no denden (<code>denden-weather-location</code>) pra ver a previsão.</p>
-        <ol id="hours" class="hours"></ol>
-      </article>
-
-      <article id="tasks" class="card tasks" hidden>
-        <header class="card__head">
-          <span class="k-icon" data-icon="list-todo"></span>
-          <h2 class="k-type-panel">Tarefas</h2>
-          <button id="tasks-clear" class="k-button k-button--text k-type-button" type="button" hidden>Limpar concluídas</button>
-        </header>
-        <form id="task-form" class="task-form">
-          <input id="task-input" class="k-text-field k-type-label" placeholder="Nova tarefa" autocomplete="off" maxlength="200">
-          <button class="task-add k-icon-button k-state" type="submit" title="Adicionar" data-icon="plus"></button>
-        </form>
-        <p id="tasks-empty" class="k-type-caption hint">Nada pendente.</p>
-        <ul id="task-list" class="task-list"></ul>
-      </article>
-    </section>
-
     <section id="market" class="market" hidden>
       <header class="news__head">
         <h2 class="section-title">Mercado</h2>
         <button id="market-refresh" class="k-icon-button k-state" type="button" title="Atualizar" data-icon="rotate-cw"></button>
       </header>
       <div id="market-state" class="news__state"></div>
-      <div id="market-list" class="market__list"></div>
-      <div id="market-mine" class="market__list"></div>
-      <button id="market-add" class="k-button k-button--text k-type-button market__add" type="button" hidden>Escolher minhas ações</button>
+      <div id="market-list" class="indicators"></div>
+      <div class="holdings">
+        <article id="stocks" class="card holding" hidden>
+          <header class="card__head">
+            <span class="k-icon" data-icon="chart-candlestick"></span>
+            <h2 class="k-type-panel">Ações</h2>
+          </header>
+          <ul id="stocks-list" class="assets"></ul>
+        </article>
+        <article id="funds" class="card holding" hidden>
+          <header class="card__head">
+            <span class="k-icon" data-icon="building-2"></span>
+            <h2 class="k-type-panel">FIIs</h2>
+          </header>
+          <ul id="funds-list" class="assets"></ul>
+        </article>
+      </div>
+      <button id="market-add" class="k-button k-button--text k-type-button market__add" type="button" hidden>Escolher ações e FIIs</button>
     </section>
 
     <section id="news" class="news" hidden>

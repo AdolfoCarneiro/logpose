@@ -4,7 +4,7 @@ import { current, label } from "./shortcuts-model.js";
 import { available as logposePrivate, call } from "./logpose-private.js";
 import { loadSettings } from "./settings-model.js";
 import { links } from "./pins-model.js";
-import { greeting, fullDate, parseNews, ago, weatherIcon, weatherLabel, hourly, shortcuts, parseTickers, tickerLabel, quoteFromChart, money, points, percent } from "./newtab-model.js";
+import { greeting, fullDate, parseNews, ago, weatherIcon, weatherLabel, shortcuts, parseTickers, tickerLabel, quoteFromChart, sparkPath, money, points, percent } from "./newtab-model.js";
 
 const NEWS_URL = "https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-419";
 const FRESH = 30 * 60 * 1000;
@@ -12,7 +12,7 @@ const MARKET_FRESH = 5 * 60 * 1000;
 const MARKET_RETRY = 30 * 1000;
 const DOLLAR_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL";
 const SELIC_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json";
-const chartUrl = (symbol) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+const chartUrl = (symbol) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=15m`;
 const LOGPOSE = "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/";
 const $ = (id) => document.getElementById(id);
 const themeStyle = $("logpose-theme");
@@ -36,7 +36,7 @@ function el(tag, className, text) {
 }
 
 const tab = await chrome.tabs.getCurrent();
-const stored = await chrome.storage.local.get(["settings", "shortcuts", "spaces", "pins", "tasks", "newsCache", "weatherCache", "marketCache"]);
+const stored = await chrome.storage.local.get(["settings", "shortcuts", "spaces", "pins", "newsCache", "weatherCache", "marketCache"]);
 const settings = loadSettings(stored.settings);
 
 function paintClock() {
@@ -112,70 +112,17 @@ async function cached(key, url, parse) {
   return data;
 }
 
+// o tempo de agora fica no topo, ao lado da saudação; sem cidade escolhida no denden, nada
 async function paintWeather(place) {
-  if (!place) {
-    $("weather-empty").hidden = false;
-    return;
-  }
-  $("weather-title").textContent = place.name ? `Tempo em ${place.name}` : "Tempo";
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code,is_day&forecast_days=2&timezone=auto`;
-  const forecast = await cached("weatherCache", url, JSON.parse).catch(() => null);
-  if (!forecast) {
-    $("weather-empty").textContent = "Não deu pra buscar a previsão agora.";
-    $("weather-empty").hidden = false;
-    return;
-  }
-  const now = forecast.current;
-  if (now) {
-    $("now-icon").textContent = glyph(weatherIcon(now.weather_code, Boolean(now.is_day)));
-    $("now-temp").textContent = `${Math.round(now.temperature_2m)}°`;
-    $("now-label").textContent = [weatherLabel(now.weather_code), place.name].filter(Boolean).join(" · ");
-    $("now").hidden = false;
-  }
-  $("hours").replaceChildren(...hourly(forecast, Date.now()).map((h, i) => {
-    const li = el("li", "hour");
-    li.append(el("span", "hour__time k-type-caption", i === 0 ? "Agora" : `${h.hour}h`), Object.assign(el("span", "k-icon"), { textContent: glyph(weatherIcon(h.code, h.day)) }), el("span", "hour__temp k-type-label", `${h.temp}°`));
-    return li;
-  }));
+  if (!place) return;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code,is_day&timezone=auto`;
+  const now = (await cached("weatherCache", url, JSON.parse).catch(() => null))?.current;
+  if (!now) return;
+  $("now-icon").textContent = glyph(weatherIcon(now.weather_code, Boolean(now.is_day)));
+  $("now-temp").textContent = `${Math.round(now.temperature_2m)}°`;
+  $("now-label").textContent = [weatherLabel(now.weather_code), place.name].filter(Boolean).join(" · ");
+  $("now").hidden = false;
 }
-
-let tasks = Array.isArray(stored.tasks) ? stored.tasks : [];
-
-async function saveTasks(next) {
-  tasks = next;
-  await chrome.storage.local.set({ tasks });
-  paintTasks();
-}
-
-function paintTasks() {
-  $("tasks-empty").hidden = tasks.length > 0;
-  $("tasks-clear").hidden = !tasks.some((t) => t.done);
-  $("task-list").replaceChildren(...tasks.map((task) => {
-    const li = el("li", `task${task.done ? " task--done" : ""}`);
-    const check = el("button", "task__check k-state");
-    check.type = "button";
-    const box = el("span", "task__box");
-    box.append(Object.assign(el("span", "k-icon"), { textContent: glyph("check") }));
-    check.append(box, el("span", "task__text k-type-body", task.text));
-    check.onclick = () => saveTasks(tasks.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
-    const remove = el("button", "task__remove k-icon-button k-icon-button--small k-state");
-    remove.type = "button";
-    remove.title = "Apagar";
-    remove.append(Object.assign(el("span", "k-icon"), { textContent: glyph("x") }));
-    remove.onclick = () => saveTasks(tasks.filter((t) => t.id !== task.id));
-    li.append(check, remove);
-    return li;
-  }));
-}
-
-$("task-form").onsubmit = (e) => {
-  e.preventDefault();
-  const text = $("task-input").value.trim();
-  if (!text) return;
-  $("task-input").value = "";
-  saveTasks([...tasks, { id: `t${Date.now().toString(36)}`, text, done: false }]);
-};
-$("tasks-clear").onclick = () => saveTasks(tasks.filter((t) => !t.done));
 
 async function paintNews(force = false) {
   const state = $("news-state");
@@ -225,7 +172,7 @@ function withPrevious(fresh, previous, expected) {
 // dólar, Selic, Ibovespa, S&P 500 e as ações escolhidas; o que falhar fica com o último valor bom
 // e o mercado tenta de novo em 30 s em vez de 5 min
 async function marketSnapshot(tickers, force) {
-  const key = tickers.join(",");
+  const key = `v2|${tickers.join(",")}`;
   const hit = stored.marketCache;
   if (!force && hit?.key === key && Date.now() - hit.at < (hit.partial ? MARKET_RETRY : MARKET_FRESH)) return hit.data;
   const [dollar, selic, ibov, sp500, ...mine] = await Promise.allSettled([
@@ -238,10 +185,10 @@ async function marketSnapshot(tickers, force) {
     indicators: [
       usd && { name: "Dólar", value: money(Number(usd.bid)), change: Number(usd.pctChange), query: "dólar hoje" },
       rate && { name: "Selic", value: `${String(rate).replace(".", ",")}% a.a.`, query: "taxa selic" },
-      value(ibov) && { name: "Ibovespa", value: `${points(value(ibov).price)} pts`, change: value(ibov).change, query: "ibovespa" },
-      value(sp500) && { name: "S&P 500", value: `${points(value(sp500).price)} pts`, change: value(sp500).change, query: "s&p 500" },
+      value(ibov) && { name: "Ibovespa", value: `${points(value(ibov).price)} pts`, change: value(ibov).change, spark: value(ibov).spark, query: "ibovespa" },
+      value(sp500) && { name: "S&P 500", value: `${points(value(sp500).price)} pts`, change: value(sp500).change, spark: value(sp500).spark, query: "s&p 500" },
     ].filter(Boolean),
-    mine: mine.map(value).filter(Boolean).map((q) => ({ name: tickerLabel(q.symbol), value: money(q.price, q.currency), change: q.change, query: `${tickerLabel(q.symbol)} cotação` })),
+    mine: mine.map(value).filter(Boolean).map((q) => ({ name: tickerLabel(q.symbol), title: q.name, fund: q.fund, value: money(q.price, q.currency), change: q.change, spark: q.spark, query: `${tickerLabel(q.symbol)} cotação` })),
   };
   const partial = data.indicators.length < 4 || data.mine.length < tickers.length;
   data.indicators = withPrevious(data.indicators, hit?.data?.indicators, ["Dólar", "Selic", "Ibovespa", "S&P 500"]);
@@ -252,15 +199,74 @@ async function marketSnapshot(tickers, force) {
   return data;
 }
 
-function quoteTile(quote) {
-  const a = el("a", "quote");
+const SVG = "http://www.w3.org/2000/svg";
+
+function direction(change) {
+  return change > 0 ? "up" : change < 0 ? "down" : "flat";
+}
+
+function changeChip(change) {
+  if (typeof change !== "number") return null;
+  return el("span", `chip chip--${direction(change)} k-type-caption`, percent(change));
+}
+
+// linha do dia com a área embaixo, na cor da variação; estica na largura que tiver
+function sparkline(values, change, className) {
+  const w = 100, h = 32;
+  const line = sparkPath(values ?? [], w, h);
+  if (!line) return null;
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("class", `spark spark--${direction(change)} ${className}`);
+  svg.setAttribute("viewBox", `0 -2 ${w} ${h + 4}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("aria-hidden", "true");
+  const area = document.createElementNS(SVG, "path");
+  area.setAttribute("class", "spark__area");
+  area.setAttribute("d", `${line}L${w} ${h + 2}L0 ${h + 2}Z`);
+  const stroke = document.createElementNS(SVG, "path");
+  stroke.setAttribute("class", "spark__line");
+  stroke.setAttribute("d", line);
+  svg.append(area, stroke);
+  return svg;
+}
+
+function searchLink(quote, className) {
+  const a = el("a", className);
   a.href = `https://www.google.com/search?q=${encodeURIComponent(quote.query)}`;
-  a.append(el("span", "quote__name k-type-caption", quote.name), el("span", "quote__value", quote.value));
-  if (typeof quote.change === "number") {
-    const dir = quote.change > 0 ? " quote__change--up" : quote.change < 0 ? " quote__change--down" : "";
-    a.append(el("span", `quote__change k-type-caption${dir}`, `${percent(quote.change)} hoje`));
-  }
   return a;
+}
+
+function indicatorTile(quote) {
+  const a = searchLink(quote, "indicator");
+  const head = el("span", "indicator__head");
+  head.append(el("span", "indicator__name k-type-caption", quote.name));
+  const chip = changeChip(quote.change);
+  if (chip) head.append(chip);
+  a.append(head, el("span", "indicator__value", quote.value));
+  const spark = sparkline(quote.spark, quote.change, "indicator__spark");
+  if (spark) a.append(spark);
+  return a;
+}
+
+function assetRow(quote) {
+  const li = el("li");
+  const a = searchLink(quote, "asset k-state");
+  if (quote.title) a.title = quote.title;
+  const id = el("span", "asset__id");
+  id.append(el("span", "asset__ticker k-type-label", quote.name));
+  if (quote.title) id.append(el("span", "asset__name k-type-caption", quote.title));
+  const price = el("span", "asset__price");
+  price.append(el("span", "asset__value k-type-label", quote.value));
+  const chip = changeChip(quote.change);
+  if (chip) price.append(chip);
+  a.append(id, sparkline(quote.spark, quote.change, "asset__spark") ?? el("span", "asset__spark"), price);
+  li.append(a);
+  return li;
+}
+
+function paintHoldings(id, quotes) {
+  $(id).hidden = quotes.length === 0;
+  $(`${id}-list`).replaceChildren(...quotes.map(assetRow));
 }
 
 async function paintMarket(force = false) {
@@ -271,8 +277,9 @@ async function paintMarket(force = false) {
   try {
     const data = await marketSnapshot(tickers, force);
     state.replaceChildren();
-    $("market-list").replaceChildren(...data.indicators.map(quoteTile));
-    $("market-mine").replaceChildren(...data.mine.map(quoteTile));
+    $("market-list").replaceChildren(...data.indicators.map(indicatorTile));
+    paintHoldings("stocks", data.mine.filter((q) => !q.fund));
+    paintHoldings("funds", data.mine.filter((q) => q.fund));
   } catch {
     const retry = el("button", "k-button k-button--text k-type-button", "Tentar de novo");
     retry.onclick = () => paintMarket(true);
@@ -293,12 +300,7 @@ themePort.onMessage.addListener((msg) => {
   if (msg.type === "location" && settings.newtabCards) paintWeather(msg.location);
 });
 
-if (settings.newtabCards) {
-  $("weather").hidden = false;
-  $("tasks").hidden = false;
-  paintTasks();
-  themePort.postMessage({ type: "location" });
-}
+if (settings.newtabCards) themePort.postMessage({ type: "location" });
 if (settings.newtabMarket) {
   $("market").hidden = false;
   paintMarket();
