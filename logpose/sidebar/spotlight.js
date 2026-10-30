@@ -25,6 +25,9 @@ let aliases = loadAliases(undefined);
 let alias = null;
 const suggestCache = new Map();
 let privateEngine = "";
+// o que a página inicial guardou enquanto a busca abria: o texto todo digitado até
+// agora (vale enquanto ninguém mexeu no campo daqui) e se o Enter já foi apertado
+let seeded = null;
 
 function faviconFor(url) {
   const src = new URL(chrome.runtime.getURL("/_favicon/"));
@@ -35,6 +38,7 @@ function faviconFor(url) {
 
 async function close() {
   document.body.classList.add("closed");
+  seeded = null;
   await painted();
   document.title = `logpose-spotlight:close:${Date.now()}`;
 }
@@ -156,18 +160,40 @@ function paint(next, keep) {
   moveSelection();
 }
 
+// a lista é do texto em shownFor; o Enter antes de ela alcançar o que foi digitado
+// espera a lista nova (sem esperar as sugestões da rede)
+let shownFor = null;
+
 async function refresh() {
   const text = query.value;
   const data = await sources(text, Boolean(target?.incognito));
   if (query.value !== text) return;
-  if (alias?.scope) return paint(scoped(alias.scope, text, data));
-  if (alias) return paint(text.trim() ? [{ kind: "site", title: `Buscar no ${alias.name}: “${text.trim()}”`, url: aliasUrl(alias, text) }] : []);
+  if (alias?.scope) return show(text, scoped(alias.scope, text, data));
+  if (alias) return show(text, text.trim() ? [{ kind: "site", title: `Buscar no ${alias.name}: “${text.trim()}”`, url: aliasUrl(alias, text) }] : []);
   const resolved = mayHaveKeyword(text) || privateEngine ? await resolve(text) : null;
+  if (query.value !== text) return;
   const base = { ...data, commands, resolved, hint: hintFor(text) };
-  paint(suggestions(text, base));
+  show(text, suggestions(text, base));
+  suggestMore(text, base);
+}
+
+function show(text, list) {
+  shownFor = text;
+  paint(list);
+}
+
+async function suggestMore(text, base) {
   const pending = suggestionsFor(text);
   const suggested = pending ? await pending : [];
   if (suggested.length && query.value === text && !alias) paint(suggestions(text, { ...base, suggested }), true);
+}
+
+async function submit() {
+  if (shownFor !== query.value) {
+    clearTimeout(timer);
+    await refresh();
+  }
+  run(items[selected]);
 }
 
 function resolve(text) {
@@ -236,6 +262,7 @@ async function open() {
   if (location.hash.startsWith("#idle")) return;
   document.title = "Log Pose";
   document.body.classList.remove("closed");
+  seeded = null;
   mode = location.hash.startsWith("#current") ? "current" : "new";
   const windowId = Number(location.hash.match(/^#\w+:(\d+)/)?.[1]) || (await chrome.windows.getLastFocused()).id;
   [target] = await chrome.tabs.query({ active: true, windowId });
@@ -251,11 +278,11 @@ async function open() {
   showAlias();
   query.value = mode === "current" && !empty ? displayUrl(target?.url ?? "", true) : "";
   // o que já foi digitado na página inicial antes de a busca abrir
+  shownFor = null;
+  seeded = "";
   const { spotlightSeed } = await chrome.storage.session.get("spotlightSeed");
-  if (spotlightSeed) chrome.storage.session.remove("spotlightSeed");
   query.focus();
-  if (spotlightSeed && empty) query.value = spotlightSeed;
-  else query.select();
+  if (!(spotlightSeed && empty && takeSeed(spotlightSeed))) query.select();
   for (const el of [document.getElementById("card"), document.getElementById("scrim")]) {
     el.style.animation = "none";
     void el.offsetWidth;
@@ -263,6 +290,22 @@ async function open() {
   }
   refresh();
 }
+
+function takeSeed(seed) {
+  chrome.storage.session.remove("spotlightSeed");
+  const { text = "", submit: enter = false } = typeof seed === "string" ? { text: seed } : seed;
+  if (seeded === null || query.value !== seeded || !text.startsWith(seeded)) return false;
+  query.value = seeded = text;
+  query.setSelectionRange(text.length, text.length);
+  if (enter) submit();
+  else refresh();
+  return true;
+}
+
+chrome.storage.session.onChanged.addListener((changes) => {
+  const seed = changes.spotlightSeed?.newValue;
+  if (seed && !document.body.classList.contains("closed") && blank(target?.url)) takeSeed(seed);
+});
 
 query.addEventListener("input", () => {
   const parsed = alias ? null : parseAlias(query.value, aliases);
@@ -277,7 +320,7 @@ query.addEventListener("keydown", (e) => {
   if (e.key === "Backspace" && alias && query.selectionStart === 0 && query.selectionEnd === 0) { e.preventDefault(); setAlias(null); refresh(); }
   else if (e.key === "ArrowDown") { e.preventDefault(); step(1); moveSelection(); }
   else if (e.key === "ArrowUp") { e.preventDefault(); step(-1); moveSelection(); }
-  else if (e.key === "Enter") { e.preventDefault(); run(items[selected]); }
+  else if (e.key === "Enter") { e.preventDefault(); submit(); }
   else if (e.key === "Escape") { e.preventDefault(); close(); }
 });
 document.getElementById("scrim").onclick = close;

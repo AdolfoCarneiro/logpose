@@ -47,12 +47,21 @@ function paintClock() {
 paintClock();
 setInterval(paintClock, 30 * 1000);
 
-// o spotlight abre com o que já foi digitado na página (spotlightSeed)
-async function search(seed = "") {
+// o spotlight abre com o que já foi digitado na página (spotlightSeed): enquanto ele não
+// pega o teclado, as teclas seguem caindo aqui e o texto todo vai junto, com o Enter
+let typed = "";
+let opening = false;
+async function search(text = "", submit = false) {
   if (!logposePrivate || !tab) return;
-  if (seed) await chrome.storage.session.set({ spotlightSeed: seed });
+  typed += text;
+  if (!typed.trim() && !submit) return;
+  await chrome.storage.session.set({ spotlightSeed: { text: typed, submit } });
+  if (opening) return;
+  opening = true;
   await call("executeCommand", tab.windowId, "openLocation").catch(() => {});
 }
+// o spotlight pegou o teclado (ou fechou e devolveu): o próximo texto começa do zero
+for (const ev of ["blur", "focus"]) window.addEventListener(ev, () => { typed = ""; opening = false; });
 const keys = current(stored.shortcuts).find((s) => s.command === "openLocation")?.keys;
 $("keys").replaceChildren(...label(keys).map((k) => el("kbd", "", k)));
 // o campo de busca da página fica focado; o que for digitado nele vai pro spotlight
@@ -64,10 +73,10 @@ searchInput.focus();
 searchInput.addEventListener("input", () => {
   const text = searchInput.value;
   searchInput.value = "";
-  if (text.trim()) search(text);
+  if (text) search(text);
 });
 searchInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") search();
+  if (e.key === "Enter") search("", true);
 });
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.key.length !== 1 || e.key === " ") return;
