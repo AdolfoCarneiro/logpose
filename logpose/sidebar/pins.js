@@ -312,5 +312,5 @@ export function setupPins({ section, grid, windowId, spaceId, assign, container,
     }
   });
 
-  return { load, save, render, liveIds, pinTab, rekey: (from, to) => saveLive(rekey(live, from, to)), toggleTab, newFolder, contains: (x, y) => Boolean(document.elementFromPoint(x, y)?.closest("#pins")) };
+  return { load, save, render, liveIds, pinTab, rekey: (from, to) => (from in live ? saveLive(rekey(live, from, to)) : Promise.resolve()), toggleTab, newFolder, contains: (x, y) => Boolean(document.elementFromPoint(x, y)?.closest("#pins")) };
 }

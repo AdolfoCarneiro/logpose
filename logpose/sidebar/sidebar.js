@@ -985,6 +985,18 @@ chrome.tabs.onRemoved.addListener(async (tabId, info) => {
   if (info.windowId === windowId && !info.isWindowClosing) await saveSpaces();
   render();
 });
+// dormir (e o descarte do Chromium) troca o WebContents e a aba ganha outro id
+// sem onRemoved nem onCreated: espaço, nome, fixada e grupo passam pro id novo
+// na hora, antes de qualquer save podar o id velho
+chrome.tabs.onReplaced.addListener(async (added, removed) => {
+  spaces = rekeyTab(spaces, removed, added);
+  if (groupTab?.id === removed) groupTab = { ...groupTab, id: added };
+  await pins.rekey(removed, added);
+  await groups.rekey(removed, added);
+  const tab = await chrome.tabs.get(added).catch(() => null);
+  if (ready && tab?.windowId === windowId) await saveSpaces();
+  render();
+});
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   if (tab.windowId === windowId && info.url) queueSnapshot();
 });

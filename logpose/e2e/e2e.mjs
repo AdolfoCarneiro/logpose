@@ -228,6 +228,30 @@ const TESTS = [
     expect(result.search.kind === "keyword" && result.search.engine === result.name, `a busca não foi pro ${result.name}: ${JSON.stringify(result.search)}`);
     expect(result.address.kind === "url", "um endereço virou busca");
   }],
+  ["a fixada que dorme continua fixada e no espaço dela", async () => {
+    const result = await worker(`(async () => {
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const tab = (await chrome.tabs.query({})).find((t) => t.url === "${OTHER}");
+      const { spaces } = await chrome.storage.local.get("spaces");
+      const space = spaces.tabSpace[tab.id];
+      const { pins = {} } = await chrome.storage.local.get("pins");
+      await chrome.storage.local.set({ pins: { ...pins, [space]: [...(pins[space] ?? []), { id: "pin-e2e", kind: "link", url: tab.url, title: "e2e" }] } });
+      const { pinLive = {} } = await chrome.storage.session.get("pinLive");
+      await chrome.storage.session.set({ pinLive: { ...pinLive, [tab.id]: "pin-e2e" } });
+      await wait(500);
+      const slept = await chrome.tabs.discard(tab.id);
+      await chrome.tabs.create({ windowId: tab.windowId, url: "about:blank", active: false });
+      await wait(1500);
+      const live = (await chrome.storage.session.get("pinLive")).pinLive;
+      const after = (await chrome.storage.local.get("spaces")).spaces;
+      const { pins: now } = await chrome.storage.local.get("pins");
+      await chrome.storage.local.set({ pins: { ...now, [space]: now[space].filter((n) => n.id !== "pin-e2e") } });
+      return { changed: slept.id !== tab.id, pin: live[slept.id], space: after.tabSpace[slept.id] === space };
+    })()`);
+    expect(result.changed, "dormir não trocou o id da aba (o teste não testou nada)");
+    expect(result.pin === "pin-e2e", "a fixada perdeu a aba ao dormir");
+    expect(result.space, "a aba saiu do espaço ao dormir");
+  }],
 ];
 
 await prepare();

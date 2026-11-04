@@ -360,7 +360,9 @@ export function setupContainerGroups({ section, list, windowId, assign, session,
 
   return {
     load, persist, render, liveIds, saveTab, adopt, createFrom, renameGroup,
-    rekey: (from, to) => saveLive(rekey(live, from, to)),
+    // só grava se tiver o que passar: gravar o live inteiro de uma barra que
+    // ainda não carregou (janela nova abrindo) apagaria o das outras
+    rekey: (from, to) => (from in live ? saveLive(rekey(live, from, to)) : Promise.resolve()),
     list: () => containers,
     pageOfTab: (tabId) => (live[tabId] ? findPage(containers, live[tabId]) : null),
   };
