@@ -1,0 +1,28 @@
+--- a/chrome/browser/extensions/api/extension_action/extension_action_api.cc
++++ b/chrome/browser/extensions/api/extension_action/extension_action_api.cc
+@@ -13,6 +13,7 @@
+ 
+ #include "base/check.h"
+ #include "base/check_op.h"
++#include "base/command_line.h"
+ #include "base/location.h"
+ #include "base/logging.h"
+ #include "base/metrics/histogram_functions.h"
+@@ -145,9 +146,16 @@
+   // exists, so the check below is sufficient.
+   // On other platforms, ExtensionsContainer is always constructed except for
+   // guest sessions, so we need more detailed checks.
++  // O Log Pose esconde a toolbar nativa, mas mostra o popup ancorado na página
++  // (extension_action_delegate_desktop.cc); só barra janelas sem toolbar de fato.
++  const bool logpose_hidden_toolbar =
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "logpose-native-chrome") &&
++      browser.GetType() == BrowserWindowInterface::Type::TYPE_NORMAL;
+   if (!WindowFeatureController::From(&browser)->SupportsWindowFeature(
+           WindowFeatureController::WindowFeature::kFeatureToolbar) ||
+-      !BrowserWindow::FromBrowser(&browser)->IsToolbarVisible()) {
++      (!logpose_hidden_toolbar &&
++       !BrowserWindow::FromBrowser(&browser)->IsToolbarVisible())) {
+     *error = "Browser window has no toolbar.";
+     return false;
+   }
