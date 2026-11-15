@@ -327,6 +327,7 @@ async function tabsMenu(ids, x, y) {
     { icon: "link", label: "Copiar links", action: () => navigator.clipboard.writeText(tabs.map((t) => t.url).join("\n")) },
     { icon: "rotate-cw", label: "Recarregar", action: () => { for (const t of tabs) chrome.tabs.reload(t.id); } },
     { icon: "moon", label: "Dormir", action: () => { tabList.clearSelection(); for (const t of tabs) if (!t.active && !t.discarded) chrome.tabs.discard(t.id).catch(() => {}); } },
+    ...(tabs.some(archivable) ? [{ icon: "archive", label: "Arquivar", action: () => { tabList.clearSelection(); archiveTabs(tabs.filter(archivable), "manual"); } }] : []),
     ...islandEntries(ids, tabs),
     ...groupEntries(ids),
     ...spaceEntries(ids),
@@ -348,6 +349,7 @@ async function tabMenu(item, x, y, selection) {
     { icon: "link", label: "Copiar link", action: () => navigator.clipboard.writeText(item.url) },
     { icon: "rotate-cw", label: "Recarregar", action: () => chrome.tabs.reload(item.id) },
     ...(item.active || item.asleep ? [] : [{ icon: "moon", label: "Dormir", action: () => chrome.tabs.discard(item.id).catch(() => {}) }]),
+    ...(archivable(tab) ? [{ icon: "archive", label: "Arquivar", action: () => archiveTabs([tab], "manual") }] : []),
     ...(item.audio === "muted" ? [{ icon: "volume-2", label: "Ativar som", action: () => chrome.tabs.update(item.id, { muted: false }) }] : []),
     ...(item.audio === "playing" ? [{ icon: "volume-x", label: "Silenciar", action: () => chrome.tabs.update(item.id, { muted: true }) }] : []),
     ...islandEntries([item.id], [tab]),
@@ -846,6 +848,11 @@ async function reopen(entries) {
     await moveTabToSpace(id, space);
   }
   render();
+}
+
+// só página da web vai pro arquivo (nova aba e páginas internas não reabrem)
+function archivable(tab) {
+  return /^https?:\/\//.test(tab.url || "");
 }
 
 async function archiveTabs(tabs, reason) {
