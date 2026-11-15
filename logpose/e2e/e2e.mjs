@@ -248,9 +248,30 @@ const TESTS = [
       await chrome.storage.local.set({ pins: { ...now, [space]: now[space].filter((n) => n.id !== "pin-e2e") } });
       return { changed: slept.id !== tab.id, pin: live[slept.id], space: after.tabSpace[slept.id] === space };
     })()`);
-    expect(result.changed, "dormir não trocou o id da aba (o teste não testou nada)");
+    expect(!result.changed, "dormir trocou a aba por outra (o descarte no lugar não está ligado)");
     expect(result.pin === "pin-e2e", "a fixada perdeu a aba ao dormir");
     expect(result.space, "a aba saiu do espaço ao dormir");
+  }],
+  ["Ctrl+W na última aba da janela abre uma nova aba em vez de fechar", async () => {
+    const win = await worker(`chrome.windows.create({ url: "${OTHER}", focused: true }).then((w) => w.id)`);
+    await sleep(2500);
+    key("w", "ctrl");
+    await sleep(1500);
+    const tabs = await worker(`chrome.tabs.query({ windowId: ${win} }).then((tabs) => tabs.map((t) => t.url || t.pendingUrl)).catch(() => null)`);
+    await worker(`chrome.windows.remove(${win}).then(() => 1).catch(() => 1)`);
+    await sleep(800);
+    expect(tabs && tabs.length === 1 && !tabs[0].startsWith("${OTHER}"), `a janela fechou ou não abriu aba nova (${JSON.stringify(tabs)})`);
+  }],
+  ["o Esc fecha as Configurações e volta pra aba de antes", async () => {
+    const before = (await activeTab()).id;
+    const settings = await worker(`chrome.tabs.create({ url: "chrome://settings/" }).then((t) => t.id)`);
+    await sleep(2500);
+    key("Escape");
+    await sleep(1200);
+    const left = await worker(`chrome.tabs.get(${settings}).then(() => true).catch(() => false)`);
+    if (left) await worker(`chrome.tabs.remove(${settings}).then(() => 1)`);
+    expect(!left, "o Esc não fechou as Configurações");
+    expect((await activeTab()).id === before, "fechar as Configurações não voltou pra aba de antes");
   }],
   ["fechar a última aba de um espaço abre uma nova nele, sem trocar de espaço", async () => {
     const spaceOf = () => worker(`(async () => {

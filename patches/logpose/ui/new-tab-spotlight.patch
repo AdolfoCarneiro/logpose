@@ -2,7 +2,7 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
 
 --- a/chrome/browser/ui/views/frame/logpose_spotlight_view.h
 +++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.h
-@@ -47,6 +47,10 @@
+@@ -47,6 +47,10 @@ class LogPoseSpotlightView : public views:
  LogPoseSpotlightView* LogPoseOverlayFor(BrowserView* browser_view,
                                      std::string_view page);
  
@@ -23,7 +23,7 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
  #include "content/public/browser/navigation_controller.h"
  #include "content/public/browser/web_contents.h"
  #include "third_party/skia/include/core/SkColor.h"
-@@ -101,6 +102,31 @@
+@@ -101,6 +102,31 @@ LogPoseSpotlightView* LogPoseOverlayFor(Brow
    return overlay;
  }
  
@@ -57,7 +57,7 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
            "logpose-native-chrome") ||
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
-@@ -1494,7 +1494,7 @@
+@@ -1494,7 +1494,7 @@ bool LogPoseHidesNativeChrome(const Browse
  
  void ShowLogPoseSpotlight(BrowserView* browser_view, bool new_tab) {
    LogPoseOverlayFor(browser_view, "spotlight.html")
@@ -66,7 +66,7 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
  }
  
  void DispatchLogPoseCommand(BrowserView* browser_view, std::string_view command) {
-@@ -6072,7 +6072,7 @@
+@@ -6067,7 +6067,7 @@ bool BrowserView::AcceleratorPressed(con
         command_id == IDC_CYCLE_TO_PREV_TAB)) {
      LogPoseOverlayFor(this, "switcher.html")
          ->Show(command_id == IDC_CYCLE_TO_NEXT_TAB ? "next" : "previous",
@@ -77,15 +77,15 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
    if (LogPoseHidesNativeChrome(browser_) &&
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -97,6 +97,7 @@
+@@ -98,6 +98,7 @@
  #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
  #include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
 +#include "chrome/browser/ui/views/frame/logpose_spotlight_view.h"
- #include "chrome/browser/ui/views/side_panel/tabs_from_other_devices/tabs_from_other_devices_side_panel_coordinator.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #include "chrome/browser/ui/web_applications/web_app_dialog_utils.h"
-@@ -771,6 +772,9 @@
+ #include "chrome/browser/ui/web_applications/web_app_launch_utils.h"
+@@ -783,6 +784,9 @@ void BrowserCommandController::HandleCom
        CloseWindow(browser_);
        break;
      case IDC_NEW_TAB: {
@@ -97,7 +97,7 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
      }
 --- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
 +++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
-@@ -63,6 +63,7 @@
+@@ -63,6 +63,7 @@ struct Command {
  };
  
  constexpr auto kCommands = std::to_array<Command>({
@@ -107,7 +107,7 @@ O botão Nova aba da barra lateral e o Ctrl+T abrem a mesma barra de busca do Lo
      {"openInApp", IDC_OPEN_IN_PWA_WINDOW},
 --- a/chrome/common/extensions/api/logpose_private.idl
 +++ b/chrome/common/extensions/api/logpose_private.idl
-@@ -73,7 +73,7 @@
+@@ -73,7 +73,7 @@ namespace logposePrivate {
          long windowId,
          CommandsCallback callback);
  

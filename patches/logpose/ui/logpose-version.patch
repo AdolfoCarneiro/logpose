@@ -10,7 +10,7 @@ Log Pose: página Sobre mostra a versão do Log Pose
 +#ifndef CHROME_BROWSER_LOGPOSE_LOGPOSE_VERSION_H_
 +#define CHROME_BROWSER_LOGPOSE_LOGPOSE_VERSION_H_
 +
-+inline constexpr char kLogPoseVersion[] = "0.4.0";
++inline constexpr char kLogPoseVersion[] = "0.5.0";
 +
 +#endif  // CHROME_BROWSER_LOGPOSE_LOGPOSE_VERSION_H_
 --- a/chrome/browser/ui/webui/version/version_ui.cc

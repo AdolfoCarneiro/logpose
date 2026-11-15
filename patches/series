@@ -68,3 +68,5 @@ logpose/ui/window-buttons.patch
 logpose/ui/focus-contents.patch
 logpose/ui/container-restore.patch
 logpose/ui/extension-popup-api.patch
+logpose/ui/last-tab-keeps-window.patch
+logpose/ui/discard-keeps-tab.patch
