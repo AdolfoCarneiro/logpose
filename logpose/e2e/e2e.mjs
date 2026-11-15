@@ -252,6 +252,37 @@ const TESTS = [
     expect(result.pin === "pin-e2e", "a fixada perdeu a aba ao dormir");
     expect(result.space, "a aba saiu do espaço ao dormir");
   }],
+  ["fechar a última aba de um espaço abre uma nova nele, sem trocar de espaço", async () => {
+    const spaceOf = () => worker(`(async () => {
+      const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const { spaces } = await chrome.storage.local.get("spaces");
+      return { tab: tab.id, url: tab.url || tab.pendingUrl, active: spaces.active[tab.windowId], space: spaces.tabSpace[tab.id] };
+    })()`);
+    await worker(`(async () => {
+      const { spaces } = await chrome.storage.local.get("spaces");
+      await chrome.storage.local.set({ spaces: { ...spaces, spaces: [...spaces.spaces, { id: "e2e-fecha", name: "E2E fecha", icon: "circle", color: null, session: "e2e-fecha" }] } });
+      return 1;
+    })()`);
+    await sleep(500);
+    await sidebar(`document.querySelector('.space[title="E2E fecha"]').click(), 1`);
+    const opened = await until(spaceOf, (s) => s.active === "e2e-fecha" && s.space === "e2e-fecha");
+    expect(opened.space === "e2e-fecha", `entrar no espaço vazio não abriu aba nele (${JSON.stringify(opened)})`);
+    await worker(`chrome.tabs.remove(${opened.tab}).then(() => 1)`);
+    await sleep(1500);
+    const after = await spaceOf();
+    await sidebar(`document.querySelector('.space[title="Pessoal"]').click(), 1`);
+    await sleep(800);
+    await worker(`(async () => {
+      const { spaces } = await chrome.storage.local.get("spaces");
+      const gone = Object.entries(spaces.tabSpace).filter(([, s]) => s === "e2e-fecha").map(([id]) => Number(id));
+      await chrome.tabs.remove(gone).catch(() => {});
+      const now = (await chrome.storage.local.get("spaces")).spaces;
+      await chrome.storage.local.set({ spaces: { ...now, spaces: now.spaces.filter((s) => s.id !== "e2e-fecha") } });
+      return 1;
+    })()`);
+    expect(after.active === "e2e-fecha", `trocou de espaço ao fechar a última aba (foi pra ${after.active})`);
+    expect(after.tab !== opened.tab && after.space === "e2e-fecha", `não abriu aba nova no espaço (${JSON.stringify(after)})`);
+  }],
 ];
 
 await prepare();

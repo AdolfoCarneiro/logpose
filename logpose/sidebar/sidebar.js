@@ -52,6 +52,7 @@ let incognito = false;
 let rightAligned = false;
 let leaveTimer;
 let ready = false;
+let closedIn = null;
 let snapshotTimer;
 let islandList = [];
 let shownItems = [];
@@ -986,6 +987,10 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
 for (const ev of ["onCreated", "onUpdated", "onRemoved", "onMoved"]) chrome.tabGroups[ev].addListener(() => render());
 chrome.tabs.onRemoved.addListener(async (tabId, info) => {
   if (!ready) return;
+  if (info.windowId === windowId && !info.isWindowClosing) {
+    const space = spaceOfTab(spaces, tabId, windowId);
+    if (space === activeSpace(spaces, windowId).id) closedIn = { space, at: Date.now() };
+  }
   spaces = forgetTab(spaces, tabId);
   if (info.windowId === windowId && !info.isWindowClosing) await saveSpaces();
   render();
@@ -1008,7 +1013,24 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
 chrome.tabs.onMoved.addListener((tabId, info) => {
   if (info.windowId === windowId) queueSnapshot();
 });
+// fechar a aba ativa faz o Chromium ativar a vizinha, que pode ser de outro
+// espaço: fica no espaço, na aba usada por último nele ou numa nova
+async function stayInSpace(spaceId) {
+  const tabs = await chrome.tabs.query({ windowId, pinned: false });
+  const kept = pins.liveIds();
+  const left = tabs.filter((t) => !kept.has(t.id) && spaceOfTab(spaces, t.id, windowId) === spaceId);
+  const target = left.reduce((best, t) => (!best || (t.lastAccessed ?? 0) > (best.lastAccessed ?? 0) ? t : best), null);
+  if (target) await chrome.tabs.update(target.id, { active: true });
+  else await blankTab(spaceId, true);
+}
+
 chrome.tabs.onActivated.addListener(async ({ tabId, windowId: w }) => {
+  const closed = closedIn && Date.now() - closedIn.at < 1000 ? closedIn.space : null;
+  if (w === windowId) closedIn = null;
+  if (ready && w === windowId && closed && spaceOfTab(spaces, tabId, windowId) !== closed) {
+    await stayInSpace(closed);
+    return render();
+  }
   if (ready && w === windowId && spaces.tabSpace[tabId]) {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (tab && await fixSessions([tab])) return render();
