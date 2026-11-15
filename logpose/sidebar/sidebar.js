@@ -103,9 +103,14 @@ async function saveSnapshot() {
   return tabs;
 }
 
+// o endereço da fixada vai junto: é por ele que ela volta a ser fixada ao
+// reabrir o navegador
 function queueSnapshot() {
   clearTimeout(snapshotTimer);
-  snapshotTimer = setTimeout(saveSnapshot, 800);
+  snapshotTimer = setTimeout(async () => {
+    await saveSnapshot();
+    if (ready) await pins.save();
+  }, 800);
 }
 
 async function saveSpaces() {

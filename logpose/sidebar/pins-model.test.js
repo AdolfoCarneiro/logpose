@@ -77,6 +77,18 @@ test("mapa de abas vivas: limpar, achar e sobreviver ao reinício pela URL", () 
   assert.deepEqual(besideIcon, { 61: "l1" });
 });
 
+test("fixada que mudou de endereço antes de fechar volta pelo site", () => {
+  const shot = [{ url: "https://www.youtube.com/", pin: "yt" }, { url: "https://mail.google.com/#inbox", pin: "gm" }];
+  const tabs = [
+    { id: 1, url: "https://mail.google.com/#inbox/abc" },
+    { id: 2, url: "https://www.youtube.com/watch?v=x&t=10s" },
+    { id: 3, url: "https://www.youtube.com/" },
+  ];
+  assert.deepEqual(restoreLive(tabs, shot, new Set(["yt", "gm"])), { 3: "yt", 1: "gm" });
+  assert.deepEqual(restoreLive(tabs.slice(0, 2), shot, new Set(["yt", "gm"])), { 2: "yt", 1: "gm" });
+  assert.deepEqual(restoreLive([{ id: 4, url: "chrome://newtab/" }], [{ url: "chrome://settings/", pin: "x" }], new Set(["x"])), {});
+});
+
 test("soltar num cartão ocupa o lugar dele, pra frente ou pra trás", () => {
   const flat = [
     { id: "a", kind: "link", url: "a" }, { id: "b", kind: "link", url: "b" },

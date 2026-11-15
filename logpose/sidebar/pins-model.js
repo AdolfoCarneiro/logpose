@@ -121,16 +121,25 @@ export function pinSnapshot(live, tabs) {
   return tabs.filter((t) => live[t.id]).map((t) => ({ url: t.url || t.pendingUrl || "", pin: live[t.id] }));
 }
 
+function hostOf(url) {
+  try { return new URL(url).host; } catch { return ""; }
+}
+
+// a URL da aba restaurada nem sempre é a do snapshot (o YouTube troca o
+// endereço sozinho, o Gmail muda o #): primeiro casa o endereço exato e o
+// que sobrar casa pelo site, na ordem das abas
 export function restoreLive(tabs, shot, nodeIds) {
   const pending = (shot ?? []).filter((entry) => nodeIds.has(entry.pin));
+  const free = tabs.filter((t) => !t.pinned).map((t) => ({ id: t.id, url: t.url || t.pendingUrl || "" }));
   const live = {};
-  for (const tab of tabs) {
-    if (tab.pinned) continue;
-    const url = tab.url || tab.pendingUrl || "";
-    const i = pending.findIndex((entry) => entry.url === url);
-    if (i < 0) continue;
-    live[tab.id] = pending[i].pin;
-    pending.splice(i, 1);
+  for (const same of [(a, b) => a === b, (a, b) => Boolean(hostOf(a)) && hostOf(a) === hostOf(b)]) {
+    for (const entry of [...pending]) {
+      const i = free.findIndex((t) => same(t.url, entry.url));
+      if (i < 0) continue;
+      live[free[i].id] = entry.pin;
+      free.splice(i, 1);
+      pending.splice(pending.indexOf(entry), 1);
+    }
   }
   return live;
 }
