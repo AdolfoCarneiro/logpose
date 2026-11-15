@@ -3,7 +3,7 @@ export const DEFAULTS = Object.freeze({
   density: "comfortable",
   showFullUrl: false,
   materialOpacity: 82,
-  sleepAfterMinutes: 30,
+  sleepAfterMinutes: 120,
   archiveAfterHours: 12,
   peekPinnedLinks: true,
   littleWindowLinks: true,
