@@ -88,5 +88,27 @@ onepassword="$config/chromium/NativeMessagingHosts/com.1password.1password.json"
 
 "$prefix/current/theme/update-theme" || true
 
+# Picture-in-picture por cima de tudo: no Wayland o Chromium não consegue pedir isso
+# (SetZOrderLevel é vazio lá), então quem segura a janelinha em cima é uma regra do KWin.
+if command -v kwriteconfig6 >/dev/null && command -v kreadconfig6 >/dev/null; then
+  rule=logpose-pip
+  w() { kwriteconfig6 --file kwinrulesrc --group "$rule" --key "$1" "$2"; }
+  w Description "Log Pose: picture-in-picture por cima"
+  w wmclass logpose
+  w wmclassmatch 1
+  w title '^Picture[ -]in[ -][Pp]icture$'
+  w titlematch 3
+  w above true
+  w aboverule 2
+  rules="$(kreadconfig6 --file kwinrulesrc --group General --key rules)"
+  case ",$rules," in
+    *",$rule,"*) ;;
+    *) rules="${rules:+$rules,}$rule"
+       kwriteconfig6 --file kwinrulesrc --group General --key rules "$rules"
+       kwriteconfig6 --file kwinrulesrc --group General --key count "$(tr ',' '\n' <<<"$rules" | grep -c .)" ;;
+  esac
+  dbus-send --session --type=method_call --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true
+fi
+
 echo "Log Pose $version${build:+ ($build)} instalado em $dest"
 echo "abrir: logpose   (menu de apps: Log Pose)"

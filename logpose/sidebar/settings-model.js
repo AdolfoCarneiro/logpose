@@ -9,6 +9,7 @@ export const DEFAULTS = Object.freeze({
   littleWindowLinks: true,
   miniPlayer: true,
   autoPip: true,
+  pipButton: true,
   newtabNews: true,
   newtabCards: true,
   newtabMarket: true,

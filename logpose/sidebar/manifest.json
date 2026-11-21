@@ -29,6 +29,14 @@
     "https://news.google.com/*",
     "https://api.open-meteo.com/*", "https://economia.awesomeapi.com.br/*", "https://api.bcb.gov.br/*", "https://query1.finance.yahoo.com/*"
   ],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["pip-button.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
   "side_panel": {
     "default_path": "sidebar.html"
   },
