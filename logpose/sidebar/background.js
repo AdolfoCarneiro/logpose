@@ -12,7 +12,8 @@ chrome.alarms.create("logpose-lifecycle", { periodInMinutes: 1 });
 async function runLifecycle() {
   const stored = await chrome.storage.local.get(["settings", "spaces", "archive"]);
   const settings = loadSettings(stored.settings);
-  const tabs = await chrome.tabs.query({});
+  // só janelas normais: apps (PWA) como o WhatsApp não dormem nem arquivam
+  const tabs = await chrome.tabs.query({ windowType: "normal" });
   const now = Date.now();
   const { pinLive = {}, containerLive = {} } = await chrome.storage.session.get(["pinLive", "containerLive"]);
   const { sleep, archive } = plan(tabs, now, settings, new Set([...Object.keys(pinLive), ...Object.keys(containerLive)].map(Number)));
