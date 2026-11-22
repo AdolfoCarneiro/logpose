@@ -37,7 +37,7 @@ mkdir -p "$dir/app/theme"
 cp "$root/logpose/theme/logpose_theme.py" "$root/logpose/theme/logpose_theme_host.py" "$root/logpose/theme/update-theme" "$dir/app/theme/"
 
 cp "$root/logpose/branding/"icon-*.png "$root/logpose/branding/icon.svg" "$dir/icons/"
-cp "$root/logpose/package/logpose.desktop" "$root/logpose/package/install.sh" "$root/logpose/package/logpose-update" "$dir/"
+cp "$root/logpose/package/logpose.desktop" "$root/logpose/package/install.sh" "$root/logpose/package/logpose-update" "$root/logpose/package/logpose-widevine" "$dir/"
 echo "$version" > "$dir/VERSION"
 echo "$build" > "$dir/BUILD"
 echo "$build" > "$dir/app/BUILD"

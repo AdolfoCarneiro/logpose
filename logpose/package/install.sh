@@ -19,9 +19,6 @@ mkdir -p "$prefix" 2>/dev/null && [ -w "$prefix" ] || as_root=(pkexec)
     rm -rf "$2.new"
     mkdir -p "$2.new"
     cp -a "$1/app/." "$2.new/"
-    cdm=/opt/google/chrome/WidevineCdm
-    [ -d "$cdm" ] || cdm="$3/current/WidevineCdm"
-    [ -d "$cdm" ] && cp -aL "$cdm" "$2.new/WidevineCdm"
     rm -rf "$2"
     mv "$2.new" "$2"
   fi
@@ -41,6 +38,9 @@ mkdir -p "$prefix" 2>/dev/null && [ -w "$prefix" ] || as_root=(pkexec)
 
 mkdir -p "$bindir"
 install -m 755 "$here/logpose-update" "$bindir/logpose-update"
+install -m 755 "$here/logpose-widevine" "$bindir/logpose-widevine"
+# Widevine (Netflix, HBO, Spotify) no perfil, baixado do Google: o build não lê um ao lado do binário
+LOGPOSE_PREFIX="$prefix" LOGPOSE_PROFILE="$profile" "$bindir/logpose-widevine" || echo "vídeo com DRM fica pra próxima: logpose-widevine" >&2
 cat > "$bindir/logpose" <<LAUNCHER
 #!/usr/bin/env bash
 profile="$profile"

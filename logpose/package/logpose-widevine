@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Baixa do Google o Widevine (o que faz Netflix, HBO e Spotify tocarem), sem precisar do Chrome.
+
+O build não é da marca Chrome, então não lê um WidevineCdm ao lado do binário: só o que
+estiver no perfil, apontado pelo arquivo de dica WidevineCdm/latest-component-updated-widevine-cdm.
+Pergunta ao serviço de atualização de componentes do Google (o mesmo do Chrome), confere o
+sha256 e desempacota em <perfil>/WidevineCdm/<versão>.
+"""
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import struct
+import sys
+import tempfile
+import urllib.request
+import zipfile
+
+PREFIX = Path(os.environ.get("LOGPOSE_PREFIX", "/opt/logpose"))
+PROFILE = Path(os.environ.get("LOGPOSE_PROFILE", Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "logpose"))
+BASE = PROFILE / "WidevineCdm"
+HINT = BASE / "latest-component-updated-widevine-cdm"
+UPDATE = "https://update.googleapis.com/service/update2/json"
+APPID = "oimompecagnajdejgnnjijobebaeigek"
+LIBRARY = Path("_platform_specific/linux_x64/libwidevinecdm.so")
+
+
+def chromium():
+    match = re.search(r"\d+\.\d+\.\d+\.\d+", (PREFIX / "current").resolve().name)
+    return match.group(0) if match else "157.0.0.0"
+
+
+def installed():
+    try:
+        path = Path(json.loads(HINT.read_text())["Path"])
+        if (path / LIBRARY).is_file():
+            return json.loads((path / "manifest.json").read_text())["version"]
+    except (OSError, ValueError, KeyError):
+        pass
+    return "0.0.0.0"
+
+
+def check(version, current):
+    app = {"appid": APPID, "version": current, "enabled": True, "updatecheck": {}}
+    body = {"request": {"@os": "linux", "@updater": "chromium", "acceptformat": "crx3", "app": [app], "arch": "x64",
+                        "dedup": "cr", "ismachine": False, "os": {"arch": "x86_64", "platform": "Linux"},
+                        "prodversion": version, "protocol": "3.1", "updaterversion": version}}
+    request = urllib.request.Request(UPDATE, json.dumps(body).encode(), {"Content-Type": "application/json", "User-Agent": "logpose-widevine"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        text = response.read().decode()
+    apps = json.loads(text[text.index("{"):])["response"]["app"]
+    return next((a.get("updatecheck", {}) for a in apps if a["appid"] == APPID), {})
+
+
+def fetch(update):
+    package = update["manifest"]["packages"]["package"][0]
+    base = next(url["codebase"] for url in update["urls"]["url"] if url["codebase"].startswith("https://"))
+    with urllib.request.urlopen(base + package["name"], timeout=300) as response:
+        data = response.read()
+    if hashlib.sha256(data).hexdigest() != package["hash_sha256"]:
+        raise RuntimeError(f"{package['name']} não confere com o sha256 do Google")
+    if data[:4] != b"Cr24" or struct.unpack("<I", data[4:8])[0] != 3:
+        raise RuntimeError(f"{package['name']} não é um crx3")
+    header = struct.unpack("<I", data[8:12])[0]
+    return zipfile.ZipFile(io.BytesIO(data[12 + header:]))
+
+
+def install(version, archive):
+    BASE.mkdir(parents=True, exist_ok=True)
+    dest = BASE / version
+    with tempfile.TemporaryDirectory(dir=BASE, prefix=f".{version}-") as tmp:
+        new = Path(tmp) / "cdm"
+        archive.extractall(new)
+        if not (new / LIBRARY).is_file():
+            raise RuntimeError(f"o pacote não tem {LIBRARY}")
+        if dest.exists():
+            shutil.rmtree(dest)
+        new.rename(dest)
+    hint = BASE / f".{HINT.name}.new"
+    hint.write_text(json.dumps({"Path": str(dest)}))
+    hint.replace(HINT)
+    for old in BASE.iterdir():
+        if old.is_dir() and old != dest and not old.name.startswith("."):
+            shutil.rmtree(old, ignore_errors=True)
+
+
+def main():
+    current = installed()
+    update = check(chromium(), current)
+    status = update.get("status")
+    if status == "ok":
+        version = update["manifest"]["version"]
+        install(version, fetch(update))
+        print(f"Widevine {version} instalado em {BASE / version}")
+    elif status == "noupdate":
+        print(f"Widevine {current} já é o mais novo")
+    else:
+        raise RuntimeError(f"o Google não entregou o Widevine: {status}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as error:  # noqa: BLE001 — sem Widevine o navegador funciona, só não toca DRM
+        print(f"Widevine não instalado: {error}", file=sys.stderr)
+        sys.exit(1)
