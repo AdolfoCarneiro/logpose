@@ -48,6 +48,52 @@ body.k-surface {
 .address:focus-within .address-zoom { display: none; }
 @keyframes zoom-in { from { opacity: 0; transform: translateY(-50%) scale(.85); } }
 
+/* sugestões embaixo do campo de endereço enquanto digita */
+.address-box { position: relative; z-index: 30; }
+.address-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--k-space-xs);
+  list-style: none;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-radius: var(--k-shape-large);
+  background: var(--k-color-surface-container-high);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.4);
+  animation: suggest-in var(--k-motion-duration-short) var(--k-motion-spring-spatial-fast);
+}
+.address-suggestions[hidden] { display: none; }
+@keyframes suggest-in { from { opacity: 0; transform: translateY(-6px); } }
+.suggest-section { padding: var(--k-space-sm) var(--k-space-sm) var(--k-space-xxs); color: var(--k-color-on-surface-variant); }
+.suggest {
+  display: flex;
+  align-items: center;
+  gap: var(--k-space-sm);
+  min-height: 40px;
+  padding: 0 var(--k-space-sm);
+  border-radius: var(--k-shape-medium);
+  cursor: default;
+}
+.suggest--selected { background: var(--k-color-secondary-container); color: var(--k-color-on-secondary-container); }
+.suggest-icon { flex: none; display: grid; place-items: center; width: 20px; height: 20px; }
+.suggest-icon img { width: 16px; height: 16px; }
+.suggest-icon .k-icon { font-size: 16px; color: var(--k-color-primary); }
+.suggest-text { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.suggest-title, .suggest-url { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.suggest-url { color: var(--k-color-on-surface-variant); }
+.suggest--selected .suggest-url { color: inherit; opacity: .75; }
+.suggest-kind {
+  flex: none;
+  padding: 1px var(--k-space-xs);
+  border-radius: var(--k-shape-full);
+  background: var(--k-color-surface-container-highest);
+  color: var(--k-color-on-surface-variant);
+}
+
 .today-header {
   display: flex;
   align-items: center;

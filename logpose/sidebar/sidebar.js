@@ -27,6 +27,7 @@ import { setupPins } from "./pins.js";
 import { setupPlayer } from "./player.js";
 import { setupPopups } from "./popups.js";
 import { available as logposePrivate, call } from "./logpose-private.js";
+import { setupAddressSuggest } from "./address-suggest.js";
 
 const SPACE_COLORS = [null, "#71b1ec", "#7cc2a8", "#d9c08a", "#d49a78", "#d8737a", "#b59ad4"];
 
@@ -763,16 +764,36 @@ for (const item of spaceMenu.querySelectorAll("[data-space-action]")) {
 
 address.addEventListener("focus", () => { address.value = displayUrl(activeUrl, true); address.select(); });
 address.addEventListener("blur", showAddress);
+async function searchHere(text) {
+  const tab = await activeTab();
+  const engine = incognito ? settings.privateSearchEngine : "";
+  const resolved = logposePrivate ? await call("resolveInput", windowId, text, ...(engine ? [engine] : [])).catch(() => null) : null;
+  if (resolved) chrome.tabs.update(tab.id, { url: resolved.url });
+  else chrome.search.query({ text, tabId: tab.id });
+}
+async function openHere(url) {
+  chrome.tabs.update((await activeTab()).id, { url });
+}
+const suggest = setupAddressSuggest({
+  input: address,
+  list: document.getElementById("address-suggestions"),
+  windowId: () => windowId,
+  incognito: () => incognito,
+  async run(item) {
+    if (item.kind === "tab") {
+      await chrome.tabs.update(item.tabId, { active: true });
+      if (item.windowId !== windowId) await chrome.windows.update(item.windowId, { focused: true });
+    } else if (item.kind === "search" || item.kind === "suggestion") await searchHere(item.text);
+    else if (item.url) await openHere(item.url);
+  },
+});
 address.addEventListener("keydown", async (e) => {
+  if (await suggest.key(e)) return;
   if (e.key === "Escape") { address.blur(); return; }
   if (e.key !== "Enter") return;
   const nav = toNavigation(address.value);
-  const tab = await activeTab();
-  const engine = incognito ? settings.privateSearchEngine : "";
-  const resolved = nav.kind === "search" && logposePrivate ? await call("resolveInput", windowId, nav.text, ...(engine ? [engine] : [])).catch(() => null) : null;
-  if (nav.kind === "url") chrome.tabs.update(tab.id, { url: nav.url });
-  else if (resolved) chrome.tabs.update(tab.id, { url: resolved.url });
-  else chrome.search.query({ text: nav.text, tabId: tab.id });
+  if (nav.kind === "url") openHere(nav.url);
+  else searchHere(nav.text);
   address.blur();
 });
 
