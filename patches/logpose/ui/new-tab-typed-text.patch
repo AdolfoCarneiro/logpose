@@ -1,0 +1,355 @@
+Nova aba sem perder letras.
+
+Do Ctrl+T até a página da nova aba ficar pronta, as teclas iam pra aba anterior e se perdiam: a janela agora as guarda (por até 1,5 s, ou até um atalho com Ctrl/Alt ou o Esc) e a nova aba pega com logposePrivate.takeTypedText.
+
+O Spotlight pré-carregado com a janela abrindo pegava a extensão ainda não pronta e caía numa página de erro; o primeiro Show() então recarregava a página e as teclas desse meio-tempo se perdiam. Escondido e com erro, ele tenta de novo.
+
+--- a/chrome/common/extensions/api/logpose_private.idl
++++ b/chrome/common/extensions/api/logpose_private.idl
+@@ -117,6 +117,7 @@
+   callback ResolvedInputCallback = void(ResolvedInput input);
+   callback SuggestionsCallback = void(DOMString[] suggestions);
+   callback ZoneCallback = void(DOMString zone);
++  callback TypedTextCallback = void(DOMString text);
+   callback DoneCallback = void();
+ 
+   interface Functions {
+@@ -192,6 +193,11 @@
+     // address bar's lock would.
+     static void showPageInfo(long windowId, optional DoneCallback callback);
+ 
++    // What was typed in the window since the new tab shortcut, while the new
++    // tab was still opening (those keys are held back from the pages); a
++    // trailing "\n" means Enter was pressed. The new tab page takes them.
++    static void takeTypedText(long windowId, TypedTextCallback callback);
++
+     // Reads <code>text</code> as the window's address bar would: an
+     // address, a search, or a search with another engine when it starts
+     // with the engine's keyword or has a !bang. A search for the default
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.h
+@@ -119,6 +119,15 @@
+   ResponseAction Run() override;
+ };
+ 
++class LogposePrivateTakeTypedTextFunction : public ExtensionFunction {
++ public:
++  DECLARE_EXTENSION_FUNCTION("logposePrivate.takeTypedText", UNKNOWN)
++
++ protected:
++  ~LogposePrivateTakeTypedTextFunction() override = default;
++  ResponseAction Run() override;
++};
++
+ class LogposePrivateResolveInputFunction : public ExtensionFunction {
+  public:
+   DECLARE_EXTENSION_FUNCTION("logposePrivate.resolveInput", UNKNOWN)
+--- a/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
++++ b/chrome/browser/extensions/api/logpose_private/logpose_private_api.cc
+@@ -449,6 +449,20 @@
+   return RespondNow(NoArguments());
+ }
+ 
++ExtensionFunction::ResponseAction LogposePrivateTakeTypedTextFunction::Run() {
++  auto params = logpose_private::TakeTypedText::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  std::string error;
++  BrowserWindowInterface* browser =
++      BrowserForWindow(this, params->window_id, &error);
++  if (!browser) {
++    return RespondNow(Error(std::move(error)));
++  }
++  return RespondNow(ArgumentList(logpose_private::TakeTypedText::Results::Create(
++      base::UTF16ToUTF8(LogPoseTakeTypedText(browser)))));
++}
++
+ ExtensionFunction::ResponseAction LogposePrivateResolveInputFunction::Run() {
+   auto params = logpose_private::ResolveInput::Params::Create(args());
+   EXTENSION_FUNCTION_VALIDATE(params);
+--- a/chrome/browser/ui/views/frame/logpose_shortcuts.h
++++ b/chrome/browser/ui/views/frame/logpose_shortcuts.h
+@@ -13,6 +13,7 @@
+ #include "ui/base/accelerators/accelerator.h"
+ 
+ class BrowserView;
++class BrowserWindowInterface;
+ 
+ std::optional<ui::Accelerator> ParseLogPoseAccelerator(std::string_view text);
+ 
+@@ -22,4 +23,9 @@
+ 
+ void LogPoseRegisterShortcuts(BrowserView* browser_view);
+ 
++// O que foi digitado na janela desde o atalho de nova aba (Ctrl+T), enquanto a
++// aba nova ainda abria; um "\n" no fim quer dizer que o Enter foi apertado. As
++// teclas ficam guardadas até a página da aba nova pedir (ou por pouco tempo).
++std::u16string LogPoseTakeTypedText(BrowserWindowInterface* browser);
++
+ #endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LOGPOSE_SHORTCUTS_H_
+--- a/chrome/browser/ui/views/frame/logpose_shortcuts.cc
++++ b/chrome/browser/ui/views/frame/logpose_shortcuts.cc
+@@ -8,7 +8,11 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "base/functional/bind.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/scoped_observation.h"
++#include "base/time/time.h"
++#include "base/timer/timer.h"
+ #include "base/no_destructor.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/string_split.h"
+@@ -26,6 +30,10 @@
+ #include "chrome/browser/ui/views/frame/logpose_sidebar_mode.h"
+ #include "chrome/browser/ui/views/frame/logpose_spotlight_view.h"
+ #include "content/public/browser/web_contents.h"
++#include "ui/aura/window.h"
++#include "ui/aura/window_observer.h"
++#include "ui/events/event.h"
++#include "ui/events/event_handler.h"
+ #include "extensions/browser/event_router.h"
+ #include "extensions/browser/extension_event_histogram_value.h"
+ #include "ui/base/class_property.h"
+@@ -33,6 +41,7 @@
+ #include "ui/events/keycodes/keyboard_codes.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/focus/focus_manager.h"
++#include "ui/views/widget/widget.h"
+ 
+ namespace {
+ 
+@@ -162,6 +171,91 @@
+   }
+ }
+ 
++// Do Ctrl+T até a página da aba nova ficar pronta passam uns 150 ms em que as
++// teclas iam pra aba anterior e se perdiam. Nesse meio-tempo elas ficam
++// guardadas aqui e a nova aba pega com takeTypedText.
++class LogPoseTypeAhead : public ui::EventHandler, public aura::WindowObserver {
++ public:
++  LogPoseTypeAhead() = default;
++  ~LogPoseTypeAhead() override { Stop(); }
++
++  void Start(aura::Window* window) {
++    Stop();
++    typed_.clear();
++    if (!window) {
++      return;
++    }
++    window_ = window;
++    window_->AddPreTargetHandler(this);
++    observation_.Observe(window_);
++    timer_.Start(FROM_HERE, base::Milliseconds(1500),
++                 base::BindOnce(&LogPoseTypeAhead::Stop,
++                                base::Unretained(this)));
++  }
++
++  std::u16string Take() {
++    Stop();
++    std::u16string typed;
++    typed.swap(typed_);
++    return typed;
++  }
++
++  void OnKeyEvent(ui::KeyEvent* event) override {
++    if (event->type() != ui::EventType::kKeyPressed) {
++      return;
++    }
++    if (event->flags() &
++        (ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN)) {
++      Stop();
++      return;
++    }
++    switch (event->key_code()) {
++      case ui::VKEY_ESCAPE:
++        Stop();
++        return;
++      case ui::VKEY_RETURN:
++        if (!typed_.empty() && typed_.back() != u'\n') {
++          typed_.push_back(u'\n');
++        }
++        event->StopPropagation();
++        return;
++      case ui::VKEY_BACK:
++        if (!typed_.empty() && typed_.back() != u'\n') {
++          typed_.pop_back();
++        }
++        event->StopPropagation();
++        return;
++      default:
++        break;
++    }
++    const char16_t character = event->GetCharacter();
++    if (character < 0x20 || character == 0x7f ||
++        (!typed_.empty() && typed_.back() == u'\n')) {
++      return;
++    }
++    typed_.push_back(character);
++    event->StopPropagation();
++  }
++
++  void OnWindowDestroying(aura::Window* window) override { Stop(); }
++
++ private:
++  void Stop() {
++    timer_.Stop();
++    observation_.Reset();
++    if (window_) {
++      window_->RemovePreTargetHandler(this);
++      window_ = nullptr;
++    }
++  }
++
++  raw_ptr<aura::Window> window_ = nullptr;
++  std::u16string typed_;
++  base::OneShotTimer timer_;
++  base::ScopedObservation<aura::Window, aura::WindowObserver> observation_{
++      this};
++};
++
+ class LogPoseShortcutTarget : public ui::AcceleratorTarget {
+  public:
+   explicit LogPoseShortcutTarget(BrowserView* browser_view)
+@@ -208,6 +302,9 @@
+       RunInLittle(browser, it->second);
+       return true;
+     }
++    if (it->second == "newTab" && browser_view_->GetWidget()) {
++      type_ahead_.Start(browser_view_->GetWidget()->GetNativeWindow());
++    }
+     if (it->second == "toggleSidebar") {
+       LogPoseSetSidebarMode(browser, LogPoseGetSidebarMode(browser) ==
+                                            LogPoseSidebarMode::kDocked
+@@ -227,6 +324,8 @@
+     return true;
+   }
+ 
++  std::u16string TakeTypedText() { return type_ahead_.Take(); }
++
+   bool CanHandleAccelerators() const override {
+     return browser_view_->IsActive();
+   }
+@@ -251,6 +350,7 @@
+ 
+   raw_ptr<BrowserView> browser_view_;
+   raw_ptr<views::FocusManager> focus_manager_ = nullptr;
++  LogPoseTypeAhead type_ahead_;
+ };
+ 
+ }  // namespace
+@@ -307,3 +407,10 @@
+   }
+   target->Register();
+ }
++
++std::u16string LogPoseTakeTypedText(BrowserWindowInterface* browser) {
++  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser);
++  LogPoseShortcutTarget* target =
++      view ? view->GetProperty(kLogPoseShortcutTargetKey) : nullptr;
++  return target ? target->TakeTypedText() : std::u16string();
++}
+--- a/chrome/browser/ui/views/frame/logpose_spotlight_view.h
++++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.h
+@@ -5,6 +5,7 @@
+ #include <string_view>
+ 
+ #include "base/functional/callback.h"
++#include "base/memory/weak_ptr.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/views/controls/webview/webview.h"
+ 
+@@ -23,6 +24,8 @@
+ class Rect;
+ }  // namespace gfx
+ 
++class GURL;
++
+ class LogPoseSpotlightView : public views::WebView {
+   METADATA_HEADER(LogPoseSpotlightView, views::WebView)
+ 
+@@ -41,12 +44,16 @@
+   void CloseContents(content::WebContents* source) override;
+   void TitleWasSet(content::NavigationEntry* entry) override;
+   void RenderFrameCreated(content::RenderFrameHost* render_frame_host) override;
++  void DidFinishLoad(content::RenderFrameHost* render_frame_host,
++                     const GURL& validated_url) override;
+ 
+  private:
+   std::string page_;
+   std::string mode_;
+   base::RepeatingClosure on_hidden_;
+   int generation_ = 0;
++  int preload_retries_ = 0;
++  base::WeakPtrFactory<LogPoseSpotlightView> weak_factory_{this};
+ };
+ 
+ LogPoseSpotlightView* LogPoseOverlayFor(BrowserView* browser_view,
+@@ -59,6 +66,7 @@
+ 
+ bool LogPoseShowSpotlight(BrowserWindowInterface* browser, std::string_view mode);
+ 
++
+ bool LogPoseShowFind(BrowserWindowInterface* browser, int step);
+ 
+ void LogPoseShowNavigationHint(BrowserWindowInterface* browser, bool back);
+--- a/chrome/browser/ui/views/frame/logpose_spotlight_view.cc
++++ b/chrome/browser/ui/views/frame/logpose_spotlight_view.cc
+@@ -4,6 +4,9 @@
+ 
+ #include "base/strings/string_number_conversions.h"
+ #include "base/command_line.h"
++#include "base/functional/bind.h"
++#include "base/task/sequenced_task_runner.h"
++#include "base/time/time.h"
+ #include "base/strings/string_util.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/logpose/logpose_links.h"
+@@ -18,6 +21,7 @@
+ #include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/render_widget_host_view.h"
+ #include "content/public/browser/web_contents.h"
++#include "content/public/common/url_constants.h"
+ #include "third_party/skia/include/core/SkColor.h"
+ #include "ui/base/base_window.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+@@ -94,6 +98,38 @@
+   }
+ }
+ 
++// O pré-carregamento feito com a janela abrindo pega a extensão ainda não
++// pronta e cai numa página de erro; aí o primeiro Show() recarregava a página e
++// as teclas apertadas nesse meio-tempo se perdiam (o Spotlight aberto pela nova
++// aba comia letras). Escondida e com erro, a página tenta de novo.
++void LogPoseSpotlightView::DidFinishLoad(
++    content::RenderFrameHost* render_frame_host,
++    const GURL& validated_url) {
++  if (!render_frame_host->IsInPrimaryMainFrame() || GetVisible() ||
++      !validated_url.SchemeIs(content::kChromeErrorScheme) ||
++      preload_retries_ >= 20) {
++    return;
++  }
++  ++preload_retries_;
++  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<LogPoseSpotlightView> view) {
++            if (!view || view->GetVisible()) {
++              return;
++            }
++            content::NavigationController::LoadURLParams params(GURL(
++                std::string(
++                    "chrome-extension://hncljkmljckjojdjincglklbdihcaeko/") +
++                view->page() + "#idle-0"));
++            params.transition_type = ui::PAGE_TRANSITION_AUTO_TOPLEVEL;
++            params.should_replace_current_entry = true;
++            view->GetWebContents()->GetController().LoadURLWithParams(params);
++          },
++          weak_factory_.GetWeakPtr()),
++      base::Milliseconds(500));
++}
++
+ void LogPoseSpotlightView::TitleWasSet(content::NavigationEntry* entry) {
+   const std::u16string& title = GetWebContents()->GetTitle();
+   if (base::StartsWith(title, u"logpose-spotlight:close")) {

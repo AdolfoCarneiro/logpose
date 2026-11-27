@@ -60,8 +60,18 @@ async function search(text = "", submit = false) {
   opening = true;
   await call("executeCommand", tab.windowId, "openLocation").catch(() => {});
 }
-// o spotlight pegou o teclado (ou fechou e devolveu): o próximo texto começa do zero
-for (const ev of ["blur", "focus"]) window.addEventListener(ev, () => { typed = ""; opening = false; });
+// o spotlight fechou e devolveu o teclado: o próximo texto começa do zero. No blur não:
+// enquanto o spotlight abre, as teclas ainda caem aqui por um instante e o texto todo
+// tem que seguir junto (zerar no blur comia as letras do meio)
+// (um foco atrasado da própria página, antes de o spotlight pegar o teclado, não conta)
+let handedOff = false;
+window.addEventListener("blur", () => { if (opening) handedOff = true; });
+window.addEventListener("focus", () => {
+  if (!opening || !handedOff) return;
+  typed = "";
+  opening = false;
+  handedOff = false;
+});
 const keys = current(stored.shortcuts).find((s) => s.command === "openLocation")?.keys;
 $("keys").replaceChildren(...label(keys).map((k) => el("kbd", "", k)));
 // o campo de busca da página fica focado; o que for digitado nele vai pro spotlight
@@ -70,11 +80,17 @@ $("keys").replaceChildren(...label(keys).map((k) => el("kbd", "", k)));
 const searchInput = $("search-input");
 if (logposePrivate && tab?.active) await call("executeCommand", tab.windowId, "focusContents").catch(() => {});
 searchInput.focus();
-searchInput.addEventListener("input", () => {
+// o que foi digitado logo depois do Ctrl+T, antes de a página carregar, ficou guardado na
+// janela (com "\n" no fim se o Enter foi apertado); vem antes do que já chegou no campo
+const early = logposePrivate && tab?.active ? await call("takeTypedText", tab.windowId).catch(() => "") : "";
+const takeInput = () => {
   const text = searchInput.value;
   searchInput.value = "";
   if (text) search(text);
-});
+};
+if (early) search(early.replace(/\n$/, ""), early.endsWith("\n"));
+takeInput();
+searchInput.addEventListener("input", takeInput);
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") search("", true);
 });

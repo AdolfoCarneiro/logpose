@@ -25,9 +25,20 @@ let aliases = loadAliases(undefined);
 let alias = null;
 const suggestCache = new Map();
 let privateEngine = "";
-// o que a página inicial guardou enquanto a busca abria: o texto todo digitado até
-// agora (vale enquanto ninguém mexeu no campo daqui) e se o Enter já foi apertado
+// o que a página inicial mandou enquanto a busca abria e já está no começo do campo
+// (vale enquanto ninguém mexeu nesse começo); o resto do campo foi digitado aqui
 let seeded = null;
+// teclas que chegam enquanto o spotlight ainda abre (na primeira vez a página dele carrega
+// de novo): ficam guardadas e entram no campo quando ele recebe o foco
+let ready = false;
+let early = "";
+let earlyEnter = false;
+document.addEventListener("keydown", (e) => {
+  if (!ready && e.key === "Enter" && early) { e.preventDefault(); earlyEnter = true; return; }
+  if (ready || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.key.length !== 1) return;
+  e.preventDefault();
+  early += e.key;
+}, true);
 
 function faviconFor(url) {
   const src = new URL(chrome.runtime.getURL("/_favicon/"));
@@ -260,6 +271,7 @@ function showMode() {
 
 async function open() {
   if (location.hash.startsWith("#idle")) return;
+  ready = false;
   document.title = "Log Pose";
   document.body.classList.remove("closed");
   seeded = null;
@@ -282,7 +294,20 @@ async function open() {
   seeded = "";
   const { spotlightSeed } = await chrome.storage.session.get("spotlightSeed");
   query.focus();
-  if (!(spotlightSeed && empty && takeSeed(spotlightSeed))) query.select();
+  const took = spotlightSeed && empty && takeSeed(spotlightSeed);
+  ready = true;
+  if (early) {
+    // digitado antes de o campo ficar pronto: continua o texto (ou troca o endereço selecionado)
+    if (!took) query.value = "";
+    query.value += early;
+    early = "";
+    query.setSelectionRange(query.value.length, query.value.length);
+  } else if (!took) query.select();
+  if (earlyEnter) {
+    earlyEnter = false;
+    submit();
+    return;
+  }
   for (const el of [document.getElementById("card"), document.getElementById("scrim")]) {
     el.style.animation = "none";
     void el.offsetWidth;
@@ -294,9 +319,11 @@ async function open() {
 function takeSeed(seed) {
   chrome.storage.session.remove("spotlightSeed");
   const { text = "", submit: enter = false } = typeof seed === "string" ? { text: seed } : seed;
-  if (seeded === null || query.value !== seeded || !text.startsWith(seeded)) return false;
-  query.value = seeded = text;
-  query.setSelectionRange(text.length, text.length);
+  // o texto da página pode chegar depois de letras que já caíram aqui: entra antes delas
+  if (seeded === null || !query.value.startsWith(seeded) || !text.startsWith(seeded)) return false;
+  query.value = text + query.value.slice(seeded.length);
+  seeded = text;
+  query.setSelectionRange(query.value.length, query.value.length);
   if (enter) submit();
   else refresh();
   return true;
@@ -304,7 +331,8 @@ function takeSeed(seed) {
 
 chrome.storage.session.onChanged.addListener((changes) => {
   const seed = changes.spotlightSeed?.newValue;
-  if (seed && !document.body.classList.contains("closed") && blank(target?.url)) takeSeed(seed);
+  // parado (pré-carregado, sem aba) não pega: o open() lê a semente quando abrir
+  if (seed && target && seeded !== null && !document.body.classList.contains("closed") && blank(target.url)) takeSeed(seed);
 });
 
 query.addEventListener("input", () => {

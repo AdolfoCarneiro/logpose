@@ -70,3 +70,4 @@ logpose/ui/container-restore.patch
 logpose/ui/extension-popup-api.patch
 logpose/ui/last-tab-keeps-window.patch
 logpose/ui/discard-keeps-tab.patch
+logpose/ui/new-tab-typed-text.patch
