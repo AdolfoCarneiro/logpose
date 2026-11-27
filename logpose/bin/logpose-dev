@@ -5,10 +5,11 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cache="${LOGPOSE_SCCACHE_DIR:-$HOME/.cache/logpose/sccache}"
 mkdir -p "$cache"
 
-docker buildx build --load -t chromium-builder:trixie-slim \
+# rede da máquina: numa rede 172.17.x o DNS do roteador cai dentro da faixa do docker0
+docker buildx build --load --network host -t chromium-builder:trixie-slim \
     --build-arg "UID=$(id -u)" --build-arg "GID=$(id -g)" \
     -f "$root/docker/build.Dockerfile" "$root/docker"
-docker buildx build --load -t logpose-dev:trixie-slim \
+docker buildx build --load --network host -t logpose-dev:trixie-slim \
     -f "$root/logpose/docker/dev.Dockerfile" "$root/logpose/docker"
 
 tty_flags=(-i)
